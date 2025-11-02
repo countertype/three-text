@@ -1,0 +1,2124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>three-text interactive demo (UMD)</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: sans-serif;
+        background: #0a0a0a;
+        color: #f3f3f3;
+        overflow: hidden;
+      }
+
+      #container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      canvas {
+        display: block;
+        cursor: grab;
+      }
+
+      canvas:active {
+        cursor: grabbing;
+      }
+
+      #gui {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 20px;
+        min-width: 280px;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+      }
+
+      .control-group {
+        margin-bottom: 20px;
+      }
+
+      .control-group:last-child {
+        margin-bottom: 0;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #ccc;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: #333;
+        outline: none;
+        margin-bottom: 8px;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0066cc;
+        cursor: pointer;
+        border: 2px solid #fff;
+      }
+
+      input[type="range"]::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #0066cc;
+        cursor: pointer;
+        border: 2px solid #fff;
+      }
+
+      .value-display {
+        font-size: 12px;
+        color: #888;
+        text-align: right;
+      }
+
+      select,
+      textarea {
+        width: 100%;
+        padding: 8px;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 4px;
+        color: #fff;
+        font-size: 14px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 80px;
+      }
+
+      button {
+        width: 100%;
+        padding: 10px;
+        background: #0066cc;
+        border: none;
+        border-radius: 4px;
+        color: white;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      button:hover {
+        background: #0088ff;
+      }
+
+      button:active {
+        background: #004499;
+      }
+
+      #status {
+        position: fixed;
+        bottom: 50px;
+        left: 20px;
+        padding: 10px 15px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 4px;
+        font-size: 12px;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+      }
+
+      .status-loading {
+        color: #ffa500;
+      }
+      .status-ready {
+        color: #00ff00;
+      }
+      .status-error {
+        color: #ff4444;
+      }
+
+      #branding {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        padding: 8px 12px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 4px;
+        font-size: 11px;
+        z-index: 100;
+        backdrop-filter: blur(10px);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #888;
+        text-decoration: none;
+      }
+
+      #branding svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+
+      @media (max-width: 768px) {
+        #gui {
+          top: 10px;
+          right: 10px;
+          left: 10px;
+          min-width: auto;
+          padding: 15px;
+        }
+
+        #status {
+          bottom: 50px;
+          left: 10px;
+          right: 10px;
+          text-align: center;
+        }
+
+        #branding {
+          bottom: 10px;
+          left: 10px;
+          right: 10px;
+          justify-content: center;
+        }
+      }
+
+      @media (max-height: 600px) {
+        #gui {
+          max-height: calc(100vh - 40px);
+          overflow-y: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+
+    <div id="status" class="status-loading">Initializing...</div>
+
+    <a id="branding" href="https://github.com/countertype/three-text" target="_blank">
+      <span>three-text</span>
+      <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+    </a>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.19.1/dist/lil-gui.umd.min.js"></script>
+
+    <!-- Official Three.js OrbitControls inline for UMD compatibility -->
+    <script>
+      (function () {
+        // Unlike TrackballControls, it maintains the "up" direction object.up (+Y by default).
+        // Orbit - left mouse / touch: one-finger move
+        // Zoom - middle mouse, or mousewheel / touch: two-finger spread or squish
+        // Pan - right mouse, or left mouse + ctrl/meta/shiftKey, or arrow keys / touch: two-finger move
+
+        const _changeEvent = { type: "change" };
+        const _startEvent = { type: "start" };
+        const _endEvent = { type: "end" };
+
+        class OrbitControls extends THREE.EventDispatcher {
+          constructor(object, domElement) {
+            super();
+            if (domElement === undefined)
+              console.warn(
+                'THREE.OrbitControls: The second parameter "domElement" is now mandatory.'
+              );
+            if (domElement === document)
+              console.error(
+                'THREE.OrbitControls: "document" should not be used as the target "domElement". Please use "renderer.domElement" instead.'
+              );
+            this.object = object;
+            this.domElement = domElement;
+            this.domElement.style.touchAction = "none"; // disable touch scroll
+
+            // Set to false to disable this control
+            this.enabled = true;
+
+            // "target" sets the location of focus, where the object orbits around
+            this.target = new THREE.Vector3();
+
+            // How far you can dolly in and out ( PerspectiveCamera only )
+            this.minDistance = 0;
+            this.maxDistance = Infinity;
+
+            // How far you can zoom in and out ( OrthographicCamera only )
+            this.minZoom = 0;
+            this.maxZoom = Infinity;
+
+            // How far you can orbit vertically, upper and lower limits.
+            // Range is 0 to Math.PI radians.
+            this.minPolarAngle = 0; // radians
+            this.maxPolarAngle = Math.PI; // radians
+
+            // How far you can orbit horizontally, upper and lower limits.
+            // If set, the interval [ min, max ] must be a sub-interval of [ - 2 PI, 2 PI ], with ( max - min < 2 PI )
+            this.minAzimuthAngle = -Infinity; // radians
+            this.maxAzimuthAngle = Infinity; // radians
+
+            // Set to true to enable damping (inertia)
+            // If damping is enabled, you must call controls.update() in your animation loop
+            this.enableDamping = false;
+            this.dampingFactor = 0.05;
+
+            // This option actually enables dollying in and out; left as "zoom" for backwards compatibility.
+            // Set to false to disable zooming
+            this.enableZoom = true;
+            this.zoomSpeed = 1.0;
+
+            // Set to false to disable rotating
+            this.enableRotate = true;
+            this.rotateSpeed = 1.0;
+
+            // Set to false to disable panning
+            this.enablePan = true;
+            this.panSpeed = 1.0;
+            this.screenSpacePanning = true; // if false, pan orthogonal to world-space direction camera.up
+            this.keyPanSpeed = 7.0; // pixels moved per arrow key push
+
+            // Set to true to automatically rotate around the target
+            // If auto-rotate is enabled, you must call controls.update() in your animation loop
+            this.autoRotate = false;
+            this.autoRotateSpeed = 2.0; // 30 seconds per orbit when fps is 60
+
+            // The four arrow keys
+            this.keys = {
+              LEFT: "ArrowLeft",
+              UP: "ArrowUp",
+              RIGHT: "ArrowRight",
+              BOTTOM: "ArrowDown",
+            };
+
+            // Mouse buttons
+            this.mouseButtons = {
+              LEFT: THREE.MOUSE.ROTATE,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.PAN,
+            };
+
+            // Touch fingers
+            this.touches = {
+              ONE: THREE.TOUCH.ROTATE,
+              TWO: THREE.TOUCH.DOLLY_PAN,
+            };
+
+            // for reset
+            this.target0 = this.target.clone();
+            this.position0 = this.object.position.clone();
+            this.zoom0 = this.object.zoom;
+
+            // the target DOM element for key events
+            this._domElementKeyEvents = null;
+
+            // public methods
+            this.getPolarAngle = function () {
+              return spherical.phi;
+            };
+
+            this.getAzimuthalAngle = function () {
+              return spherical.theta;
+            };
+
+            this.getDistance = function () {
+              return this.object.position.distanceTo(this.target);
+            };
+
+            this.listenToKeyEvents = function (domElement) {
+              domElement.addEventListener("keydown", onKeyDown);
+              this._domElementKeyEvents = domElement;
+            };
+
+            this.saveState = function () {
+              scope.target0.copy(scope.target);
+              scope.position0.copy(scope.object.position);
+              scope.zoom0 = scope.object.zoom;
+            };
+
+            this.reset = function () {
+              scope.target.copy(scope.target0);
+              scope.object.position.copy(scope.position0);
+              scope.object.zoom = scope.zoom0;
+              scope.object.updateProjectionMatrix();
+              scope.dispatchEvent(_changeEvent);
+              scope.update();
+              state = STATE.NONE;
+            };
+
+            // this method is exposed, but perhaps it would be better if we can make it private...
+            this.update = (function () {
+              const offset = new THREE.Vector3();
+              // so camera.up is the orbit axis
+              const quat = new THREE.Quaternion().setFromUnitVectors(
+                object.up,
+                new THREE.Vector3(0, 1, 0)
+              );
+              const quatInverse = quat.clone().invert();
+              const lastPosition = new THREE.Vector3();
+              const lastQuaternion = new THREE.Quaternion();
+              const twoPI = 2 * Math.PI;
+
+              return function update() {
+                const position = scope.object.position;
+                offset.copy(position).sub(scope.target);
+                // rotate offset to "y-axis-is-up" space
+                offset.applyQuaternion(quat);
+                // angle from z-axis around y-axis
+                spherical.setFromVector3(offset);
+
+                if (scope.autoRotate && state === STATE.NONE) {
+                  rotateLeft(getAutoRotationAngle());
+                }
+
+                if (scope.enableDamping) {
+                  spherical.theta += sphericalDelta.theta * scope.dampingFactor;
+                  spherical.phi += sphericalDelta.phi * scope.dampingFactor;
+                } else {
+                  spherical.theta += sphericalDelta.theta;
+                  spherical.phi += sphericalDelta.phi;
+                }
+
+                // restrict theta to be between desired limits
+                let min = scope.minAzimuthAngle;
+                let max = scope.maxAzimuthAngle;
+                if (isFinite(min) && isFinite(max)) {
+                  if (min < -Math.PI) min += twoPI;
+                  else if (min > Math.PI) min -= twoPI;
+                  if (max < -Math.PI) max += twoPI;
+                  else if (max > Math.PI) max -= twoPI;
+                  if (min <= max) {
+                    spherical.theta = Math.max(
+                      min,
+                      Math.min(max, spherical.theta)
+                    );
+                  } else {
+                    spherical.theta =
+                      spherical.theta > (min + max) / 2
+                        ? Math.max(min, spherical.theta)
+                        : Math.min(max, spherical.theta);
+                  }
+                }
+
+                // restrict phi to be between desired limits
+                spherical.phi = Math.max(
+                  scope.minPolarAngle,
+                  Math.min(scope.maxPolarAngle, spherical.phi)
+                );
+                spherical.makeSafe();
+                spherical.radius *= scale;
+
+                // restrict radius to be between desired limits
+                spherical.radius = Math.max(
+                  scope.minDistance,
+                  Math.min(scope.maxDistance, spherical.radius)
+                );
+
+                // move target to panned location
+                if (scope.enableDamping === true) {
+                  scope.target.addScaledVector(panOffset, scope.dampingFactor);
+                } else {
+                  scope.target.add(panOffset);
+                }
+
+                offset.setFromSpherical(spherical);
+                // rotate offset back to "camera-up-vector-is-up" space
+                offset.applyQuaternion(quatInverse);
+                position.copy(scope.target).add(offset);
+                scope.object.lookAt(scope.target);
+
+                if (scope.enableDamping === true) {
+                  sphericalDelta.theta *= 1 - scope.dampingFactor;
+                  sphericalDelta.phi *= 1 - scope.dampingFactor;
+                  panOffset.multiplyScalar(1 - scope.dampingFactor);
+                } else {
+                  sphericalDelta.set(0, 0, 0);
+                  panOffset.set(0, 0, 0);
+                }
+
+                scale = 1;
+
+                // update condition is:
+                // min(camera displacement, camera rotation in radians)^2 > EPS
+                // using small-angle approximation cos(x/2) = 1 - x^2 / 8
+                if (
+                  zoomChanged ||
+                  lastPosition.distanceToSquared(scope.object.position) > EPS ||
+                  8 * (1 - lastQuaternion.dot(scope.object.quaternion)) > EPS
+                ) {
+                  scope.dispatchEvent(_changeEvent);
+                  lastPosition.copy(scope.object.position);
+                  lastQuaternion.copy(scope.object.quaternion);
+                  zoomChanged = false;
+                  return true;
+                }
+                return false;
+              };
+            })();
+
+            this.dispose = function () {
+              scope.domElement.removeEventListener(
+                "contextmenu",
+                onContextMenu
+              );
+              scope.domElement.removeEventListener(
+                "pointerdown",
+                onPointerDown
+              );
+              scope.domElement.removeEventListener(
+                "pointercancel",
+                onPointerCancel
+              );
+              scope.domElement.removeEventListener("wheel", onMouseWheel);
+              scope.domElement.removeEventListener(
+                "pointermove",
+                onPointerMove
+              );
+              scope.domElement.removeEventListener("pointerup", onPointerUp);
+              if (scope._domElementKeyEvents !== null) {
+                scope._domElementKeyEvents.removeEventListener(
+                  "keydown",
+                  onKeyDown
+                );
+              }
+            };
+
+            // internals
+            const scope = this;
+            const STATE = {
+              NONE: -1,
+              ROTATE: 0,
+              DOLLY: 1,
+              PAN: 2,
+              TOUCH_ROTATE: 3,
+              TOUCH_PAN: 4,
+              TOUCH_DOLLY_PAN: 5,
+              TOUCH_DOLLY_ROTATE: 6,
+            };
+            let state = STATE.NONE;
+            const EPS = 0.000001;
+
+            // current position in spherical coordinates
+            const spherical = new THREE.Spherical();
+            const sphericalDelta = new THREE.Spherical();
+            let scale = 1;
+            const panOffset = new THREE.Vector3();
+            let zoomChanged = false;
+
+            const rotateStart = new THREE.Vector2();
+            const rotateEnd = new THREE.Vector2();
+            const rotateDelta = new THREE.Vector2();
+            const panStart = new THREE.Vector2();
+            const panEnd = new THREE.Vector2();
+            const panDelta = new THREE.Vector2();
+            const dollyStart = new THREE.Vector2();
+            const dollyEnd = new THREE.Vector2();
+            const dollyDelta = new THREE.Vector2();
+            const pointers = [];
+            const pointerPositions = {};
+
+            function getAutoRotationAngle() {
+              return ((2 * Math.PI) / 60 / 60) * scope.autoRotateSpeed;
+            }
+
+            function getZoomScale() {
+              return Math.pow(0.95, scope.zoomSpeed);
+            }
+
+            function rotateLeft(angle) {
+              sphericalDelta.theta -= angle;
+            }
+
+            function rotateUp(angle) {
+              sphericalDelta.phi -= angle;
+            }
+
+            const panLeft = (function () {
+              const v = new THREE.Vector3();
+              return function panLeft(distance, objectMatrix) {
+                v.setFromMatrixColumn(objectMatrix, 0); // get X column of objectMatrix
+                v.multiplyScalar(-distance);
+                panOffset.add(v);
+              };
+            })();
+
+            const panUp = (function () {
+              const v = new THREE.Vector3();
+              return function panUp(distance, objectMatrix) {
+                if (scope.screenSpacePanning === true) {
+                  v.setFromMatrixColumn(objectMatrix, 1);
+                } else {
+                  v.setFromMatrixColumn(objectMatrix, 0);
+                  v.crossVectors(scope.object.up, v);
+                }
+                v.multiplyScalar(distance);
+                panOffset.add(v);
+              };
+            })();
+
+            // deltaX and deltaY are in pixels; right and down are positive
+            const pan = (function () {
+              const offset = new THREE.Vector3();
+              return function pan(deltaX, deltaY) {
+                const element = scope.domElement;
+                if (scope.object.isPerspectiveCamera) {
+                  // perspective
+                  const position = scope.object.position;
+                  offset.copy(position).sub(scope.target);
+                  let targetDistance = offset.length();
+                  // half of the fov is center to top of screen
+                  targetDistance *= Math.tan(
+                    ((scope.object.fov / 2) * Math.PI) / 180.0
+                  );
+                  // we use only clientHeight here so aspect ratio does not distort speed
+                  panLeft(
+                    (2 * deltaX * targetDistance) / element.clientHeight,
+                    scope.object.matrix
+                  );
+                  panUp(
+                    (2 * deltaY * targetDistance) / element.clientHeight,
+                    scope.object.matrix
+                  );
+                } else if (scope.object.isOrthographicCamera) {
+                  // orthographic
+                  panLeft(
+                    (deltaX * (scope.object.right - scope.object.left)) /
+                      scope.object.zoom /
+                      element.clientWidth,
+                    scope.object.matrix
+                  );
+                  panUp(
+                    (deltaY * (scope.object.top - scope.object.bottom)) /
+                      scope.object.zoom /
+                      element.clientHeight,
+                    scope.object.matrix
+                  );
+                } else {
+                  // camera neither orthographic nor perspective
+                  console.warn(
+                    "WARNING: OrbitControls.js encountered an unknown camera type - pan disabled."
+                  );
+                  scope.enablePan = false;
+                }
+              };
+            })();
+
+            function dollyOut(dollyScale) {
+              if (scope.object.isPerspectiveCamera) {
+                scale /= dollyScale;
+              } else if (scope.object.isOrthographicCamera) {
+                scope.object.zoom = Math.max(
+                  scope.minZoom,
+                  Math.min(scope.maxZoom, scope.object.zoom * dollyScale)
+                );
+                scope.object.updateProjectionMatrix();
+                zoomChanged = true;
+              } else {
+                console.warn(
+                  "WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled."
+                );
+                scope.enableZoom = false;
+              }
+            }
+
+            function dollyIn(dollyScale) {
+              if (scope.object.isPerspectiveCamera) {
+                scale *= dollyScale;
+              } else if (scope.object.isOrthographicCamera) {
+                scope.object.zoom = Math.max(
+                  scope.minZoom,
+                  Math.min(scope.maxZoom, scope.object.zoom / dollyScale)
+                );
+                scope.object.updateProjectionMatrix();
+                zoomChanged = true;
+              } else {
+                console.warn(
+                  "WARNING: OrbitControls.js encountered an unknown camera type - dolly/zoom disabled."
+                );
+                scope.enableZoom = false;
+              }
+            }
+
+            // event callbacks - update the object state
+            function handleMouseDownRotate(event) {
+              rotateStart.set(event.clientX, event.clientY);
+            }
+
+            function handleMouseDownDolly(event) {
+              dollyStart.set(event.clientX, event.clientY);
+            }
+
+            function handleMouseDownPan(event) {
+              panStart.set(event.clientX, event.clientY);
+            }
+
+            function handleMouseMoveRotate(event) {
+              rotateEnd.set(event.clientX, event.clientY);
+              rotateDelta
+                .subVectors(rotateEnd, rotateStart)
+                .multiplyScalar(scope.rotateSpeed);
+              const element = scope.domElement;
+              rotateLeft((2 * Math.PI * rotateDelta.x) / element.clientHeight); // yes, height
+              rotateUp((2 * Math.PI * rotateDelta.y) / element.clientHeight);
+              rotateStart.copy(rotateEnd);
+              scope.update();
+            }
+
+            function handleMouseMoveDolly(event) {
+              dollyEnd.set(event.clientX, event.clientY);
+              dollyDelta.subVectors(dollyEnd, dollyStart);
+              if (dollyDelta.y > 0) {
+                dollyOut(getZoomScale());
+              } else if (dollyDelta.y < 0) {
+                dollyIn(getZoomScale());
+              }
+              dollyStart.copy(dollyEnd);
+              scope.update();
+            }
+
+            function handleMouseMovePan(event) {
+              panEnd.set(event.clientX, event.clientY);
+              panDelta
+                .subVectors(panEnd, panStart)
+                .multiplyScalar(scope.panSpeed);
+              pan(panDelta.x, panDelta.y);
+              panStart.copy(panEnd);
+              scope.update();
+            }
+
+            function handleMouseUp() {
+              // no-op
+            }
+
+            function handleMouseWheel(event) {
+              if (event.deltaY < 0) {
+                dollyIn(getZoomScale());
+              } else if (event.deltaY > 0) {
+                dollyOut(getZoomScale());
+              }
+              scope.update();
+            }
+
+            function handleKeyDown(event) {
+              let needsUpdate = false;
+              switch (event.code) {
+                case scope.keys.UP:
+                  pan(0, scope.keyPanSpeed);
+                  needsUpdate = true;
+                  break;
+                case scope.keys.BOTTOM:
+                  pan(0, -scope.keyPanSpeed);
+                  needsUpdate = true;
+                  break;
+                case scope.keys.LEFT:
+                  pan(scope.keyPanSpeed, 0);
+                  needsUpdate = true;
+                  break;
+                case scope.keys.RIGHT:
+                  pan(-scope.keyPanSpeed, 0);
+                  needsUpdate = true;
+                  break;
+              }
+              if (needsUpdate) {
+                // prevent the browser from scrolling on cursor keys
+                event.preventDefault();
+                scope.update();
+              }
+            }
+
+            // Simplified event handlers for UMD
+            function onPointerDown(event) {
+              if (scope.enabled === false) return;
+
+              switch (event.button) {
+                case 0: // left mouse
+                  if (scope.enableRotate === false) return;
+                  handleMouseDownRotate(event);
+                  state = STATE.ROTATE;
+                  break;
+                case 1: // middle mouse
+                  if (scope.enableZoom === false) return;
+                  handleMouseDownDolly(event);
+                  state = STATE.DOLLY;
+                  break;
+                case 2: // right mouse
+                  if (scope.enablePan === false) return;
+                  handleMouseDownPan(event);
+                  state = STATE.PAN;
+                  break;
+              }
+
+              if (state !== STATE.NONE) {
+                scope.domElement.addEventListener("pointermove", onPointerMove);
+                scope.domElement.addEventListener("pointerup", onPointerUp);
+                scope.dispatchEvent(_startEvent);
+              }
+            }
+
+            function onPointerMove(event) {
+              if (scope.enabled === false) return;
+
+              switch (state) {
+                case STATE.ROTATE:
+                  if (scope.enableRotate === false) return;
+                  handleMouseMoveRotate(event);
+                  break;
+                case STATE.DOLLY:
+                  if (scope.enableZoom === false) return;
+                  handleMouseMoveDolly(event);
+                  break;
+                case STATE.PAN:
+                  if (scope.enablePan === false) return;
+                  handleMouseMovePan(event);
+                  break;
+              }
+            }
+
+            function onPointerUp(event) {
+              handleMouseUp(event);
+              scope.domElement.removeEventListener(
+                "pointermove",
+                onPointerMove
+              );
+              scope.domElement.removeEventListener("pointerup", onPointerUp);
+              scope.dispatchEvent(_endEvent);
+              state = STATE.NONE;
+            }
+
+            function onPointerCancel(event) {
+              scope.domElement.removeEventListener(
+                "pointermove",
+                onPointerMove
+              );
+              scope.domElement.removeEventListener("pointerup", onPointerUp);
+              state = STATE.NONE;
+            }
+
+            function onMouseWheel(event) {
+              if (
+                scope.enabled === false ||
+                scope.enableZoom === false ||
+                (state !== STATE.NONE && state !== STATE.ROTATE)
+              )
+                return;
+              event.preventDefault();
+              scope.dispatchEvent(_startEvent);
+              handleMouseWheel(event);
+              scope.dispatchEvent(_endEvent);
+            }
+
+            function onKeyDown(event) {
+              if (scope.enabled === false || scope.enablePan === false) return;
+              handleKeyDown(event);
+            }
+
+            function onContextMenu(event) {
+              if (scope.enabled === false) return;
+              event.preventDefault();
+            }
+
+            scope.domElement.addEventListener("contextmenu", onContextMenu);
+            scope.domElement.addEventListener("pointerdown", onPointerDown);
+            scope.domElement.addEventListener("pointercancel", onPointerCancel);
+            scope.domElement.addEventListener("wheel", onMouseWheel, {
+              passive: false,
+            });
+
+            // force an update at start
+            this.update();
+          }
+        }
+
+        THREE.OrbitControls = OrbitControls;
+      })();
+    </script>
+
+    <script src="../dist/index.umd.js"></script>
+    <script src="../dist/patterns/en-us.umd.js"></script>
+
+    <script>
+      
+      function updateStatus(message, type = "loading") {
+        const status = document.getElementById("status");
+        status.textContent = message;
+        status.className = `status-${type}`;
+      }
+    </script>
+
+
+    <script>
+      if (!window.THREE) throw new Error('THREE.js not loaded');
+      if (!window.THREE.OrbitControls && !window.OrbitControls) throw new Error('OrbitControls not loaded');
+      if (!window.ThreeText) throw new Error('three-text not loaded');
+
+      // Use global variables from UMD scripts
+      const THREE = window.THREE;
+      const OrbitControls = window.THREE.OrbitControls || window.OrbitControls;
+      const Text = window.ThreeText.Text;
+
+      // Configure once
+      Text.setHarfBuzzPath("/examples/hb/hb.wasm");
+
+      let scene,
+        camera,
+        renderer,
+        controls,
+        textMesh;
+      let isRendering = false;
+      let time = 0;
+        let gui;
+        let textFolder;
+        let customFontBuffer = null;
+        let currentFontName = 'NimbusSanL-Reg.woff';
+        let variableFontControllers = [];
+        let currentShaderMode = 'wave';
+        let shaderFolders = {};
+
+      const params = {
+        text: "three-text renders and formats text from TTF, OTF, and WOFF font files in Three.js. It uses TeX-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess2 (based on the GLU tessellator by Eric Veach) for removing overlaps and triangulation, bezier curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, Visvalingam-Whyatt line simplification, and Three.js as a platform for 3D rendering on the web",
+        lineWidth: 1400,
+        fontSize: 72,
+        lineHeight: 1.33,
+        letterSpacing: 0,
+        direction: "ltr",
+        depth: 7,
+        alignment: "justify",
+        optimizationEnabled: true,
+        areaThreshold: 1.0,
+        colinearThreshold: 0.0087,
+        minSegmentLength: 0.25,
+        removeOverlaps: null,
+        waveSpeed: 1.0,
+        waveHeight: 10,
+        waveFrequency: 0.01,
+
+        shaderMode: 'wave',
+
+        flipSpeed: 0.3,
+        flipPauseDuration: 0.3,
+
+        explodeSpeed: 0.4,
+        explodeDistance: 1800,
+
+        orbitRadius: 30,
+        orbitSpeed: 0.5,
+
+        twisterSpeed: 0.5,
+        twisterHeight: 150,
+        twisterRadius: 300,
+
+        hyphenate: true,
+        language: "en-us",
+        lefthyphenmin: 2,
+        righthyphenmin: 4,
+        hyphenpenalty: 50,
+        exhyphenpenalty: 50,
+        doublehyphendemerits: 10000,
+        tolerance: 200,
+        pretolerance: 100,
+        emergencyStretch: 0,
+        looseness: 0,
+        linepenalty: 10,
+        adjdemerits: 10000,
+        respectExistingBreaks: true,
+        disableSingleWordDetection: false,
+        distanceTolerance: 0.5,
+        angleTolerance: 0.25,
+      };
+
+      const waveVertexShader = `
+            uniform float time;
+            uniform float waveHeight;
+            uniform float waveFrequency;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            varying float vIsBackFace;
+
+            void main() {
+                vec3 pos = position;
+                
+                float wave = sin(position.x * waveFrequency + time) * 
+                            sin(position.y * waveFrequency + time);
+                
+                pos.x += wave * waveHeight * 0.25;
+                pos.y += wave * waveHeight * 0.25;
+                pos.z += wave * waveHeight;
+                
+                vec3 newNormal = normal;
+                float waveGradientX = cos(position.x * waveFrequency + time) * waveFrequency * waveHeight * 0.25;
+                float waveGradientY = cos(position.y * waveFrequency + time) * waveFrequency * waveHeight * 0.25;
+                newNormal.x -= waveGradientX;
+                newNormal.y -= waveGradientY;
+                newNormal = normalize(newNormal);
+                
+                vec4 worldNormal = modelMatrix * vec4(newNormal, 0.0);
+                vec4 worldPosition = modelMatrix * vec4(pos, 1.0);
+                vec3 viewDirection = normalize(cameraPosition - worldPosition.xyz);
+                float facing = dot(worldNormal.xyz, viewDirection);
+                
+                if (facing < 0.0) {
+                    newNormal = -newNormal;
+                    vIsBackFace = 1.0;
+                } else {
+                    vIsBackFace = 0.0;
+                }
+                
+                vColor = color;
+                vNormal = normalize(normalMatrix * newNormal);
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+      const waveFragmentShader = `
+            uniform float opacity;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            varying float vIsBackFace;
+            
+            void main() {
+                vec3 lightDirection = normalize(vec3(1.0, 1.0, 1.0));
+                vec3 normal = normalize(vNormal);
+                
+                float diffuse = max(dot(normal, lightDirection), 0.0);
+                float ambient = 0.3;
+                float lightIntensity = ambient + diffuse * 0.7;
+                vec3 baseColor = vColor;
+                
+                vec3 finalColor = baseColor * lightIntensity;
+                
+                gl_FragColor = vec4(finalColor, opacity);
+            }
+        `;
+
+      const flipVertexShader = `
+            uniform float time;
+            uniform float flipSpeed;
+            uniform float flipPauseDuration;
+            uniform float minDiagonal;
+            uniform float maxDiagonal;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            attribute vec3 glyphCenter;
+            attribute float glyphIndex;
+            attribute float glyphLineIndex;
+
+            mat4 rotationY(float angle) {
+                float s = sin(angle);
+                float c = cos(angle);
+                return mat4(
+                    c, 0.0, s, 0.0,
+                    0.0, 1.0, 0.0, 0.0,
+                    -s, 0.0, c, 0.0,
+                    0.0, 0.0, 0.0, 1.0
+                );
+            }
+
+            float easeInOutCubic(float t) {
+                return t < 0.5 ? 4.0 * t * t * t : 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0;
+            }
+
+            void main() {
+                vColor = color;
+                
+                float diagonalValue = glyphCenter.x + glyphCenter.y;
+                float normalizedDiagonal = (diagonalValue - minDiagonal) / (maxDiagonal - minDiagonal);
+                
+                float waveDuration = 0.7;
+                float phaseOffset = normalizedDiagonal * waveDuration;
+                
+                float cycleTime = time * flipSpeed;
+                float flipDuration = 1.5;
+                float totalCycle = flipDuration + flipPauseDuration + flipDuration + flipPauseDuration;
+                float t = mod(cycleTime, totalCycle);
+                
+                float angle = 0.0;
+                
+                if (t < flipDuration) {
+                    float progress = t - phaseOffset;
+                    if (progress >= 0.0 && progress <= flipDuration) {
+                        float normalizedT = clamp(progress / (flipDuration - waveDuration), 0.0, 1.0);
+                        angle = easeInOutCubic(normalizedT) * 3.14159;
+                    } else if (progress > flipDuration) {
+                        angle = 3.14159;
+                    }
+                }
+                else if (t < flipDuration + flipPauseDuration) {
+                    angle = 3.14159;
+                }
+                else if (t < flipDuration * 2.0 + flipPauseDuration) {
+                    float backStart = flipDuration + flipPauseDuration;
+                    float reversePhase = (1.0 - normalizedDiagonal) * waveDuration;
+                    float progress = (t - backStart) - reversePhase;
+                    if (progress >= 0.0 && progress <= flipDuration) {
+                        float normalizedT = clamp(progress / (flipDuration - waveDuration), 0.0, 1.0);
+                        angle = (1.0 - easeInOutCubic(normalizedT)) * 3.14159;
+                    } else if (progress < 0.0) {
+                        angle = 3.14159;
+                    }
+                }
+                
+                vec3 localPos = position - glyphCenter;
+                vec3 rotatedPos = (rotationY(angle) * vec4(localPos, 1.0)).xyz;
+                vec3 finalPos = rotatedPos + glyphCenter;
+                
+                vec3 newNormal = (rotationY(angle) * vec4(normal, 0.0)).xyz;
+                vNormal = normalize(normalMatrix * newNormal);
+                
+                vec4 mvPosition = modelViewMatrix * vec4(finalPos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+      const explodeVertexShader = `
+            uniform float time;
+            uniform float explodeSpeed;
+            uniform float explodeDistance;
+            uniform vec3 paragraphCenter;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            attribute vec3 glyphCenter;
+            attribute float glyphIndex;
+
+            float hash(vec3 p) {
+                return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+            }
+            
+            vec3 hash3(vec3 p) {
+                return vec3(
+                    hash(p),
+                    hash(p + vec3(1.0)),
+                    hash(p + vec3(2.0))
+                );
+            }
+
+            float easeOutElastic(float t) {
+                float c4 = (2.0 * 3.14159) / 3.0;
+                return t == 0.0 ? 0.0 : t == 1.0 ? 1.0 : 
+                       pow(2.0, -10.0 * t) * sin((t * 10.0 - 0.75) * c4) + 1.0;
+            }
+            
+            mat4 rotationMatrix(vec3 axis, float angle) {
+                axis = normalize(axis);
+                float s = sin(angle);
+                float c = cos(angle);
+                float oc = 1.0 - c;
+                
+                return mat4(
+                    oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+                    oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+                    oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+                    0.0,                                0.0,                                0.0,                                1.0
+                );
+            }
+
+            void main() {
+                vColor = color;
+                
+                float distFromCenter = length(glyphCenter - paragraphCenter);
+                
+                vec3 glyphSeed = glyphCenter * 0.01;
+                vec3 vertexSeed = position * 0.01;
+                vec3 chaos = hash3(glyphSeed) - 0.5;
+                
+                vec3 radialDir = normalize(glyphCenter - paragraphCenter);
+                vec3 chaoticDir = normalize(radialDir + chaos * 2.5);
+                
+                float cycleTime = time * explodeSpeed;
+                float cycleDuration = 8.0;
+                float t = mod(cycleTime, cycleDuration);
+                
+                float shockwaveDelay = distFromCenter * 0.0008;
+                float phaseT = t - shockwaveDelay;
+                
+                float offset = 0.0;
+                float tumbleAngle = 0.0;
+                float scatter = 0.0;
+                
+                if (phaseT < 2.4 && phaseT >= 0.0) {
+                    float outT = phaseT / 2.4;
+                    float curve = outT * outT * (3.0 - 2.0 * outT);
+                    offset = explodeDistance * 4.8 * curve;
+                    tumbleAngle = 40.0 * (hash(glyphSeed) - 0.5) * curve;
+                    scatter = 200.0 * curve;
+                }
+                else if (phaseT >= 2.4 && phaseT < 3.2) {
+                    offset = explodeDistance * 4.8;
+                    tumbleAngle = 40.0 * (hash(glyphSeed) - 0.5);
+                    scatter = 200.0;
+                }
+                else if (phaseT >= 3.2 && phaseT < 5.8) {
+                    float returnT = (phaseT - 3.2) / 2.6;
+                    float curve = returnT * returnT * (3.0 - 2.0 * returnT);
+                    offset = explodeDistance * 4.8 * (1.0 - curve);
+                    tumbleAngle = 40.0 * (hash(glyphSeed) - 0.5) * (1.0 - curve);
+                    scatter = 200.0 * (1.0 - curve);
+                }
+                
+                vec3 pos = position;
+                
+                vec3 tumbleAxis = normalize(chaos);
+                mat4 rotation = rotationMatrix(tumbleAxis, tumbleAngle);
+                vec3 localPos = pos - glyphCenter;
+                pos = (rotation * vec4(localPos, 1.0)).xyz + glyphCenter;
+                
+                vec3 vertexChaos = (hash3(vertexSeed) - 0.5) * scatter;
+                pos += vertexChaos;
+                pos += chaoticDir * offset;
+                
+                vec3 rotatedNormal = (rotation * vec4(normal, 0.0)).xyz;
+                vNormal = normalize(normalMatrix * rotatedNormal);
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+      const orbitVertexShader = `
+            uniform float time;
+            uniform float orbitRadius;
+            uniform float orbitSpeed;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            attribute vec3 glyphCenter;
+            attribute float glyphIndex;
+
+            void main() {
+                vColor = color;
+                vNormal = normalize(normalMatrix * normal);
+                
+                float phase = glyphIndex * 0.3;
+                float angle = time * orbitSpeed + phase;
+                
+                vec2 circularOffset = vec2(cos(angle), sin(angle)) * orbitRadius;
+                float zOffset = sin(angle * 1.5) * orbitRadius * 1.5;
+                
+                vec3 pos = position + vec3(circularOffset.x, circularOffset.y, zOffset);
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+      const twisterVertexShader = `
+            uniform float time;
+            uniform float twisterSpeed;
+            uniform float twisterHeight;
+            uniform float twisterRadius;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+            attribute vec3 glyphCenter;
+            attribute float glyphIndex;
+            attribute float glyphLineIndex;
+
+            float hash(vec3 p) {
+                return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453);
+            }
+
+            mat4 rotationMatrix(vec3 axis, float angle) {
+                axis = normalize(axis);
+                float s = sin(angle);
+                float c = cos(angle);
+                float oc = 1.0 - c;
+                
+                return mat4(
+                    oc * axis.x * axis.x + c,           oc * axis.x * axis.y - axis.z * s,  oc * axis.z * axis.x + axis.y * s,  0.0,
+                    oc * axis.x * axis.y + axis.z * s,  oc * axis.y * axis.y + c,           oc * axis.y * axis.z - axis.x * s,  0.0,
+                    oc * axis.z * axis.x - axis.y * s,  oc * axis.y * axis.z + axis.x * s,  oc * axis.z * axis.z + c,           0.0,
+                    0.0,                                0.0,                                0.0,                                1.0
+                );
+            }
+
+            void main() {
+                vColor = color;
+                
+                vec3 glyphSeed = glyphCenter * 0.01;
+                float distanceFromCenter = length(glyphCenter.xz);
+                float verticalPos = glyphCenter.y;
+                
+                float vortexPull = exp(-distanceFromCenter * 0.001);
+                
+                float glyphPhaseOffset = hash(glyphSeed) * 0.5;
+                
+                float t = time * twisterSpeed;
+                
+                float vortexAngle = t + verticalPos * 0.004 + vortexPull * 6.0 + glyphPhaseOffset;
+                
+                float breathe = sin(t * 0.3 + glyphPhaseOffset) * 0.2 + 1.0;
+                float spiralRadius = twisterRadius * vortexPull * breathe;
+                
+                vec2 spiralOffset = vec2(
+                    cos(vortexAngle) * spiralRadius,
+                    sin(vortexAngle) * spiralRadius
+                );
+                
+                float uplift = sin(vortexAngle + glyphPhaseOffset) * twisterHeight * vortexPull;
+                
+                vec3 pos = position;
+                
+                vec3 windAxis = normalize(vec3(
+                    hash(glyphSeed) - 0.5,
+                    0.8,
+                    hash(glyphSeed + vec3(1.0)) - 0.5
+                ));
+                float tumble = vortexAngle * 0.2 * vortexPull;
+                
+                vec3 localPos = pos - glyphCenter;
+                pos = (rotationMatrix(windAxis, tumble) * vec4(localPos, 1.0)).xyz + glyphCenter;
+                
+                pos += vec3(spiralOffset.x, uplift, spiralOffset.y);
+                
+                vec3 rotatedNormal = (rotationMatrix(windAxis, tumble) * vec4(normal, 0.0)).xyz;
+                vNormal = normalize(normalMatrix * rotatedNormal);
+                
+                vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+      const offVertexShader = `
+            varying vec3 vColor;
+            varying vec3 vNormal;
+
+            void main() {
+                vColor = color;
+                vNormal = normalize(normalMatrix * normal);
+
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `;
+
+      const standardFragmentShader = `
+            uniform float opacity;
+            varying vec3 vColor;
+            varying vec3 vNormal;
+
+            void main() {
+                vec3 lightDirection = normalize(vec3(1.0, 1.0, 1.0));
+                vec3 normal = normalize(vNormal);
+
+                float diffuse = max(dot(normal, lightDirection), 0.0);
+                float ambient = 0.3;
+                float lightIntensity = ambient + diffuse * 0.7;
+                vec3 baseColor = vColor;
+
+                vec3 finalColor = baseColor * lightIntensity;
+
+                gl_FragColor = vec4(finalColor, opacity);
+            }
+        `;
+
+      function initScene() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111);
+
+        camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          100,
+          50000
+        );
+        camera.position.set(-20, 20, 3000);
+
+        renderer = new THREE.WebGLRenderer({
+          antialias: true,
+          precision: "highp",
+          powerPreference: "high-performance",
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+        document.getElementById("container").appendChild(renderer.domElement);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.screenSpacePanning = false;
+        controls.minDistance = 1000;
+        controls.maxDistance = 8000;
+        controls.maxPolarAngle = Math.PI / 1.2;
+        controls.target.set(0, 0, 0);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        window.addEventListener("resize", onWindowResize, false);
+
+        animate();
+      }
+
+      function initGUI() {
+        gui = new lil.GUI();
+        gui.title("Text settings");
+        
+        // Add font upload section
+        addFontUploadGUI();
+
+        let renderTimeout;
+        const debouncedRender = () => {
+          clearTimeout(renderTimeout);
+          renderTimeout = setTimeout(renderText, 300);
+        };
+
+        textFolder = gui.addFolder("Text");
+        textFolder
+          .add(params, "text")
+          .name("Content")
+          .onChange(debouncedRender);
+        textFolder
+          .add(params, "fontSize", 30, 150, 5)
+          .name("Font size")
+          .onChange(debouncedRender);
+        textFolder
+          .add(params, "letterSpacing", -0.1, 0.2, 0.01)
+          .name("Letter spacing")
+          .onChange(debouncedRender);
+        textFolder
+          .add(params, "direction", ["ltr", "rtl"])
+          .name("Direction")
+          .onChange(debouncedRender);
+        textFolder
+          .add(params, "depth", 0, 50, 1)
+          .name("Depth")
+          .onChange(debouncedRender);
+
+        const animationFolder = gui.addFolder("Animation");
+        animationFolder
+          .add(params, "shaderMode", ["off", "wave", "flip", "explode", "orbit", "twister"])
+          .name("Animation mode")
+          .onChange((mode) => {
+            currentShaderMode = mode;
+            switchShaderMode(mode);
+          });
+
+        shaderFolders.wave = animationFolder.addFolder("Wave controls");
+        shaderFolders.wave
+          .add(params, "waveHeight", 0, 50, 1)
+          .name("Wave height");
+        shaderFolders.wave
+          .add(params, "waveFrequency", 0.001, 0.1, 0.001)
+          .name("Wave frequency");
+
+        shaderFolders.flip = animationFolder.addFolder("Flip controls");
+        shaderFolders.flip
+          .add(params, "flipSpeed", 0.1, 3.0, 0.1)
+          .name("Flip speed");
+        shaderFolders.flip
+          .add(params, "flipPauseDuration", 0, 2.0, 0.1)
+          .name("Pause duration");
+
+        shaderFolders.explode = animationFolder.addFolder("Explode controls");
+        shaderFolders.explode
+          .add(params, "explodeSpeed", 0.1, 3.0, 0.1)
+          .name("Explode speed");
+        shaderFolders.explode
+          .add(params, "explodeDistance", 100, 2000, 50)
+          .name("Explode distance");
+
+        shaderFolders.orbit = animationFolder.addFolder("Orbit controls");
+        shaderFolders.orbit
+          .add(params, "orbitRadius", 5, 100, 5)
+          .name("Orbit radius");
+        shaderFolders.orbit
+          .add(params, "orbitSpeed", 0.1, 5.0, 0.1)
+          .name("Orbit speed");
+
+        shaderFolders.twister = animationFolder.addFolder("Twister controls");
+        shaderFolders.twister
+          .add(params, "twisterSpeed", 0.1, 3.0, 0.1)
+          .name("Twister speed");
+        shaderFolders.twister
+          .add(params, "twisterHeight", 0, 300, 10)
+          .name("Twister height");
+        shaderFolders.twister
+          .add(params, "twisterRadius", 50, 500, 10)
+          .name("Twister radius");
+
+        updateShaderFolderVisibility('wave');
+
+        const lineBreakingFolder = gui.addFolder("Line breaking");
+        lineBreakingFolder
+          .add(params, "lineWidth", 500, 3000, 10)
+          .name("Line width")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "lineHeight", 0.8, 2.0, 0.05)
+          .name("Line height")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "alignment", ["left", "center", "right", "justify"])
+          .name("Alignment")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "respectExistingBreaks")
+          .name("Respect existing breaks")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "disableSingleWordDetection")
+          .name("Disable single-word detection")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "tolerance", 10, 10000, 100)
+          .name("Tolerance")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "pretolerance", 10, 1000, 50)
+          .name("Pretolerance")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "emergencyStretch", 0, 1000, 50)
+          .name("Emergency stretch")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "looseness", -3, 3, 1)
+          .name("Looseness")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "linepenalty", 0, 100, 1)
+          .name("Line penalty")
+          .onChange(debouncedRender);
+        lineBreakingFolder
+          .add(params, "adjdemerits", 0, 20000, 500)
+          .name("Adjacent demerits")
+          .onChange(debouncedRender);
+
+        const hyphenationFolder = gui.addFolder("Hyphenation");
+        hyphenationFolder
+          .add(params, "hyphenate")
+          .name("Enable hyphenation")
+          .onChange(debouncedRender);
+        hyphenationFolder
+          .add(params, "language", [
+            "en-us", "en-gb", "de-1996", "fr", "es", "it", "pt", "nl", "da", "sv",
+            "nb", "nn", "fi", "is", "pl", "cs", "sk", "sl", "hr", "sr-cyrl",
+            "sh-cyrl", "sh-latn", "ru", "uk", "be", "bg", "mk", "el-monoton",
+            "el-polyton", "hy", "ka", "tr", "tk", "sq", "et", "lv", "lt", "ro",
+            "hu", "ca", "oc", "gl", "eu", "cy", "ga", "eo", "ia", "la", "af",
+            "id", "hi", "bn", "as", "gu", "pa", "or", "ml", "kn", "ta", "te",
+            "mr", "sa", "th", "kmr", "hsb", "fur", "rm", "pms", "zh-latn-pinyin",
+            "mn-cyrl", "mul-ethi"
+          ])
+          .name("Language")
+          .onChange(debouncedRender);
+        hyphenationFolder
+          .add(params, "lefthyphenmin", 1, 5, 1)
+          .name("Left hyphen min")
+          .onChange(debouncedRender);
+        hyphenationFolder
+          .add(params, "righthyphenmin", 1, 5, 1)
+          .name("Right hyphen min")
+          .onChange(debouncedRender);
+        hyphenationFolder
+          .add(params, "hyphenpenalty", 0, 500, 10)
+          .name("Hyphen penalty")
+          .onChange(debouncedRender);
+        hyphenationFolder
+          .add(params, "exhyphenpenalty", 0, 500, 10)
+          .name("Explicit hyphen penalty")
+          .onChange(debouncedRender);
+        hyphenationFolder
+          .add(params, "doublehyphendemerits", 0, 20000, 500)
+          .name("Double hyphen demerits")
+          .onChange(debouncedRender);
+
+        const flatteningFolder = gui.addFolder("Curve fidelity");
+        flatteningFolder
+          .add(params, "distanceTolerance", 0.1, 10, 0.1)
+          .name("Distance tolerance")
+          .onChange(debouncedRender);
+        flatteningFolder
+          .add(params, "angleTolerance", 0.1, 10, 0.05)
+          .name("Angle tolerance")
+          .onChange(debouncedRender);
+
+        const optimizationFolder = gui.addFolder("Geometry optimization");
+        optimizationFolder
+          .add(params, "optimizationEnabled")
+          .name("Enable V-W optimization")
+          .onChange(debouncedRender);
+        optimizationFolder
+          .add(params, "areaThreshold", 0.1, 15.0, 0.1)
+          .name("V-W area threshold (font units²)")
+          .onChange(debouncedRender);
+        optimizationFolder
+          .add(params, "colinearThreshold", 0.001, 0.02, 0.0001)
+          .name("Colinear threshold (rad)")
+          .onChange(debouncedRender);
+        optimizationFolder
+          .add(params, "minSegmentLength", 0.1, 2.0, 0.05)
+          .name("Min segment length")
+          .onChange(debouncedRender);
+        optimizationFolder
+          .add(params, "removeOverlaps", { "Auto (VF=on, Static=off)": null, "Force On": true, "Force Off": false })
+          .name("Overlap removal")
+          .onChange(debouncedRender);
+      }
+
+      function updateShaderFolderVisibility(mode) {
+        Object.keys(shaderFolders).forEach(key => {
+          if (shaderFolders[key]) {
+            if (key === mode) {
+              shaderFolders[key].show();
+            } else {
+              shaderFolders[key].hide();
+            }
+          }
+        });
+      }
+
+      function switchShaderMode(mode) {
+        if (!textMesh) return;
+
+        updateShaderFolderVisibility(mode);
+
+        const needsAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(mode);
+        const hasAttributes = textMesh.geometry.attributes.glyphCenter !== undefined;
+
+        if (needsAttributes && !hasAttributes) {
+          renderText();
+          return;
+        }
+
+        if (!needsAttributes && hasAttributes) {
+          renderText();
+          return;
+        }
+
+        let minDiagonal = 0;
+        let maxDiagonal = 1;
+        
+        if (hasAttributes) {
+          const glyphCenterAttr = textMesh.geometry.attributes.glyphCenter;
+          minDiagonal = Infinity;
+          maxDiagonal = -Infinity;
+          
+          for (let i = 0; i < glyphCenterAttr.count; i++) {
+            const x = glyphCenterAttr.getX(i);
+            const y = glyphCenterAttr.getY(i);
+            const diagonal = x + y;
+            minDiagonal = Math.min(minDiagonal, diagonal);
+            maxDiagonal = Math.max(maxDiagonal, diagonal);
+          }
+        }
+
+        const paragraphCenter = new THREE.Vector3(0, 0, 0);
+
+        if (textMesh.material) {
+          textMesh.material.dispose();
+        }
+
+        textMesh.material = createMaterialForMode(mode, paragraphCenter, minDiagonal, maxDiagonal);
+      }
+      
+      function addFontUploadGUI() {
+        const fontFolder = gui.addFolder('Font');
+        
+        // Current font display
+        window.fontDisplay = { currentFont: currentFontName };
+        window.fontController = fontFolder.add(window.fontDisplay, 'currentFont').name('Current').disable();
+        
+        // Upload button
+        const uploadAction = { 
+          uploadFont: function() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.ttf,.otf,.woff';
+            input.onchange = handleFontUpload;
+            input.click();
+          }
+        };
+        fontFolder.add(uploadAction, 'uploadFont').name('Add custom font');
+        
+        // Privacy disclaimer
+        const privacyDisplay = { privacy: 'Files stay local' };
+        fontFolder.add(privacyDisplay, 'privacy').name('Privacy').disable();
+        
+        // Create drag overlay
+        createDragOverlay();
+      }
+      
+      function createDragOverlay() {
+        const overlay = document.createElement('div');
+        overlay.id = 'font-drag-overlay';
+        overlay.innerHTML = `
+          <div class="drag-border"></div>
+          <div class="drag-content">
+            <h2>Drop Font File Here</h2>
+            <p>TTF, OTF, or WOFF supported. No files uploaded, all are local in your browser</p>
+            <p class="current">Current: <span>${currentFontName}</span></p>
+          </div>
+        `;
+        
+        const style = document.createElement('style');
+        style.textContent = `
+          #font-drag-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+          }
+          
+          .drag-border {
+            position: absolute;
+            top: 24px;
+            left: 24px;
+            right: 24px;
+            bottom: 24px;
+            border: 4px dashed #0066cc;
+            border-radius: 8px;
+            pointer-events: none;
+          }
+          
+          .drag-content {
+            text-align: center;
+            color: white;
+            padding: 40px;
+            position: relative;
+            z-index: 1;
+          }
+          
+          .drag-content h2 {
+            margin: 0 0 16px 0;
+            font-size: 48px;
+            color: #0066cc;
+            font-weight: 600;
+          }
+          
+          .drag-content p {
+            margin: 0 0 8px 0;
+            font-size: 24px;
+            color: #ccc;
+          }
+          
+          .drag-content p:last-child {
+            margin: 0;
+            font-size: 18px;
+            color: #888;
+          }
+          
+          .drag-content .current span {
+            color: #0066cc;
+            font-weight: 500;
+          }
+        `;
+        
+        document.head.appendChild(style);
+        document.body.appendChild(overlay);
+        
+        // Drag and drop events (only on non-mobile)
+        const isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
+        if (isMobile) return;
+        
+        document.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          const items = Array.from(e.dataTransfer.items);
+          const hasFont = items.some(item => {
+            const type = item.type;
+            return type === 'font/ttf' || type === 'font/otf';
+          });
+          
+          if (hasFont) {
+            // Update current font name in overlay
+            const currentSpan = overlay.querySelector('.current span');
+            if (currentSpan) {
+              currentSpan.textContent = currentFontName;
+            }
+            overlay.style.display = 'flex';
+          }
+        });
+        
+        document.addEventListener('dragleave', (e) => {
+          if (!document.body.contains(e.relatedTarget)) {
+            overlay.style.display = 'none';
+          }
+        });
+        
+        document.addEventListener('drop', (e) => {
+          e.preventDefault();
+          overlay.style.display = 'none';
+          
+          const files = Array.from(e.dataTransfer.files);
+          const fontFile = files.find(file => {
+            const ext = file.name.toLowerCase();
+            return ext.endsWith('.ttf') || ext.endsWith('.otf') || ext.endsWith('.woff');
+          });
+          
+          if (fontFile) {
+            loadCustomFont(fontFile);
+          }
+        });
+      }
+      
+      function handleFontUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+          loadCustomFont(file);
+        }
+      }
+      
+      function clearVariableFontControls() {
+        variableFontControllers.forEach(controller => {
+          controller.destroy();
+        });
+        variableFontControllers = [];
+      }
+
+      function addVariableFontControls(axes, textFolder) {
+        clearVariableFontControls();
+        
+        if (!axes || Object.keys(axes).length === 0) {
+          return;
+        }
+
+        for (const [tag, axisInfo] of Object.entries(axes)) {
+          const name = axisInfo.name || tag;
+
+          params[`fontVar_${tag}`] = axisInfo.default;
+          
+          const controller = textFolder
+            .add(params, `fontVar_${tag}`, axisInfo.min, axisInfo.max, tag === "slnt" ? 0.1 : 1)
+            .name(name)
+            .onChange(() => {
+              renderText();
+            });
+            
+          variableFontControllers.push(controller);
+        }
+      }
+
+      async function loadCustomFont(file) {
+        try {
+          updateStatus(`Loading ${file.name}...`, 'loading');
+          
+          customFontBuffer = await file.arrayBuffer();
+          currentFontName = file.name;
+          
+          if (window.fontDisplay && window.fontController) {
+            window.fontDisplay.currentFont = currentFontName;
+            window.fontController.updateDisplay();
+          }
+          
+          await renderText();
+        } catch (error) {
+          console.error('Font loading error:', error);
+          updateStatus(`Error loading ${file.name}: ${error.message}`, 'error');
+        }
+      }
+
+      function createMaterialForMode(mode, paragraphCenter, minDiagonal, maxDiagonal) {
+        const baseConfig = {
+          vertexColors: true,
+          side: THREE.DoubleSide,
+          transparent: true,
+          defines: {
+            USE_COLOR: "",
+          },
+        };
+
+        switch (mode) {
+          case 'off':
+            return new THREE.ShaderMaterial({
+              uniforms: {
+                time: { value: time },
+                opacity: { value: 1.0 },
+              },
+              vertexShader: offVertexShader,
+              fragmentShader: standardFragmentShader,
+              ...baseConfig,
+            });
+
+          case 'flip':
+            return new THREE.ShaderMaterial({
+              uniforms: {
+                time: { value: time },
+                flipSpeed: { value: params.flipSpeed },
+                flipPauseDuration: { value: params.flipPauseDuration },
+                minDiagonal: { value: minDiagonal },
+                maxDiagonal: { value: maxDiagonal },
+                opacity: { value: 1.0 },
+              },
+              vertexShader: flipVertexShader,
+              fragmentShader: standardFragmentShader,
+              ...baseConfig,
+            });
+
+          case 'explode':
+            return new THREE.ShaderMaterial({
+              uniforms: {
+                time: { value: time },
+                explodeSpeed: { value: params.explodeSpeed },
+                explodeDistance: { value: params.explodeDistance },
+                paragraphCenter: { value: paragraphCenter },
+                opacity: { value: 1.0 },
+              },
+              vertexShader: explodeVertexShader,
+              fragmentShader: standardFragmentShader,
+              ...baseConfig,
+            });
+
+          case 'orbit':
+            return new THREE.ShaderMaterial({
+              uniforms: {
+                time: { value: time },
+                orbitRadius: { value: params.orbitRadius },
+                orbitSpeed: { value: params.orbitSpeed },
+                opacity: { value: 1.0 },
+              },
+              vertexShader: orbitVertexShader,
+              fragmentShader: standardFragmentShader,
+              ...baseConfig,
+            });
+
+          case 'twister':
+            return new THREE.ShaderMaterial({
+              uniforms: {
+                time: { value: time },
+                twisterSpeed: { value: params.twisterSpeed },
+                twisterHeight: { value: params.twisterHeight },
+                twisterRadius: { value: params.twisterRadius },
+                opacity: { value: 1.0 },
+              },
+              vertexShader: twisterVertexShader,
+              fragmentShader: standardFragmentShader,
+              ...baseConfig,
+            });
+
+          case 'wave':
+          default:
+            return new THREE.ShaderMaterial({
+              uniforms: {
+                time: { value: time },
+                waveHeight: { value: params.waveHeight },
+                waveFrequency: { value: params.waveFrequency },
+                opacity: { value: 1.0 },
+              },
+              vertexShader: waveVertexShader,
+              fragmentShader: waveFragmentShader,
+              ...baseConfig,
+            });
+        }
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+
+        time += 0.01;
+        
+        if (textMesh?.material instanceof THREE.ShaderMaterial) {
+          textMesh.material.uniforms.time.value = time;
+          
+          const uniforms = textMesh.material.uniforms;
+          switch (currentShaderMode) {
+            case 'wave':
+              if (uniforms.waveHeight) uniforms.waveHeight.value = params.waveHeight;
+              if (uniforms.waveFrequency) uniforms.waveFrequency.value = params.waveFrequency;
+              break;
+            case 'flip':
+              if (uniforms.flipSpeed) uniforms.flipSpeed.value = params.flipSpeed;
+              if (uniforms.flipPauseDuration) uniforms.flipPauseDuration.value = params.flipPauseDuration;
+              break;
+            case 'explode':
+              if (uniforms.explodeSpeed) uniforms.explodeSpeed.value = params.explodeSpeed;
+              if (uniforms.explodeDistance) uniforms.explodeDistance.value = params.explodeDistance;
+              break;
+            case 'orbit':
+              if (uniforms.orbitRadius) uniforms.orbitRadius.value = params.orbitRadius;
+              if (uniforms.orbitSpeed) uniforms.orbitSpeed.value = params.orbitSpeed;
+              break;
+            case 'twister':
+              if (uniforms.twisterSpeed) uniforms.twisterSpeed.value = params.twisterSpeed;
+              if (uniforms.twisterHeight) uniforms.twisterHeight.value = params.twisterHeight;
+              if (uniforms.twisterRadius) uniforms.twisterRadius.value = params.twisterRadius;
+              break;
+          }
+        }
+
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      async function renderText() {
+        if (isRendering) return;
+        isRendering = true;
+
+        try {
+          updateStatus("Rendering text...", "loading");
+
+          // Collect font variations from params
+          const fontVariations = {};
+          for (const key in params) {
+            if (key.startsWith('fontVar_')) {
+              const tag = key.replace('fontVar_', '');
+              fontVariations[tag] = params[key];
+            }
+          }
+
+          // Get font (can be URL string or ArrayBuffer)
+          let font;
+          if (customFontBuffer) {
+            font = customFontBuffer;
+          } else {
+            font = "./fonts/NimbusSanL-Reg.woff";
+          }
+
+          const needsGlyphAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(params.shaderMode);
+
+          const result = await Text.create({
+            text: params.text,
+            font: font,
+            size: params.fontSize,
+            depth: params.depth,
+            lineHeight: params.lineHeight,
+            letterSpacing: params.letterSpacing,
+            fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
+            removeOverlaps: params.removeOverlaps,
+            separateGlyphsWithAttributes: needsGlyphAttributes,
+            curveFidelity: {
+              distanceTolerance: params.distanceTolerance,
+              angleTolerance: params.angleTolerance,
+            },
+            geometryOptimization: {
+              enabled: params.optimizationEnabled,
+              areaThreshold: params.areaThreshold,
+              colinearThreshold: params.colinearThreshold,
+              minSegmentLength: params.minSegmentLength,
+            },
+            layout: {
+              width: params.lineWidth,
+              align: params.alignment,
+              direction: params.direction,
+              hyphenate: params.hyphenate,
+              language: params.language,
+              tolerance: params.tolerance,
+              pretolerance: params.pretolerance,
+              emergencyStretch: params.emergencyStretch,
+              respectExistingBreaks: params.respectExistingBreaks,
+              disableSingleWordDetection: params.disableSingleWordDetection,
+              lefthyphenmin: params.lefthyphenmin,
+              righthyphenmin: params.righthyphenmin,
+              looseness: params.looseness,
+              linepenalty: params.linepenalty,
+              adjdemerits: params.adjdemerits,
+              hyphenpenalty: params.hyphenpenalty,
+              exhyphenpenalty: params.exhyphenpenalty,
+              doublehyphendemerits: params.doublehyphendemerits,
+            },
+          });
+
+          const loadedFont = result.getLoadedFont();
+          const axes = loadedFont?.variationAxes || null;
+          if (customFontBuffer && axes) {
+            addVariableFontControls(axes, textFolder);
+          }
+
+          if (textMesh) {
+            scene.remove(textMesh);
+            if (textMesh.geometry) textMesh.geometry.dispose();
+            if (textMesh.material) textMesh.material.dispose();
+          }
+
+          result.geometry.computeBoundingBox();
+          const center = new THREE.Vector3();
+          result.geometry.boundingBox.getCenter(center);
+          result.geometry.translate(-center.x, -center.y, -center.z);
+
+          if (needsGlyphAttributes && result.geometry.attributes.glyphCenter) {
+            const glyphCenterAttr = result.geometry.attributes.glyphCenter;
+            for (let i = 0; i < glyphCenterAttr.count; i++) {
+              glyphCenterAttr.setX(i, glyphCenterAttr.getX(i) - center.x);
+              glyphCenterAttr.setY(i, glyphCenterAttr.getY(i) - center.y);
+              glyphCenterAttr.setZ(i, glyphCenterAttr.getZ(i) - center.z);
+            }
+            glyphCenterAttr.needsUpdate = true;
+          }
+
+          let minDiagonal = Infinity;
+          let maxDiagonal = -Infinity;
+
+          if (needsGlyphAttributes && result.geometry.attributes.glyphCenter) {
+            const glyphCenterAttr = result.geometry.attributes.glyphCenter;
+            for (let i = 0; i < glyphCenterAttr.count; i++) {
+              const x = glyphCenterAttr.getX(i);
+              const y = glyphCenterAttr.getY(i);
+              const diagonal = x + y;
+              minDiagonal = Math.min(minDiagonal, diagonal);
+              maxDiagonal = Math.max(maxDiagonal, diagonal);
+            }
+          }
+
+          const paragraphCenter = new THREE.Vector3(0, 0, 0);
+          const material = createMaterialForMode(params.shaderMode, paragraphCenter, minDiagonal, maxDiagonal);
+
+          textMesh = new THREE.Mesh(result.geometry, material);
+          textMesh.rotation.x = 0;
+          textMesh.rotation.y = 0.5;
+
+          scene.add(textMesh);
+          updateStatus(`Text rendered successfully: ${result.stats.trianglesGenerated.toLocaleString()} triangles`, "ready");
+        } catch (error) {
+          console.error("Error rendering text:", error);
+          updateStatus(`Error: ${error.message}`, "error");
+        } finally {
+          isRendering = false;
+        }
+      }
+
+      async function init() {
+        updateStatus("Initializing Three.js...", "loading");
+        initScene();
+        initGUI();
+
+
+        await renderText();
+      }
+
+      init().catch((error) => {
+        console.error("Initialization error:", error);
+        updateStatus("Initialization failed", "error");
+      });
+    </script>
+  </body>
+</html>

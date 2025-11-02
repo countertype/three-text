@@ -1,0 +1,100 @@
+{
+  "name": "three-text",
+  "version": "0.1.1",
+  "description": "Font rendering and text layout for Three.js",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./react": {
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.cjs"
+    },
+    "./patterns/*": "./dist/patterns/*"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "LICENSE_THIRD_PARTY"
+  ],
+  "scripts": {
+    "build:patterns": "node scripts/convertPatterns.js",
+    "build:patterns:en-us": "node scripts/convertPatterns.js --languages en-us",
+    "copy:harfbuzz": "mkdir -p examples/hb && cp node_modules/harfbuzzjs/hb.wasm examples/hb/",
+    "build": "rollup -c && npm run copy:harfbuzz",
+    "dev": "rollup -c -w",
+    "serve": "npx http-server . -c-1 -p 8080 --cors",
+    "clean": "rimraf dist/index.* dist/react dist/hb dist/types",
+    "prepublishOnly": "npm run clean && npm run test:build && npm run build",
+    "test": "vitest run",
+    "test:build": "node scripts/verifyBuild.mjs",
+    "format": "prettier --write \"**/*.{js,ts,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,ts,json,md}\""
+  },
+  "keywords": [
+    "three.js",
+    "text",
+    "font",
+    "typography",
+    "layout",
+    "knuth-plass",
+    "harfbuzz"
+  ],
+  "author": "Jeremy Tribby, Countertype LLC",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/countertype/three-text.git"
+  },
+  "bugs": {
+    "url": "https://github.com/countertype/three-text/issues"
+  },
+  "homepage": "https://countertype.com/tools/three-text/demo",
+  "peerDependencies": {
+    "@react-three/fiber": ">=8.0.0",
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0",
+    "three": ">=0.160.0"
+  },
+  "peerDependenciesMeta": {
+    "@react-three/fiber": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "harfbuzzjs": "^0.4.11",
+    "tess2-ts": "^1.0.8"
+  },
+  "devDependencies": {
+    "@react-three/fiber": ">=8.0.0",
+    "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-replace": "^6.0.2",
+    "@rollup/plugin-terser": "^0.4.0",
+    "@rollup/plugin-typescript": "^11.0.0",
+    "@types/react": ">=17.0.0",
+    "@types/three": ">=0.175.0",
+    "http-server": "^14.1.1",
+    "jsdom": "^26.1.0",
+    "prettier": "^3.6.2",
+    "rimraf": "^4.1.2",
+    "rollup": "^3.18.0",
+    "rollup-plugin-dts": "^5.2.0",
+    "terser": "^5.43.1",
+    "tslib": "^2.8.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

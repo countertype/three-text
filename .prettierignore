@@ -1,0 +1,29 @@
+# Build artifacts
+dist/
+public/
+coverage/
+
+# Dependencies
+node_modules/
+
+# Lockfiles
+package-lock.json
+pnpm-lock.yaml
+
+# Hyphenation patterns (generated)
+src/hyphenation/*.ts
+!src/hyphenation/index.ts
+!src/hyphenation/types.ts
+!src/hyphenation/HyphenationPatternLoader.ts
+
+# Snapshots
+test/__snapshots__/
+
+# UMD patterns in examples
+examples/react-three-fiber/public/patterns/
+
+# Vendored submodule - do not format
+tex-hyphen/
+
+# Ignore all markdown files
+**/*.md

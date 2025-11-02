@@ -1,0 +1,38 @@
+# Source files (TypeScript)
+src/
+tsconfig.json
+
+# Build configuration
+rollup.config.js
+vitest.config.ts
+
+# Development scripts
+scripts/verifyBuild.mjs
+
+# Documentation
+RELEASE.md
+3D.png
+
+# Test files
+test/
+*.test.ts
+*.spec.ts
+
+# Examples (users should get from GitHub)
+examples/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# Other
+*.log
+.npmrc

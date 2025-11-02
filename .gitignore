@@ -1,0 +1,17 @@
+# Build outputs
+dist/*
+!dist/patterns/
+*.tsbuildinfo
+
+# Generated docs
+docs-api/
+
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*

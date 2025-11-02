@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>three-text variable fonts demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: sans-serif;
+        background: #0a0a0a;
+        color: #f3f3f3;
+        overflow: hidden;
+      }
+
+      #container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { GUI } from "three/addons/libs/lil-gui.module.min.js";
+      import { Text } from "three-text";
+
+      Text.setHarfBuzzPath("/examples/hb/hb.wasm");
+
+      let scene, camera, renderer, controls, textMesh;
+      let gui;
+
+      const params = {
+         text: "Variable Typography",
+         fontSize: 100,
+         depth: 20,
+         fontVariations: {},
+       };
+
+      async function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111);
+
+        camera = new THREE.PerspectiveCamera(
+          45,
+          window.innerWidth / window.innerHeight,
+          1,
+          10000
+        );
+        camera.position.set(0, 0, 800);
+
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById("container").appendChild(renderer.domElement);
+
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        
+        let fontBuffer = "./fonts/Merriweather-VariableFont_opsz,wdth,wght.woff";
+        
+        initGUI();
+        await renderText();
+        animate();
+      }
+
+      function initGUI() {
+        gui = new GUI();
+        gui.add(params, "text").name("Text").onChange(renderText);
+      }
+
+      async function renderText() {
+        if (textMesh) {
+          scene.remove(textMesh);
+          textMesh.geometry.dispose();
+          textMesh.material.dispose();
+        }
+
+        const textOptions = {
+          text: params.text,
+          size: params.fontSize,
+          depth: params.depth,
+          fontVariations: params.fontVariations,
+        };
+
+        const result = await Text.create({
+          ...textOptions,
+          font: fontBuffer
+        });
+        
+        const loadedFont = result.getLoadedFont();
+        if (loadedFont?.variationAxes && Object.keys(params.fontVariations).length === 0) {
+          const axes = loadedFont.variationAxes;
+          for (const [tag, axisInfo] of Object.entries(axes)) {
+            const name = tag === "wght" ? "Weight" 
+                       : tag === "wdth" ? "Width"
+                       : tag === "slnt" ? "Slant"
+                       : tag === "opsz" ? "Optical Size"
+                       : tag.toUpperCase();
+                       
+            params.fontVariations[tag] = axisInfo.default;
+            gui.add(params.fontVariations, tag, axisInfo.min, axisInfo.max, tag === "slnt" ? 0.1 : 1)
+               .name(name)
+               .onChange(renderText);
+          }
+        }
+        
+        const material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+        textMesh = new THREE.Mesh(result.geometry, material);
+        
+        result.geometry.computeBoundingBox();
+        const center = new THREE.Vector3();
+        result.geometry.boundingBox.getCenter(center);
+        result.geometry.translate(-center.x, -center.y, -center.z);
+
+        scene.add(textMesh);
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      init();
+    </script>
+  </body>
+</html>
