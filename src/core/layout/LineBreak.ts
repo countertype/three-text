@@ -90,7 +90,7 @@ interface BreakNode {
 // - Each node tracks its array index for swap-and-pop removal
 
 class ActiveNodeList {
-  private nodesByKey: Map<string, BreakNode>;
+  private nodesByKey: Map<number, BreakNode>;
   private activeList: BreakNode[];
   private allNodes: Set<BreakNode>;
 
@@ -100,8 +100,8 @@ class ActiveNodeList {
     this.allNodes = new Set();
   }
 
-  private getKey(position: number, fitness: FitnessClass): string {
-    return `${position}_${fitness}`;
+  private getKey(position: number, fitness: FitnessClass): number {
+    return (position << 2) | fitness;
   }
 
   insert(node: BreakNode): void {
