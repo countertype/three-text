@@ -131,14 +131,10 @@ export class Polygonizer {
     const dy = y3 - y1;
     const d = Math.abs((x2 - x3) * dy - (y2 - y3) * dx);
 
-    const curveLength = Math.sqrt(dx * dx + dy * dy);
     const baseTolerance =
       this.curveFidelityConfig.distanceTolerance ??
       DEFAULT_CURVE_FIDELITY.distanceTolerance!;
-    const distanceTolerance =
-      curveLength > 0
-        ? baseTolerance * baseTolerance
-        : baseTolerance * baseTolerance;
+    const distanceTolerance = baseTolerance * baseTolerance;
 
     if (d > COLLINEARITY_EPSILON) {
       // Regular case
@@ -220,14 +216,10 @@ export class Polygonizer {
     const d2 = Math.abs((x2 - x4) * dy - (y2 - y4) * dx);
     const d3 = Math.abs((x3 - x4) * dy - (y3 - y4) * dx);
 
-    const curveLength = Math.sqrt(dx * dx + dy * dy);
     const baseTolerance =
       this.curveFidelityConfig.distanceTolerance ??
       DEFAULT_CURVE_FIDELITY.distanceTolerance!;
-    const distanceTolerance =
-      curveLength > 0
-        ? baseTolerance * baseTolerance
-        : baseTolerance * baseTolerance;
+    const distanceTolerance = baseTolerance * baseTolerance;
 
     let switchCondition = 0;
 
