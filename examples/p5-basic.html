@@ -26,47 +26,41 @@
     .status-loading { color: #ffa500; }
     .status-ready { color: #00ff00; }
     .status-error { color: #ff4444; }
+    #p5_loading { display: none !important; }
   </style>
 </head>
 <body>
   <div id="status" class="status-loading">Initializing p5.js...</div>
 
   <script type="module">
-    import { Text } from '../dist/index.js';
-    import { createP5Geometry } from '../dist/p5/index.js';
+    import '../dist/p5/index.js';
 
     const status = document.getElementById('status');
-    let textGeom;
+    let font;
+    let textResult;
+
+    window.preload = function() {
+      status.textContent = 'Loading text shaper...';
+      loadThreeTextShaper('/examples/hb/hb.wasm');
+      
+      status.textContent = 'Loading font...';
+      font = loadThreeTextFont('./fonts/NimbusSanL-Reg.woff');
+    };
 
     window.setup = async function() {
       createCanvas(windowWidth, windowHeight, WEBGL);
       setAttributes('antialias', true);
       
-      status.textContent = 'Loading font...';
+      status.textContent = 'Creating text geometry...';
 
       try {
-        Text.setHarfBuzzPath('/examples/hb/hb.wasm');
-        
-        const textData = await Text.create({
-          text: 'Hello p5!',
-          font: './fonts/NimbusSanL-Reg.woff',
+        textResult = await createThreeTextGeometry('Hello p5!', {
+          font: font,
           size: 72,
           depth: 30
         });
 
-        status.textContent = 'Converting to p5.Geometry...';
-
-        // Use adapter to convert
-        textGeom = createP5Geometry(p5 || window, textData);
-        
-        // Store center for translate() in draw
-        window.textCenter = {
-          x: (textData.planeBounds.min.x + textData.planeBounds.max.x) / 2,
-          y: (textData.planeBounds.min.y + textData.planeBounds.max.y) / 2,
-          z: (textData.planeBounds.min.z + textData.planeBounds.max.z) / 2
-        };
-
-        status.textContent = `Ready: ${textData.indices.length / 3} triangles`;
+        status.textContent = 'Ready';
         status.className = 'status-ready';
       } catch (err) {
         console.error(err);
@@ -78,22 +72,24 @@
     window.draw = function() {
       background(20);
       
-      if (!textGeom || !window.textCenter) return;
+      if (!textResult || !textResult.geometry) return;
       
-      // Lighting
+      const { geometry, planeBounds } = textResult;
+      const centerX = (planeBounds.min.x + planeBounds.max.x) / 2;
+      const centerY = (planeBounds.min.y + planeBounds.max.y) / 2;
+      const centerZ = (planeBounds.min.z + planeBounds.max.z) / 2;
+      
       ambientLight(150);
       directionalLight(200, 200, 200, 0.5, 0.5, -1);
       
-      // Transform
       push();
       rotateY(frameCount * 0.01);
       rotateX(0.3);
-      translate(-window.textCenter.x, window.textCenter.y, -window.textCenter.z);
+      translate(-centerX, centerY, -centerZ);
       
-      // Draw
       fill(255);
       noStroke();
-      model(textGeom);
+      model(geometry);
       pop();
     };
 
