@@ -1,9 +1,9 @@
-import { Vector2, BufferGeometry, Vector3 } from 'three';
 import type { HyphenationTrieNode } from '../hyphenation';
+import type { Vec2, Vec3, BoundingBox } from './vectors';
 export type { HyphenationTrieNode };
 
 export interface Path {
-  points: Vector2[];
+  points: Vec2[];
   glyphIndex: number;
   bounds?: {
     minX: number;
@@ -29,7 +29,7 @@ export interface HarfBuzzGlyph {
 export interface GlyphCluster {
   text: string;
   glyphs: HarfBuzzGlyph[];
-  position: Vector3;
+  position: Vec3;
 }
 
 export interface GlyphContours {
@@ -198,12 +198,17 @@ export interface TextQueryOptions {
 }
 
 export interface TextGeometryInfo {
-  geometry: BufferGeometry;
-  glyphs: GlyphGeometryInfo[];
-  planeBounds: {
-    min: { x: number; y: number; z: number };
-    max: { x: number; y: number; z: number };
+  vertices: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+  colors?: Float32Array;
+  glyphAttributes?: {
+    glyphCenter: Float32Array;
+    glyphIndex: Float32Array;
+    glyphLineIndex: Float32Array;
   };
+  glyphs: GlyphGeometryInfo[];
+  planeBounds: BoundingBox;
   stats: {
     trianglesGenerated: number;
     verticesGenerated: number;

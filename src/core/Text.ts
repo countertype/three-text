@@ -1,6 +1,5 @@
 const DEFAULT_MAX_TEXT_LENGTH = 100000;
 
-import { BufferGeometry, Float32BufferAttribute } from 'three';
 import { TextLayout } from './layout/TextLayout';
 import {
   DEFAULT_TOLERANCE,
@@ -72,7 +71,7 @@ export class Text {
     Text.hbInitPromise = null;
   }
 
-  // Initialize HarfBuzz WASM manually (optional - called automatically by create())
+  // Initialize HarfBuzz WASM (optional - create() calls this if needed)
   public static init(): Promise<HarfBuzzInstance> {
     if (!Text.hbInitPromise) {
       Text.hbInitPromise = HarfBuzzLoader.getHarfBuzz();
@@ -294,7 +293,9 @@ export class Text {
       const cacheStats = this.geometryBuilder.getCacheStats();
 
       const result = this.finalizeGeometry(
-        shapedResult.geometry,
+        shapedResult.vertices,
+        shapedResult.normals,
+        shapedResult.indices,
         shapedResult.glyphInfos,
         shapedResult.planeBounds,
         options,
@@ -303,7 +304,11 @@ export class Text {
       );
 
       if (options.separateGlyphsWithAttributes) {
-        this.addGlyphAttributes(result.geometry, result.glyphs);
+        const glyphAttrs = this.createGlyphAttributes(
+          result.vertices.length / 3,
+          result.glyphs
+        );
+        result.glyphAttributes = glyphAttrs;
       }
 
       return result;
@@ -465,12 +470,12 @@ export class Text {
   }
 
   private applyColorSystem(
-    geometry: BufferGeometry,
+    vertices: Float32Array,
     glyphInfoArray: GlyphGeometryInfo[],
     color: [number, number, number] | ColorOptions,
     originalText: string
-  ): ColoredRange[] {
-    const vertexCount = geometry.attributes.position.count;
+  ): { colors: Float32Array; coloredRanges: ColoredRange[] } {
+    const vertexCount = vertices.length / 3;
     const colors = new Float32Array(vertexCount * 3);
     const coloredRanges: ColoredRange[] = [];
 
@@ -569,12 +574,13 @@ export class Text {
       }
     }
 
-    geometry.setAttribute('color', new Float32BufferAttribute(colors, 3));
-    return coloredRanges;
+    return { colors, coloredRanges };
   }
 
   private finalizeGeometry(
-    geometry: BufferGeometry,
+    vertices: Float32Array,
+    normals: Float32Array,
+    indices: Uint32Array,
     glyphInfoArray: GlyphGeometryInfo[],
     planeBounds: {
       min: { x: number; y: number; z: number };
@@ -583,7 +589,7 @@ export class Text {
     options: TextOptions,
     cacheStats?: any,
     originalText?: string
-  ) {
+  ): TextGeometryInfo {
     const { layout = {}, size = 72 } = options;
     const { width, align = layout.direction === 'rtl' ? 'right' : 'left' } =
       layout;
@@ -592,7 +598,7 @@ export class Text {
       this.textLayout = new TextLayout(this.loadedFont!);
     }
 
-    const alignmentResult = this.textLayout.applyAlignment(geometry, {
+    const alignmentResult = this.textLayout.applyAlignment(vertices, {
       width,
       align,
       planeBounds
@@ -603,7 +609,14 @@ export class Text {
     planeBounds.max.x = alignmentResult.adjustedBounds.max.x;
 
     const finalScale = size / this.loadedFont!.upem;
-    geometry.scale(finalScale, finalScale, finalScale);
+    
+    // Scale vertices and normals directly
+    for (let i = 0; i < vertices.length; i++) {
+      vertices[i] *= finalScale;
+    }
+    for (let i = 0; i < normals.length; i++) {
+      normals[i] *= finalScale;
+    }
 
     planeBounds.min.x *= finalScale;
     planeBounds.min.y *= finalScale;
@@ -628,22 +641,30 @@ export class Text {
       glyphInfo.bounds.max.z *= finalScale;
     }
 
-    const coloredRanges = options.color
-      ? this.applyColorSystem(
-          geometry,
-          glyphInfoArray,
-          options.color,
-          options.text
-        )
-      : undefined;
+    let colors: Float32Array | undefined;
+    let coloredRanges: ColoredRange[] | undefined;
+    
+    if (options.color) {
+      const colorResult = this.applyColorSystem(
+        vertices,
+        glyphInfoArray,
+        options.color,
+        options.text
+      );
+      colors = colorResult.colors;
+      coloredRanges = colorResult.coloredRanges;
+    }
 
     // Collect optimization stats for return value
     const optimizationStats = this.geometryBuilder!.getOptimizationStats();
-    const trianglesGenerated = geometry.index ? geometry.index.count / 3 : 0;
-    const verticesGenerated = geometry.attributes.position.count;
+    const trianglesGenerated = indices.length / 3;
+    const verticesGenerated = vertices.length / 3;
 
     return {
-      geometry,
+      vertices,
+      normals,
+      indices,
+      colors,
       glyphs: glyphInfoArray,
       planeBounds,
       stats: {
@@ -662,7 +683,8 @@ export class Text {
         const queryInstance = new TextRangeQuery(originalText, glyphInfoArray);
         return queryInstance.execute(options);
       },
-      coloredRanges
+      coloredRanges,
+      glyphAttributes: undefined
     };
   }
 
@@ -726,11 +748,14 @@ export class Text {
     }
   }
 
-  private addGlyphAttributes(
-    geometry: BufferGeometry,
+  private createGlyphAttributes(
+    vertexCount: number,
     glyphs: GlyphGeometryInfo[]
-  ): void {
-    const vertexCount = geometry.attributes.position.count;
+  ): {
+    glyphCenter: Float32Array;
+    glyphIndex: Float32Array;
+    glyphLineIndex: Float32Array;
+  } {
     const glyphCenters = new Float32Array(vertexCount * 3);
     const glyphIndices = new Float32Array(vertexCount);
     const glyphLineIndices = new Float32Array(vertexCount);
@@ -754,18 +779,11 @@ export class Text {
       }
     });
 
-    geometry.setAttribute(
-      'glyphCenter',
-      new Float32BufferAttribute(glyphCenters, 3)
-    );
-    geometry.setAttribute(
-      'glyphIndex',
-      new Float32BufferAttribute(glyphIndices, 1)
-    );
-    geometry.setAttribute(
-      'glyphLineIndex',
-      new Float32BufferAttribute(glyphLineIndices, 1)
-    );
+    return {
+      glyphCenter: glyphCenters,
+      glyphIndex: glyphIndices,
+      glyphLineIndex: glyphLineIndices
+    };
   }
 
   public destroy(): void {

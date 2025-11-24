@@ -1,14 +1,24 @@
 # three-text examples
 
-This directory contains interactive examples that demonstrate three-text. It's recommended to start with `hello-world.html` for a minimal, easy-to-understand example
+This directory contains examples demonstrating three-text across different rendering frameworks
 
 ## Example files
 
-- `hello-world.html` - A minimal, "hello world" example. The best place to start
-- `index.html` - A full-featured interactive demo with parameter controls (lil-gui)
-- `index-umd.html` - The same interactive demo, but for browsers without module support
-- `variable-fonts.html` - A focused demonstration of variable font capabilities
-- `react-three-fiber/` - A React Three Fiber example with Leva controls
+**Three.js:**
+- `hello-world.html` - Minimal Three.js example
+- `index.html` - Full-featured demo with parameter controls
+- `index-umd.html` - UMD build for legacy browsers
+- `variable-fonts.html` - Variable font demonstration
+- `react-three-fiber/` - React Three Fiber with Leva controls
+
+**p5.js**
+- `p5-basic.html` - p5.js integration
+
+**Raw APIs:**
+- `webgpu-basic.html` - WebGPU example
+- `webgl-basic.html` - WebGL example
+
+
 
 ## Running the examples
 
@@ -46,9 +56,36 @@ All examples include parameter controls for real-time adjustment:
 - **Geometry optimization**: V-W simplification, overlap removal
 - **Font loading**: Drag-and-drop support for TTF, OTF, and WOFF files
 
-Variable fonts automatically expose sliders for each axis (weight, width, etc.)
+Variable fonts automatically expose sliders for each axis (weight, width, etc)
 
 ## Usage patterns
+
+### ES Modules
+
+```html
+<script type="module">
+  import * as THREE from 'three';
+  import { Text } from 'three-text/three';
+  import enUs from 'three-text/patterns/en-us';
+
+  Text.setHarfBuzzPath('/hb/hb.wasm');
+  Text.registerPattern('en-us', enUs);
+
+  const text = await Text.create({
+    text: 'Your text here',
+    font: '/fonts/YourFont.ttf',
+    size: 72,
+    layout: {
+      width: 1200,
+      align: 'justify',
+      language: 'en-us'
+    }
+  });
+
+  const mesh = new THREE.Mesh(text.geometry, material);
+  scene.add(mesh);
+</script>
+```
 
 ### UMD build (script tags)
 
@@ -67,18 +104,17 @@ Variable fonts automatically expose sliders for each axis (weight, width, etc.)
       async function init() {
         const { Text } = window.ThreeText;
 
-        // Configure once
         Text.setHarfBuzzPath('/hb/hb.wasm');
 
         const text = await Text.create({
           text: 'Your text here',
-          font: './fonts/NimbusSanL-Reg.woff', // or .ttf, .otf
+          font: './fonts/NimbusSanL-Reg.woff',
           size: 72,
           layout: {
             width: 400,
             align: 'justify',
-            language: 'en-us',
-          },
+            language: 'en-us'
+          }
         });
 
         const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
@@ -92,135 +128,40 @@ Variable fonts automatically expose sliders for each axis (weight, width, etc.)
 </html>
 ```
 
-Patterns loaded via script tags automatically register with `ThreeText`. For dynamic loading, you can set `layout.patternsPath` to specify where pattern files are located (defaults to `/patterns/`)
-
-### ES Modules
-
-**Recommended:** Import and register patterns statically for better tree-shaking:
-
-```html
-<script type="module">
-  import * as THREE from 'three';
-  import { Text } from 'three-text';
-  import enUs from 'three-text/patterns/en-us';
-
-  // Configure once
-  Text.setHarfBuzzPath('/hb/hb.wasm');
-  Text.registerPattern('en-us', enUs);
-
-  const text = await Text.create({
-    text: 'Your text here',
-    font: '/fonts/YourFont.ttf',
-    size: 72,
-    layout: {
-      width: 12000,
-      align: 'justify',
-      language: 'en-us',
-    },
-  });
-
-  const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const mesh = new THREE.Mesh(text.geometry, material);
-  scene.add(mesh);
-</script>
-```
-
-### CommonJS
-
-```javascript
-const THREE = require('three');
-const { Text } = require('three-text');
-
-// Configure once
-Text.setHarfBuzzPath('/hb/hb.wasm');
-
-// Note: HarfBuzz requires a browser environment with WASM
-async function main() {
-  const text = await Text.create({
-    text: 'Your text here',
-    font: '/fonts/YourFont.ttf',
-    size: 72,
-    layout: {
-      width: 12000,
-      align: 'justify',
-      language: 'en-us',
-    },
-  });
-
-  const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
-  const mesh = new THREE.Mesh(text.geometry, material);
-  scene.add(mesh);
-}
-```
+Patterns loaded via script tags automatically register with `ThreeText`. For dynamic loading, set `layout.patternsPath`
 
 ### React Three Fiber
 
-See the `react-three-fiber/` directory for a complete example. The setup script copies the HarfBuzz WASM file to the public directory
+See `react-three-fiber/` for a complete example.
 
-#### Using the ThreeText Component
-
-The `<ThreeText>` component manages font loading, geometry creation, and cleanup automatically
-
-```javascript
+```jsx
 import { Canvas } from '@react-three/fiber';
-import { ThreeText } from 'three-text/react';
+import { Text } from 'three-text/three/react';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
 
 function App() {
   return (
     <Canvas>
-      <ThreeText
-        font="/fonts/NimbusSanL-Reg.woff"
-        size={72}
-        depth={10}
-        layout={{
-          width: 800,
-          align: 'justify',
-          language: 'en-us',
-        }}
-        position={[0, 0, 0]}
-      >
-        Your text here
-      </ThreeText>
+      <Text font="/fonts/Font.woff" size={72}>
+        Hello React
+      </Text>
     </Canvas>
   );
 }
 ```
 
-#### Manual Implementation
+### WebGL
 
-Direct use of the Text class provides fine-grained control over the rendering pipeline:
+See `webgl-basic.html` for raw WebGL usage without Three.js
 
-```javascript
-import { Text } from 'three-text';
+### WebGPU
 
-function TextMesh({ text, fontSize, fontBuffer, ...props }) {
-  const [geometry, setGeometry] = useState(null);
+See `webgpu-basic.html` for WebGPU usage
 
-  useEffect(() => {
-    async function createText() {
-      const result = await Text.create({
-        text,
-        font: fontBuffer,
-        size: fontSize,
-        layout: {
-          width: 800,
-          align: 'justify',
-          language: 'en-us',
-        },
-      });
-      setGeometry(result.geometry);
-    }
+### p5.js
 
-    createText();
-
-    return () => {
-      geometry?.dispose();
-    };
-  }, [text, fontSize, fontBuffer]);
-
-  return geometry ? <mesh geometry={geometry} {...props} /> : null;
-}
-```
+See `p5-basic.html` for p5.js integration
 
 ## Local development
 

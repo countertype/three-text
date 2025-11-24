@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Vec3 } from '../vectors';
 import { ProcessedGeometry } from '../types';
 
 const DEFAULT_CACHE_SIZE_MB = 250;
@@ -16,15 +16,15 @@ export interface GlyphData {
   normals: Float32Array;
   indices: Uint16Array | Uint32Array;
   bounds: {
-    min: Vector3;
-    max: Vector3;
+    min: Vec3;
+    max: Vec3;
   };
   useCount: number;
 }
 
 export interface GlyphInstance {
   glyphId: number;
-  position: Vector3;
+  position: Vec3;
   scale: number;
   textIndex: number;
   lineIndex: number;
@@ -152,7 +152,7 @@ export class GlyphCache {
     // Indices (Uint16Array or Uint32Array)
     size += glyph.indices.length * glyph.indices.BYTES_PER_ELEMENT;
 
-    // Bounds (2 Vector3s = 6 floats * 4 bytes)
+    // Bounds (2 Vec3s = 6 floats * 4 bytes)
     size += 24;
 
     // Object overhead

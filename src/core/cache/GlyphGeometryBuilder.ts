@@ -1,4 +1,4 @@
-import { BufferGeometry, Float32BufferAttribute, Vector3, Box3 } from 'three';
+import { Vec2, Vec3, Box3 as Box3Core } from '../vectors';
 import { GlyphCache, GlyphData, GlyphInstance } from './GlyphCache';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import {
@@ -11,14 +11,15 @@ import {
 import { Tessellator } from '../geometry/Tessellator';
 import { Extruder } from '../geometry/Extruder';
 import { BoundaryClusterer } from '../geometry/BoundaryClusterer';
-import { Vector2 } from 'three';
 import { GlyphContourCollector } from './GlyphContourCollector';
 import { DrawCallbackHandler } from '../shaping/DrawCallbacks';
 import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
 import { HarfBuzzGlyph } from '../types';
 
 export interface InstancedTextGeometry {
-  geometry: BufferGeometry;
+  vertices: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
   glyphInfos: GlyphGeometryInfo[];
   planeBounds: {
     min: { x: number; y: number; z: number };
@@ -100,7 +101,7 @@ export class GlyphGeometryBuilder {
 
         // Step 2: Check for overlaps within the cluster
         const relativePositions = cluster.glyphs.map(
-          (g) => new Vector3(g.x, g.y, 0)
+          (g) => new Vec3(g.x, g.y, 0)
         );
         const boundaryGroups = this.clusterer.cluster(
           clusterGlyphContours,
@@ -125,7 +126,7 @@ export class GlyphGeometryBuilder {
                   ...path,
                   points: path.points.map(
                     (p) =>
-                      new Vector2(p.x + (glyph.x ?? 0), p.y + (glyph.y ?? 0))
+                      new Vec2(p.x + (glyph.x ?? 0), p.y + (glyph.y ?? 0))
                   )
                 });
               }
@@ -153,7 +154,7 @@ export class GlyphGeometryBuilder {
             const glyph = cluster.glyphs[i];
             const glyphContours = clusterGlyphContours[i];
 
-            const absoluteGlyphPosition = new Vector3(
+            const absoluteGlyphPosition = new Vec3(
               cluster.position.x + (glyph.x ?? 0),
               cluster.position.y + (glyph.y ?? 0),
               cluster.position.z
@@ -175,7 +176,7 @@ export class GlyphGeometryBuilder {
           for (let i = 0; i < cluster.glyphs.length; i++) {
             const glyph = cluster.glyphs[i];
             const glyphContours = clusterGlyphContours[i];
-            const glyphPosition = new Vector3(
+            const glyphPosition = new Vec3(
               cluster.position.x + (glyph.x ?? 0),
               cluster.position.y + (glyph.y ?? 0),
               cluster.position.z
@@ -243,21 +244,19 @@ export class GlyphGeometryBuilder {
       }
     }
 
-    const geometry = new BufferGeometry();
     const vertexArray = new Float32Array(vertices);
     const normalArray = new Float32Array(normals);
-
-    geometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(vertexArray, 3)
-    );
-    geometry.setAttribute('normal', new Float32BufferAttribute(normalArray, 3));
-    geometry.setIndex(indices);
-    geometry.computeBoundingBox();
+    const indexArray = new Uint32Array(indices);
 
     perfLogger.end('GlyphGeometryBuilder.buildInstancedGeometry');
 
-    return { geometry, glyphInfos, planeBounds };
+    return {
+      vertices: vertexArray,
+      normals: normalArray,
+      indices: indexArray,
+      glyphInfos,
+      planeBounds
+    };
   }
 
   private appendGeometry(
@@ -265,7 +264,7 @@ export class GlyphGeometryBuilder {
     normals: number[],
     indices: number[],
     data: GlyphData,
-    position: Vector3,
+    position: Vec3,
     offset: number
   ) {
     for (let j = 0; j < data.vertices.length; j += 3) {
@@ -287,7 +286,7 @@ export class GlyphGeometryBuilder {
     glyph: HarfBuzzGlyph,
     vertexStart: number,
     vertexCount: number,
-    position: Vector3,
+    position: Vec3,
     contours: GlyphContours,
     depth: number
   ): GlyphGeometryInfo {
@@ -354,26 +353,33 @@ export class GlyphGeometryBuilder {
       this.loadedFont.upem
     );
 
-    const tempGeometry = new BufferGeometry();
-    const vertices = new Float32Array(extrudedResult.vertices);
-    tempGeometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(vertices, 3)
-    );
-    tempGeometry.computeBoundingBox();
+    // Compute bounding box from vertices
+    const vertices = extrudedResult.vertices;
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    
+    for (let i = 0; i < vertices.length; i += 3) {
+      const x = vertices[i];
+      const y = vertices[i + 1];
+      const z = vertices[i + 2];
+      
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z;
+      if (z > maxZ) maxZ = z;
+    }
 
-    const bounds = tempGeometry.boundingBox!;
-    const boundsMin = new Vector3(bounds.min.x, bounds.min.y, bounds.min.z);
-    const boundsMax = new Vector3(bounds.max.x, bounds.max.y, bounds.max.z);
-
-    tempGeometry.dispose();
+    const boundsMin = new Vec3(minX, minY, minZ);
+    const boundsMax = new Vec3(maxX, maxY, maxZ);
 
     const vertexCount = extrudedResult.vertices.length / 3;
     const IndexArray = vertexCount < 65536 ? Uint16Array : Uint32Array;
 
     return {
       geometry: processedGeometry,
-      vertices: vertices,
+      vertices: new Float32Array(extrudedResult.vertices),
       normals: new Float32Array(extrudedResult.normals),
       indices: new IndexArray(extrudedResult.indices),
       bounds: { min: boundsMin, max: boundsMax },
@@ -412,14 +418,14 @@ export class GlyphGeometryBuilder {
       max: { x: number; y: number; z: number };
     }
   ): void {
-    const planeBox = new Box3(
-      new Vector3(planeBounds.min.x, planeBounds.min.y, planeBounds.min.z),
-      new Vector3(planeBounds.max.x, planeBounds.max.y, planeBounds.max.z)
+    const planeBox = new Box3Core(
+      new Vec3(planeBounds.min.x, planeBounds.min.y, planeBounds.min.z),
+      new Vec3(planeBounds.max.x, planeBounds.max.y, planeBounds.max.z)
     );
 
-    const glyphBox = new Box3(
-      new Vector3(glyphBounds.min.x, glyphBounds.min.y, glyphBounds.min.z),
-      new Vector3(glyphBounds.max.x, glyphBounds.max.y, glyphBounds.max.z)
+    const glyphBox = new Box3Core(
+      new Vec3(glyphBounds.min.x, glyphBounds.min.y, glyphBounds.min.z),
+      new Vec3(glyphBounds.max.x, glyphBounds.max.y, glyphBounds.max.z)
     );
 
     planeBox.union(glyphBox);

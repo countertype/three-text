@@ -1,7 +1,7 @@
 {
   "name": "three-text",
-  "version": "0.1.1",
-  "description": "Font rendering and text layout for Three.js",
+  "version": "0.2.0",
+  "description": "3D font rendering and text layout engine for the web",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
   "type": "module",
@@ -11,9 +11,25 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./react": {
-      "import": "./dist/react/index.js",
-      "require": "./dist/react/index.cjs"
+    "./three": {
+      "import": "./dist/three/index.js",
+      "require": "./dist/three/index.cjs"
+    },
+    "./three/react": {
+      "import": "./dist/three/react.js",
+      "require": "./dist/three/react.cjs"
+    },
+    "./webgl": {
+      "import": "./dist/webgl/index.js",
+      "require": "./dist/webgl/index.cjs"
+    },
+    "./webgpu": {
+      "import": "./dist/webgpu/index.js",
+      "require": "./dist/webgpu/index.cjs"
+    },
+    "./p5": {
+      "import": "./dist/p5/index.js",
+      "require": "./dist/p5/index.cjs"
     },
     "./patterns/*": "./dist/patterns/*"
   },
@@ -30,7 +46,7 @@
     "build": "rollup -c && npm run copy:harfbuzz",
     "dev": "rollup -c -w",
     "serve": "npx http-server . -c-1 -p 8080 --cors",
-    "clean": "rimraf dist/index.* dist/react dist/hb dist/types",
+    "clean": "rimraf dist/index.* dist/react dist/three dist/hb dist/types",
     "prepublishOnly": "npm run clean && npm run test:build && npm run build",
     "test": "vitest run",
     "test:build": "node scripts/verifyBuild.mjs",

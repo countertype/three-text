@@ -1,4 +1,4 @@
-import { Vector2 } from 'three';
+import { Vec2 } from '../vectors';
 import type { ProcessedGeometry, Triangles } from '../types';
 
 export interface ExtrusionResult {
@@ -110,8 +110,8 @@ export class Extruder {
       const p1x = points[i + 2];
       const p1y = points[i + 3];
 
-      const edge = new Vector2(p1x - p0x, p1y - p0y);
-      const normal = new Vector2(edge.y, -edge.x).normalize();
+      const edge = new Vec2(p1x - p0x, p1y - p0y);
+      const normal = new Vec2(edge.y, -edge.x).normalize();
 
       const wallBaseIndex = vertices.length / 3;
       vertices.push(p0x, p0y, 0, p1x, p1y, 0, p0x, p0y, depth, p1x, p1y, depth);

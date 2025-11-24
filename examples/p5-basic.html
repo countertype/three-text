@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>three-text p5.js Example</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <style>
+    body { 
+      margin: 0; 
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    #status {
+      position: fixed;
+      bottom: 50px;
+      left: 20px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .status-loading { color: #ffa500; }
+    .status-ready { color: #00ff00; }
+    .status-error { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <div id="status" class="status-loading">Initializing p5.js...</div>
+
+  <script type="module">
+    import { Text } from '../dist/index.js';
+    import { createP5Geometry } from '../dist/p5/index.js';
+
+    const status = document.getElementById('status');
+    let textGeom;
+
+    window.setup = async function() {
+      createCanvas(windowWidth, windowHeight, WEBGL);
+      setAttributes('antialias', true);
+      
+      status.textContent = 'Loading font...';
+
+      try {
+        Text.setHarfBuzzPath('/examples/hb/hb.wasm');
+        
+        const textData = await Text.create({
+          text: 'Hello p5!',
+          font: './fonts/NimbusSanL-Reg.woff',
+          size: 72,
+          depth: 30
+        });
+
+        status.textContent = 'Converting to p5.Geometry...';
+
+        // Use adapter to convert
+        textGeom = createP5Geometry(p5 || window, textData);
+        
+        // Store center for translate() in draw
+        window.textCenter = {
+          x: (textData.planeBounds.min.x + textData.planeBounds.max.x) / 2,
+          y: (textData.planeBounds.min.y + textData.planeBounds.max.y) / 2,
+          z: (textData.planeBounds.min.z + textData.planeBounds.max.z) / 2
+        };
+
+        status.textContent = `Ready: ${textData.indices.length / 3} triangles`;
+        status.className = 'status-ready';
+      } catch (err) {
+        console.error(err);
+        status.textContent = `Error: ${err.message}`;
+        status.className = 'status-error';
+      }
+    };
+
+    window.draw = function() {
+      background(20);
+      
+      if (!textGeom || !window.textCenter) return;
+      
+      // Lighting
+      ambientLight(150);
+      directionalLight(200, 200, 200, 0.5, 0.5, -1);
+      
+      // Transform
+      push();
+      rotateY(frameCount * 0.01);
+      rotateX(0.3);
+      translate(-window.textCenter.x, window.textCenter.y, -window.textCenter.z);
+      
+      // Draw
+      fill(255);
+      noStroke();
+      model(textGeom);
+      pop();
+    };
+
+    window.windowResized = function() {
+      resizeCanvas(windowWidth, windowHeight);
+    };
+  </script>
+</body>
+</html>
+

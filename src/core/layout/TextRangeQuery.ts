@@ -1,5 +1,5 @@
 import { GlyphGeometryInfo, TextRange, TextQueryOptions } from '../types';
-import { Box3, Vector3 } from 'three';
+import { Box3 as Box3Core, Vec3 } from '../vectors';
 
 export class TextRangeQuery {
   private glyphsByTextIndex = new Map<number, GlyphGeometryInfo[]>();
@@ -98,12 +98,12 @@ export class TextRangeQuery {
       };
     }
 
-    const box = new Box3();
+    const box = new Box3Core();
 
     for (const glyph of glyphs) {
-      const glyphBox = new Box3(
-        new Vector3(glyph.bounds.min.x, glyph.bounds.min.y, glyph.bounds.min.z),
-        new Vector3(glyph.bounds.max.x, glyph.bounds.max.y, glyph.bounds.max.z)
+      const glyphBox = new Box3Core(
+        new Vec3(glyph.bounds.min.x, glyph.bounds.min.y, glyph.bounds.min.z),
+        new Vec3(glyph.bounds.max.x, glyph.bounds.max.y, glyph.bounds.max.z)
       );
       box.union(glyphBox);
     }

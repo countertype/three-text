@@ -1,7 +1,6 @@
 import { LineBreak } from './LineBreak';
 import { TextMeasurer } from '../shaping/TextMeasurer';
 import { LineInfo, TextAlign, LoadedFont, LayoutOptions } from '../types';
-import { BufferGeometry } from 'three';
 
 export interface TextLayoutOptions extends LayoutOptions {
   text: string;
@@ -107,7 +106,7 @@ export class TextLayout {
   }
 
   public applyAlignment(
-    geometry: BufferGeometry,
+    vertices: Float32Array,
     options: AlignmentOptions
   ): {
     offset: number;
@@ -133,7 +132,10 @@ export class TextLayout {
       }
 
       if (offset !== 0) {
-        geometry.translate(offset, 0, 0);
+        // Translate vertices directly
+        for (let i = 0; i < vertices.length; i += 3) {
+          vertices[i] += offset;
+        }
 
         adjustedBounds.min.x += offset;
         adjustedBounds.max.x += offset;

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>three-text WebGPU Example</title>
+  <style>
+    body { 
+      margin: 0; 
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    canvas { 
+      display: block; 
+      width: 100%;
+      height: 100vh;
+    }
+    #status {
+      position: fixed;
+      bottom: 50px;
+      left: 20px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .status-loading { color: #ffa500; }
+    .status-ready { color: #00ff00; }
+    .status-error { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <div id="status" class="status-loading">Initializing WebGPU...</div>
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import { Text } from '../dist/index.js';
+    import { createWebGPUBuffers } from '../dist/webgpu/index.js';
+
+    const status = document.getElementById('status');
+
+    async function main() {
+      // Check WebGPU support
+      if (!navigator.gpu) {
+        status.textContent = 'WebGPU not supported';
+        status.className = 'status-error';
+        return;
+      }
+
+      status.textContent = 'Requesting GPU adapter...';
+
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        status.textContent = 'Failed to get GPU adapter';
+        status.className = 'status-error';
+        return;
+      }
+
+      const device = await adapter.requestDevice();
+      
+      const canvas = document.getElementById('canvas');
+      const context = canvas.getContext('webgpu');
+      
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      canvas.width = canvas.clientWidth * devicePixelRatio;
+      canvas.height = canvas.clientHeight * devicePixelRatio;
+
+      const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
+      context.configure({
+        device,
+        format: presentationFormat,
+        alphaMode: 'premultiplied'
+      });
+
+      status.textContent = 'Loading font and generating text...';
+
+      // Initialize three-text
+      Text.setHarfBuzzPath('/examples/hb/hb.wasm');
+
+      const textGeometry = await Text.create({
+        text: 'Hello WebGPU!',
+        font: './fonts/NimbusSanL-Reg.woff',
+        size: 72,
+        depth: 30
+      });
+
+      status.textContent = 'Creating GPU buffers...';
+
+      // Create WebGPU buffers from geometry
+      const bufferSet = createWebGPUBuffers(device, textGeometry);
+      
+      const bounds = textGeometry.planeBounds;
+      const centerX = (bounds.min.x + bounds.max.x) / 2;
+      const centerY = (bounds.min.y + bounds.max.y) / 2;
+      const width = bounds.max.x - bounds.min.x;
+      const height = bounds.max.y - bounds.min.y;
+
+      status.textContent = `Ready: ${bufferSet.vertexCount} triangles`;
+      status.className = 'status-ready';
+
+      // Simple shader that renders with basic lighting
+      const shaderModule = device.createShaderModule({
+        label: 'text-shader',
+        code: `
+          struct Uniforms {
+            modelViewProjection: mat4x4<f32>,
+            normalMatrix: mat3x3<f32>,
+          }
+          @binding(0) @group(0) var<uniform> uniforms: Uniforms;
+
+          struct VertexInput {
+            @location(0) position: vec3<f32>,
+            @location(1) normal: vec3<f32>,
+          }
+
+          struct VertexOutput {
+            @builtin(position) position: vec4<f32>,
+            @location(0) normal: vec3<f32>,
+          }
+
+          @vertex
+          fn vertex_main(input: VertexInput) -> VertexOutput {
+            var output: VertexOutput;
+            output.position = uniforms.modelViewProjection * vec4<f32>(input.position, 1.0);
+            output.normal = input.normal;
+            return output;
+          }
+
+          @fragment
+          fn fragment_main(input: VertexOutput) -> @location(0) vec4<f32> {
+            // Light from behind-top-left
+            let lightDir = normalize(vec3<f32>(-0.5, 0.5, -1.0));
+            let normal = normalize(input.normal);
+            
+            let diffuse = max(dot(normal, lightDir), 0.0);
+            let ambient = 0.5;
+            let lighting = ambient + diffuse * 0.9;
+            
+            return vec4<f32>(vec3<f32>(1.0) * lighting, 1.0);
+          }
+        `
+      });
+
+      const pipeline = device.createRenderPipeline({
+        label: 'text-pipeline',
+        layout: 'auto',
+        vertex: {
+          module: shaderModule,
+          entryPoint: 'vertex_main',
+          buffers: [bufferSet.layout.vertex]
+        },
+        fragment: {
+          module: shaderModule,
+          entryPoint: 'fragment_main',
+          targets: [{
+            format: presentationFormat
+          }]
+        },
+        primitive: {
+          topology: 'triangle-list',
+          cullMode: 'none'
+        },
+        depthStencil: {
+          depthWriteEnabled: true,
+          depthCompare: 'less',
+          format: 'depth24plus'
+        },
+        multisample: {
+          count: 4  // 4x MSAA
+        }
+      });
+
+      // Create uniform buffer (256 bytes for mat4 + mat3 with alignment)
+      const uniformBufferSize = 256;
+      const uniformBuffer = device.createBuffer({
+        size: uniformBufferSize,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
+      });
+
+      const bindGroup = device.createBindGroup({
+        layout: pipeline.getBindGroupLayout(0),
+        entries: [{
+          binding: 0,
+          resource: { buffer: uniformBuffer }
+        }]
+      });
+
+      // Create MSAA textures
+      let msaaTexture = device.createTexture({
+        size: [canvas.width, canvas.height],
+        format: presentationFormat,
+        sampleCount: 4,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT
+      });
+
+      let depthTexture = device.createTexture({
+        size: [canvas.width, canvas.height],
+        format: 'depth24plus',
+        sampleCount: 4,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT
+      });
+
+      // Camera matrices
+      function getMatrices(time) {
+        const staticYaw = 0.4;
+        const staticPitch = 0.2;
+        const aspect = canvas.width / canvas.height;
+        
+        // Fit text in viewport
+        const padding = 1.8;
+        const scaleX = 2 / (width * padding);
+        const scaleY = (2 / (width * padding)) * aspect;
+        const translateX = -centerX * scaleX;
+        const translateY = -centerY * scaleY;
+        
+        // Static rotation
+        const cy = Math.cos(staticYaw);
+        const sy = Math.sin(staticYaw);
+        const cp = Math.cos(staticPitch);
+        const sp = Math.sin(staticPitch);
+        
+        // MVP
+        const mvp = new Float32Array([
+          scaleX * cy, scaleX * sy * sp, scaleX * sy * cp, 0,
+          scaleY * 0, scaleY * cp, scaleY * -sp, 0,
+          0.001 * -sy, 0.001 * cy * sp, 0.001 * cy * cp, 0,
+          translateX, translateY, 0.5, 1
+        ]);
+
+        // Normal matrix for rotation
+        const normalMatrix = new Float32Array([
+          cy, sy * sp, sy * cp,
+          0, cp, -sp,
+          -sy, cy * sp, cy * cp
+        ]);
+
+        return { mvp, normalMatrix };
+      }
+
+      // Render loop
+      function frame(time) {
+        const { mvp, normalMatrix } = getMatrices(time * 0.001);
+        
+
+        // Pack uniforms with alignment (mat4 + mat3)
+        const uniformData = new Float32Array(64);
+        uniformData.set(mvp, 0);
+        
+        // mat3 with vec4 row alignment
+        uniformData[16] = normalMatrix[0];
+        uniformData[17] = normalMatrix[1];
+        uniformData[18] = normalMatrix[2];
+        
+        uniformData[20] = normalMatrix[3];
+        uniformData[21] = normalMatrix[4];
+        uniformData[22] = normalMatrix[5];
+        
+        uniformData[24] = normalMatrix[6];
+        uniformData[25] = normalMatrix[7];
+        uniformData[26] = normalMatrix[8];
+
+        device.queue.writeBuffer(uniformBuffer, 0, uniformData);
+
+        const commandEncoder = device.createCommandEncoder();
+        const textureView = context.getCurrentTexture().createView();
+
+        const renderPass = commandEncoder.beginRenderPass({
+          colorAttachments: [{
+            view: msaaTexture.createView(),
+            resolveTarget: textureView,
+            clearValue: { r: 0.05, g: 0.05, b: 0.05, a: 1.0 },
+            loadOp: 'clear',
+            storeOp: 'store'
+          }],
+          depthStencilAttachment: {
+            view: depthTexture.createView(),
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store'
+          }
+        });
+
+        renderPass.setPipeline(pipeline);
+        renderPass.setViewport(0, 0, canvas.width, canvas.height, 0, 1);
+        renderPass.setScissorRect(0, 0, canvas.width, canvas.height);
+        renderPass.setBindGroup(0, bindGroup);
+        renderPass.setVertexBuffer(0, bufferSet.buffers.vertex);
+        renderPass.setIndexBuffer(bufferSet.buffers.indices, bufferSet.indexFormat);
+        renderPass.drawIndexed(bufferSet.vertexCount);
+        renderPass.end();
+
+        device.queue.submit([commandEncoder.finish()]);
+        requestAnimationFrame(frame);
+      }
+
+      requestAnimationFrame(frame);
+
+      // Handle resize
+      window.addEventListener('resize', () => {
+        canvas.width = canvas.clientWidth * devicePixelRatio;
+        canvas.height = canvas.clientHeight * devicePixelRatio;
+        
+        msaaTexture.destroy();
+        depthTexture.destroy();
+        
+        msaaTexture = device.createTexture({
+          size: [canvas.width, canvas.height],
+          format: presentationFormat,
+          sampleCount: 4,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+        
+        depthTexture = device.createTexture({
+          size: [canvas.width, canvas.height],
+          format: 'depth24plus',
+          sampleCount: 4,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+      });
+    }
+
+    main().catch(err => {
+      console.error(err);
+      status.textContent = `Error: ${err.message}`;
+      status.className = 'status-error';
+    });
+  </script>
+</body>
+</html>
+

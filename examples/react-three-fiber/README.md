@@ -44,78 +44,27 @@ This example demonstrates how to use the `<ThreeText>` component with React Thre
 - Geometry optimization settings (V-W simplification, overlap removal)
 - Loading custom fonts (WOFF, TTF, OTF) via drag-and-drop
 
-If using hyphenation, import and register patterns at app startup:
-
-```javascript
-import { Text } from 'three-text';
-import enUs from 'three-text/patterns/en-us';
-
-// Configure once at app initialization
-Text.setHarfBuzzPath('/hb/hb.wasm');
-Text.registerPattern('en-us', enUs);
-```
-
-### Using the ThreeText Component
-
-The `<ThreeText>` component handles font loading and geometry lifecycle automatically:
+### Using the Text Component
 
 ```jsx
 import { Canvas } from '@react-three/fiber';
-import { ThreeText } from 'three-text/react';
+import { Text } from 'three-text/three/react';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
 
 function App() {
   return (
     <Canvas>
-      <ThreeText
-        font="/fonts/NimbusSanL-Reg.woff"
+      <Text
+        font="/fonts/Font.woff"
         size={72}
-        depth={10}
-        layout={{
-          width: 800,
-          align: 'justify',
-          language: 'en-us',
-        }}
-        position={[0, 0, 0]}
+        layout={{ width: 800, align: 'justify' }}
       >
         Your text here
-      </ThreeText>
+      </Text>
     </Canvas>
   );
 }
 ```
 
-#### Manual Implementation
-
-Direct use of the Text class provides fine-grained control over the rendering pipeline:
-
-```javascript
-import { Text } from 'three-text';
-
-function TextMesh({ text, fontSize, font, ...props }) {
-  const [geometry, setGeometry] = useState(null);
-
-  useEffect(() => {
-    async function createText() {
-      const result = await Text.create({
-        text,
-        font,
-        size: fontSize,
-        layout: {
-          width: 800,
-          align: 'justify',
-          language: 'en-us',
-        },
-      });
-      setGeometry(result.geometry);
-    }
-
-    createText();
-
-    return () => {
-      geometry?.dispose();
-    };
-  }, [text, fontSize, font]);
-
-  return geometry ? <mesh geometry={geometry} {...props} /> : null;
-}
-```
+The component handles font loading, geometry creation, and cleanup automatically

@@ -231,7 +231,8 @@
         "imports": {
           "three": "../node_modules/three/build/three.module.js",
           "three/addons/": "../node_modules/three/examples/jsm/",
-          "three-text": "../dist/index.js"
+          "three-text": "../dist/index.js",
+          "three-text/three": "../dist/three/index.js"
         }
       }
     </script>
@@ -240,7 +241,7 @@
       import * as THREE from "three";
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       import { GUI } from "three/addons/libs/lil-gui.module.min.js";
-      import { Text } from "three-text";
+      import { Text } from "three-text/three";
 
       Text.setHarfBuzzPath("/examples/hb/hb.wasm");
 

@@ -1,4 +1,4 @@
-import { Vector2 } from 'three';
+import { Vec2 } from '../vectors';
 import { MinHeap } from '../../utils/MinHeap';
 import type { Path } from '../types';
 
@@ -77,7 +77,7 @@ export class PathOptimizer {
   }
 
   // Visvalingam-Whyatt algorithm
-  private simplifyPathVW(points: Vector2[], areaThreshold: number): Vector2[] {
+  private simplifyPathVW(points: Vec2[], areaThreshold: number): Vec2[] {
     if (points.length <= 3) return points;
 
     const originalLength = points.length;
@@ -152,7 +152,7 @@ export class PathOptimizer {
       }
     }
 
-    const simplifiedPoints: Vector2[] = [];
+    const simplifiedPoints: Vec2[] = [];
     let current: VWPoint | null = pointList[0];
     while (current) {
       simplifiedPoints.push(points[current.index]);
@@ -166,20 +166,20 @@ export class PathOptimizer {
   }
 
   private removeColinearPoints(
-    points: Vector2[],
+    points: Vec2[],
     threshold: number
-  ): Vector2[] {
+  ): Vec2[] {
     if (points.length <= 2) return points;
 
-    const result: Vector2[] = [points[0]];
+    const result: Vec2[] = [points[0]];
 
     for (let i = 1; i < points.length - 1; i++) {
       const prev = points[i - 1];
       const current = points[i];
       const next = points[i + 1];
 
-      const v1 = new Vector2(current.x - prev.x, current.y - prev.y);
-      const v2 = new Vector2(next.x - current.x, next.y - current.y);
+      const v1 = new Vec2(current.x - prev.x, current.y - prev.y);
+      const v2 = new Vec2(next.x - current.x, next.y - current.y);
 
       const angle = Math.abs(v1.angle() - v2.angle());
       const normalizedAngle = Math.min(angle, 2 * Math.PI - angle);
@@ -200,7 +200,7 @@ export class PathOptimizer {
   }
 
   // Shoelace formula
-  private calculateTriangleArea(p1: Vector2, p2: Vector2, p3: Vector2): number {
+  private calculateTriangleArea(p1: Vec2, p2: Vec2, p3: Vec2): number {
     return Math.abs(
       (p1.x * (p2.y - p3.y) + p2.x * (p3.y - p1.y) + p3.x * (p1.y - p2.y)) / 2
     );

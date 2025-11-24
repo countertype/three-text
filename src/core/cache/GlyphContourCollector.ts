@@ -1,4 +1,4 @@
-import { Vector2 } from 'three';
+import { Vec2 } from '../vectors';
 import { Path, GlyphContours } from '../types';
 import {
   PathOptimizer,
@@ -13,20 +13,20 @@ export class GlyphContourCollector {
   private currentTextIndex: number = 0;
   private currentGlyphPaths: Path[] = [];
   private currentPath: Path | null = null;
-  private currentPoint: Vector2 | null = null;
+  private currentPoint: Vec2 | null = null;
   private currentGlyphBounds = {
-    min: new Vector2(Infinity, Infinity),
-    max: new Vector2(-Infinity, -Infinity)
+    min: new Vec2(Infinity, Infinity),
+    max: new Vec2(-Infinity, -Infinity)
   };
 
   private collectedGlyphs: GlyphContours[] = [];
-  private glyphPositions: Vector2[] = [];
+  private glyphPositions: Vec2[] = [];
   private glyphTextIndices: number[] = [];
 
   private polygonizer: Polygonizer;
   private pathOptimizer: PathOptimizer;
 
-  private currentPosition: Vector2 = new Vector2(0, 0);
+  private currentPosition: Vec2 = new Vec2(0, 0);
 
   constructor(
     curveFidelityConfig?: CurveFidelityConfig,
@@ -96,7 +96,7 @@ export class GlyphContourCollector {
     if (this.currentPath) {
       this.finishPath();
     }
-    this.currentPoint = new Vector2(x, y);
+    this.currentPoint = new Vec2(x, y);
     this.updateBounds(this.currentPoint);
     this.currentPath = {
       points: [this.currentPoint],
@@ -106,7 +106,7 @@ export class GlyphContourCollector {
 
   public onLineTo(x: number, y: number): void {
     if (!this.currentPath || !this.currentPoint) return;
-    const point = new Vector2(x, y);
+    const point = new Vec2(x, y);
     this.updateBounds(point);
     this.currentPath.points.push(point);
     this.currentPoint = point;
@@ -116,8 +116,8 @@ export class GlyphContourCollector {
     if (!this.currentPath || !this.currentPoint) return;
 
     const start = this.currentPoint;
-    const control = new Vector2(cx, cy);
-    const end = new Vector2(x, y);
+    const control = new Vec2(cx, cy);
+    const end = new Vec2(x, y);
 
     const dx = end.x - start.x;
     const dy = end.y - start.y;
@@ -155,9 +155,9 @@ export class GlyphContourCollector {
     if (!this.currentPath || !this.currentPoint) return;
 
     const start = this.currentPoint;
-    const control1 = new Vector2(c1x, c1y);
-    const control2 = new Vector2(c2x, c2y);
-    const end = new Vector2(x, y);
+    const control1 = new Vec2(c1x, c1y);
+    const control2 = new Vec2(c2x, c2y);
+    const end = new Vec2(x, y);
 
     const dx = end.x - start.x;
     const dy = end.y - start.y;
@@ -206,7 +206,7 @@ export class GlyphContourCollector {
     }
   }
 
-  private updateBounds(point: Vector2): void {
+  private updateBounds(point: Vec2): void {
     this.currentGlyphBounds.min.x = Math.min(
       this.currentGlyphBounds.min.x,
       point.x
@@ -226,14 +226,14 @@ export class GlyphContourCollector {
   }
 
   public getCollectedGlyphs(): GlyphContours[] {
-    // Make sure to finish any pending glyph
+    // Finish any pending glyph
     if (this.currentGlyphPaths.length > 0) {
       this.finishGlyph();
     }
     return this.collectedGlyphs;
   }
 
-  public getGlyphPositions(): Vector2[] {
+  public getGlyphPositions(): Vec2[] {
     return this.glyphPositions;
   }
 
@@ -252,8 +252,8 @@ export class GlyphContourCollector {
     this.currentTextIndex = 0;
     this.currentPosition.set(0, 0);
     this.currentGlyphBounds = {
-      min: new Vector2(Infinity, Infinity),
-      max: new Vector2(-Infinity, -Infinity)
+      min: new Vec2(Infinity, Infinity),
+      max: new Vec2(-Infinity, -Infinity)
     };
   }
 
