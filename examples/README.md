@@ -19,7 +19,6 @@ This directory contains examples demonstrating three-text across different rende
 - `webgl-basic.html` - WebGL example
 
 
-
 ## Running the examples
 
 ### Static HTML examples
@@ -162,6 +161,33 @@ See `webgpu-basic.html` for WebGPU usage
 ### p5.js
 
 See `p5-basic.html` for p5.js integration
+
+```javascript
+import 'three-text/p5';
+
+let font;
+let textResult;
+
+function preload() {
+  loadThreeTextShaper('/hb/hb.wasm');
+  font = loadThreeTextFont('./fonts/Font.woff');
+}
+
+async function setup() {
+  createCanvas(400, 400, WEBGL);
+  textResult = await createThreeTextGeometry('Hello p5!', {
+    font: font,
+    size: 72,
+    depth: 30
+  });
+}
+
+function draw() {
+  background(20);
+  lights();
+  if (textResult) model(textResult.geometry);
+}
+```
 
 ## Local development
 

@@ -70,7 +70,7 @@ three-text has a framework-agnostic core that processes fonts and generates geom
 - **`three-text/three/react`** - React Three Fiber component
 - **`three-text/webgl`** - WebGL buffer utility
 - **`three-text/webgpu`** - WebGPU buffer utility
-- **`three-text/p5`** - p5.js geometry converter
+- **`three-text/p5`** - p5.js adapter
 
 Choose the import that matches your stack. Most users will use `three-text/three` or `three-text/p5`
 
@@ -97,28 +97,29 @@ scene.add(mesh);
 #### p5.js
 
 ```javascript
-import { Text } from 'three-text';
-import { createP5Geometry } from 'three-text/p5';
+import 'three-text/p5';
 
-let textGeom;
+let font;
+let textResult;
+
+function preload() {
+  loadThreeTextShaper('/hb/hb.wasm');
+  font = loadThreeTextFont('/fonts/Font.woff');
+}
 
 async function setup() {
   createCanvas(400, 400, WEBGL);
-  Text.setHarfBuzzPath('/hb/hb.wasm');
-  
-  const data = await Text.create({
-    text: 'Hello p5!',
-    font: '/fonts/Font.woff',
-    size: 72
+  textResult = await createThreeTextGeometry('Hello p5!', {
+    font: font,
+    size: 72,
+    depth: 30
   });
-  
-  textGeom = createP5Geometry(window, data);
 }
 
 function draw() {
   background(200);
   lights();
-  model(textGeom);
+  if (textResult) model(textResult.geometry);
 }
 ```
 
@@ -244,7 +245,7 @@ three-text/
 │   │   └── ThreeText.tsx       # React Three Fiber component
 │   ├── webgl/                  # WebGL buffer utility
 │   ├── webgpu/                 # WebGPU buffer utility
-│   ├── p5/                     # p5.js geometry converter
+│   ├── p5/                     # p5.js adapter
 │   ├── hyphenation/            # Language-specific hyphenation patterns
 │   └── utils/                  # Performance logging, data structures
 ├── examples/                   # Demos for all adapters
@@ -961,7 +962,7 @@ The build generates multiple module formats for core and all adapters:
 - `dist/three/react.js` - React component
 - `dist/webgl/` - WebGL utility
 - `dist/webgpu/` - WebGPU utility
-- `dist/p5/` - p5.js converter
+- `dist/p5/` - p5.js adapter
 
 **Patterns:**
 - `dist/patterns/` - Hyphenation patterns (ESM and UMD)
