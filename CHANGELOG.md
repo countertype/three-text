@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2] - 2025-11-24
+
+### Changed
+
+- p5.js adapter now hooks into p5's preload system with `loadThreeTextShaper()` and `loadThreeTextFont()`
+- `createThreeTextGeometry()` returns object with `geometry`, `planeBounds`, and `glyphs`
+- p5 example tries to stay closer to p5 patterns
+
 ## [0.2.1] - 2025-11-24
 
 ### Fixed
