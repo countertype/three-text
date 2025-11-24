@@ -1,5 +1,4 @@
-// Lightweight vector and bounding box types for core (no Three.js dependency)
-// These replace Three.js Vector2, Vector3, and Box3 in the core module
+// Bector and bounding box types for core
 
 // 2D Vector
 export class Vec2 {
