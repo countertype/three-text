@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-007acc.svg)](https://www.typescriptlang.org/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3_or_later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-A high fidelity font renderer and text layout engine for [Three.js](https://github.com/mrdoob/three.js/)
+A high fidelity font renderer and text layout engine for the web
 
 ![Screenshot of three-text example file](https://countertype.com/assets/three-text/3D.png)
 
@@ -15,15 +15,24 @@ A high fidelity font renderer and text layout engine for [Three.js](https://gith
 > [!CAUTION]
 > three-text is an alpha release and the API may break rapidly. This warning will last at least through the end of 2025. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** renders and formats text from TTF, OTF, and WOFF font files in Three.js. It uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate
+**three-text** renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines, and turns font outlines into 3D shapes on the fly, caching their geometries for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate
 
-Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harfbuzzjs) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking, [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation, [libtess2](https://github.com/memononen/libtess2) (based on the [OpenGL Utility Library (GLU) tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, bezier curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/), and Three.js as a platform for 3D rendering on the web
+The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL, and WebGPU
+
+Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harfbuzzjs) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking, [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation, [libtess2](https://github.com/memononen/libtess2) (based on the [OpenGL Utility Library (GLU) tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, bezier curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), and [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/).
 
 ## Table of contents
 
 - [Overview](#overview)
 - [Getting started](#getting-started)
+  - [Three.js](#threejs-usage)
+  - [React Three Fiber](#react-three-fiber-usage)
+  - [WebGL](#webgl-usage)
+  - [WebGPU](#webgpu-usage)
+  - [p5.js](#p5js-usage)
+  - [Core (framework-agnostic)](#core-usage)
 - [Development and examples](#development-and-examples)
+- [Architecture](#architecture)
 - [Why three-text?](#why-three-text)
 - [Library structure](#library-structure)
 - [Key concepts and methods](#key-concepts-and-methods)
@@ -41,13 +50,77 @@ Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harf
 
 ## Getting started
 
-To use `three-text` in your own project:
-
 ```bash
-npm install three-text three
+npm install three-text
+```
+
+For Three.js projects, also install:
+```bash
+npm install three
 ```
 
 `harfbuzzjs` is a direct dependency and will be installed automatically
+
+## Architecture
+
+three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats:
+
+- **`three-text`** - Core (returns raw arrays)
+- **`three-text/three`** - Three.js (returns BufferGeometry)
+- **`three-text/three/react`** - React Three Fiber component
+- **`three-text/webgl`** - WebGL buffer utility
+- **`three-text/webgpu`** - WebGPU buffer utility
+- **`three-text/p5`** - p5.js geometry converter
+
+Choose the import that matches your stack. Most users will use `three-text/three` or `three-text/p5`
+
+### Basic Usage
+
+#### Three.js
+
+```javascript
+import { Text } from 'three-text/three';
+import * as THREE from 'three';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+
+const result = await Text.create({
+  text: 'Hello World',
+  font: '/fonts/Font.woff',
+  size: 72
+});
+
+const mesh = new THREE.Mesh(result.geometry, material);
+scene.add(mesh);
+```
+
+#### p5.js
+
+```javascript
+import { Text } from 'three-text';
+import { createP5Geometry } from 'three-text/p5';
+
+let textGeom;
+
+async function setup() {
+  createCanvas(400, 400, WEBGL);
+  Text.setHarfBuzzPath('/hb/hb.wasm');
+  
+  const data = await Text.create({
+    text: 'Hello p5!',
+    font: '/fonts/Font.woff',
+    size: 72
+  });
+  
+  textGeom = createP5Geometry(window, data);
+}
+
+function draw() {
+  background(200);
+  lights();
+  model(textGeom);
+}
+```
 
 ### Setup
 
@@ -63,12 +136,14 @@ Copy the WASM binary to a public directory:
 cp node_modules/harfbuzzjs/hb.wasm public/hb/
 ```
 
-Then, before any `Text.create()` calls, tell `three-text` where to find it:
+Then, before any `Text.create()` calls, configure the path:
 
 ```javascript
-import { Text } from 'three-text';
+import { Text } from 'three-text/three';
 Text.setHarfBuzzPath('/hb/hb.wasm');
 ```
+
+The path configuration is shared across all adapters
 
 #### Option 2: Buffer-based loading
 
@@ -76,19 +151,16 @@ This method is essential for applications that use Web Workers, as it is the onl
 
 
 ```javascript
-import { Text } from 'three-text';
+import { Text } from 'three-text/three';
 
-// On your main thread, fetch the assets once.
+// Main thread
 const wasmResponse = await fetch('/hb/hb.wasm');
 const wasmBuffer = await wasmResponse.arrayBuffer();
 
-// Then, in each of your Web Workers, receive the buffer and
-// provide it to the library before use.
-// worker.js:
+// worker.js
 self.onmessage = (e) => {
-    const { wasmBuffer } = e.data;
-    Text.setHarfBuzzBuffer(wasmBuffer);
-    // ... now you can call Text.create()
+  const { wasmBuffer } = e.data;
+  Text.setHarfBuzzBuffer(wasmBuffer);
 };
 ```
 
@@ -100,7 +172,7 @@ The library will prioritize the buffer if both a path and a buffer have been set
 
 ```javascript
 import enUs from 'three-text/patterns/en-us';
-import { Text } from 'three-text';
+import { Text } from 'three-text/three';
 
 Text.registerPattern('en-us', enUs);
 ```
@@ -111,106 +183,6 @@ Text.registerPattern('en-us', enUs);
 cp -r node_modules/three-text/dist/patterns public/patterns/
 ```
 
-### Basic usage
-
-For modern browsers that support ES Modules:
-
-```html
-<script type="module">
-  import { Text } from 'three-text';
-  import fr from 'three-text/patterns/fr';
-
-  // Configure once
-  Text.setHarfBuzzPath('/hb/hb.wasm');
-  Text.registerPattern('fr', fr);
-
-  const text = await Text.create({
-    text: 'Bonjour',
-    font: '/fonts/YourFont.woff', // or .ttf, .otf
-    size: 72,
-    layout: { width: 400, align: 'center', language: 'fr' },
-  });
-</script>
-```
-
-### UMD (legacy browser) usage
-
-```html
-<!-- Load Three.js and three-text -->
-<script src="three-text/dist/index.umd.js"></script>
-
-<!-- Load hyphenation patterns as needed (auto-registers) -->
-<script src="/patterns/fr.umd.js"></script>
-
-<script>
-  const { Text } = window.ThreeText;
-
-  // Configure once
-  Text.setHarfBuzzPath('/hb/hb.wasm');
-
-  const text = await Text.create({
-    text: 'Bonjour',
-    font: '/fonts/YourFont.woff', // or .ttf, .otf
-    size: 72,
-    layout: { width: 400, align: 'center', language: 'fr' }
-  });
-</script>
-```
-
-Patterns loaded via script tags automatically register themselves this way
-
-### React Three Fiber usage
-
-For `react-three-fiber` projects, use the `<ThreeText>` component which manages font loading, geometry creation, and React's lifecycle:
-
-```jsx
-import { ThreeText } from 'three-text/react';
-
-function Scene() {
-  return (
-    <ThreeText
-      font="/fonts/Font-Regular.woff"
-      size={72}
-      depth={100}
-      layout={{
-        hyphenate: true,
-        language: 'fr',
-      }}
-      onLoad={(geometry, info) => console.log('Text loaded!', info)}
-    >
-      Hello world
-    </ThreeText>
-  );
-}
-```
-
-All `TextOptions` flow through as props, alongside standard Three.js mesh properties:
-
-```jsx
-<ThreeText
-  font="/fonts/MyFont.woff"
-  size={100}
-  depth={100}
-  lineHeight={1.2}
-  letterSpacing={0.02}
-  fontVariations={{ wght: 500, wdth: 100 }}
-  layout={{
-    width: 800,
-    align: 'justify',
-    language: 'en-us',
-  }}
-  position={[0, 0, 0]}
-  rotation={[0, Math.PI / 4, 0]}
-  material={customMaterial}
-  vertexColors={true} // Default: true
-  onLoad={(geometry, info) => {}}
-  onError={(error) => {}}
->
-  Your text content here
-</ThreeText>
-```
-
-Vertex colors are included by default for maximum compatibility with custom materials. Set `vertexColors={false}` to disable them
 
 ## Development and examples
 
@@ -242,36 +214,41 @@ Then navigate to `http://localhost:3000`
 
 ## Why three-text?
 
-`three-text` was designed to produce high-fidelity, 3D mesh geometry for
-Three.js scenes
+three-text generates high-fidelity 3D mesh geometry from font files. Unlike texture-based approaches, it produces true geometry that can be lit, shaded, and manipulated like any 3D model.
 
-Existing Three.js text solutions take different approaches:
+Existing solutions take different approaches:
 
 - **Three.js native TextGeometry** uses fonts converted by facetype.js to JSON format. It creates 3D text by extruding flat 2D character outlines. While this produces true 3D geometry with depth, there is no support for real fonts or OpenType features needed for many of the world's scripts
-- **three-bmfont-text** is a 2D approach, using pre-rendered bitmap fonts with SDF support. Texture atlases are generated at specific sizes, and artifacts are apparent up close
+- **three-bmfont-text** is a 2D approach for Three.js, using pre-rendered bitmap fonts with SDF support. Texture atlases are generated at specific sizes, and artifacts are apparent up close
 - **troika-three-text** uses MSDF, which improves quality, and like three-text, it is built on HarfBuzz, which provides substantial language coverage, but is ultimately a 2D technique in image space. For flat text that does not need formatting or extrusion, and where artifacts are acceptable up close, troika works well
 
-`three-text` generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than `three-bmfont-text` and `troika-three-text` when flat, and can fully participate in the scene as a `THREE.BufferGeometry`. The library caches tesselated glyphs, so a paragraph of 1000 words might only require 50 tessellations depending on the language and only one draw call is made. This makes it well-suited to longer texts. In addition to performance considerations, three-text provides control over typesetting and paragraph justification via TeX-based parameters
+three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches when flat, and produces real mesh data that can be used with any rendering system. The library caches tessellated glyphs, so a paragraph of 1000 words might only require 50 tessellations depending on the language. This makes it well-suited to longer texts. In addition to performance considerations, three-text provides control over typesetting and paragraph justification via TeX-based parameters
 
 ## Library structure
 
 ```
 three-text/
 ├── src/
-│   ├── core/                   # Core text rendering engine
-│   │   ├── Text.ts             # Main Text class, user-facing API
-│   │   ├── types.ts            # Shared TypeScript interfaces and types
+│   ├── core/                   # Framework-agnostic text engine
+│   │   ├── Text.ts             # Core API (returns raw arrays)
+│   │   ├── vectors.ts          # Vec2, Vec3, Box3Core
+│   │   ├── types.ts            # TypeScript interfaces
 │   │   ├── cache/              # Glyph caching system
 │   │   ├── font/               # Font loading and metrics
 │   │   ├── shaping/            # HarfBuzz text shaping
 │   │   ├── layout/             # Line breaking and text layout
 │   │   └── geometry/           # Tessellation and geometry processing
-│   ├── react/                  # React Three Fiber components
+│   ├── three/                  # Three.js adapter
+│   │   ├── index.ts            # BufferGeometry wrapper
+│   │   ├── react.tsx           # React component export
+│   │   └── ThreeText.tsx       # React Three Fiber component
+│   ├── webgl/                  # WebGL buffer utility
+│   ├── webgpu/                 # WebGPU buffer utility
+│   ├── p5/                     # p5.js geometry converter
 │   ├── hyphenation/            # Language-specific hyphenation patterns
 │   └── utils/                  # Performance logging, data structures
-├── scripts/                    # Scripts for converting hyphenation patterns and more
-├── examples/                   # Demos and usage examples
-└── dist/                       # Built library (ESM, CJS, UMD) including patterns
+├── examples/                   # Demos for all adapters
+└── dist/                       # Built library (ESM, CJS, UMD)
 ```
 
 ## Key concepts and methods
@@ -632,23 +609,30 @@ Text matching occurs after layout processing, so patterns like "connection" will
 
 The library's full TypeScript definitions are the most complete source of truth for the API. The core data structures and configuration options can be found in `src/core/types.ts`
 
-### Text class
+### Core API
 
-#### Static Methods
+#### `Text.create(options: TextOptions): Promise<TextGeometryInfo>`
 
-##### `Text.create(options: TextOptions): Promise<TextGeometryInfo>`
+Creates text geometry with automatic font loading and HarfBuzz initialization.
 
-Creates text geometry with automatic font loading and HarfBuzz initialization. This is the primary API for all text rendering. Returns a result object with:
-
-- `geometry: BufferGeometry` - Three.js geometry ready for rendering
-- `glyphs: GlyphGeometryInfo[]` - Per-glyph information
+**Core (`three-text`) returns:**
+- `vertices: Float32Array` - Vertex positions
+- `normals: Float32Array` - Vertex normals
+- `indices: Uint32Array` - Triangle indices
+- `colors?: Float32Array` - Vertex colors (if color option used)
+- `glyphAttributes?` - Per-glyph shader attributes (if requested)
+- `glyphs: GlyphGeometryInfo[]` - Per-glyph metadata
 - `planeBounds` - Overall text bounds
 - `stats` - Performance and optimization statistics
 - `query(options)` - Method to find text ranges
-- `getLoadedFont()` - Access to font metadata and variable font axes
-- `getCacheStatistics()` - Glyph cache performance data
-- `clearCache()` - Clear the glyph geometry cache for this instance
-- `measureTextWidth(text, letterSpacing?)` - Measure text width in font units
+- `getLoadedFont()` - Access to font metadata
+- `getCacheStatistics()` - Cache performance data
+- `clearCache()` - Clear the glyph cache
+- `measureTextWidth(text, letterSpacing?)` - Measure text width
+
+**Three.js adapter (`three-text/three`) returns:**
+- `geometry: BufferGeometry` - Three.js geometry
+- Plus all the above except vertices/normals/indices/colors/glyphAttributes
 
 ##### `Text.setHarfBuzzPath(path: string): void`
 
@@ -759,25 +743,42 @@ interface GeometryOptimizationOptions {
 }
 ````
 
-#### TextGeometryInfo
+#### TextGeometryInfo (Core)
 
 ```typescript
 interface TextGeometryInfo {
-  geometry: BufferGeometry; // The final Three.js geometry, ready for use in a Mesh
-  glyphs: GlyphGeometryInfo[]; // Detailed information and bounds for each individual glyph
+  vertices: Float32Array;
+  normals: Float32Array;
+  indices: Uint32Array;
+  colors?: Float32Array;
+  glyphAttributes?: {
+    glyphCenter: Float32Array;
+    glyphIndex: Float32Array;
+    glyphLineIndex: Float32Array;
+  };
+  glyphs: GlyphGeometryInfo[];
   planeBounds: {
     min: { x: number; y: number; z: number };
     max: { x: number; y: number; z: number };
   };
   stats: {
-    trianglesGenerated: number; // Total triangles in the final mesh
-    verticesGenerated: number; // Total vertices in the final mesh
-    pointsRemovedByVisvalingam: number; // Curve points removed by Visvalingam-Whyatt simplification
-    pointsRemovedByColinear: number; // Redundant points removed from straight lines
-    originalPointCount: number; // Total curve points before any optimization
+    trianglesGenerated: number;
+    verticesGenerated: number;
+    pointsRemovedByVisvalingam: number;
+    pointsRemovedByColinear: number;
+    originalPointCount: number;
   };
-  query(options: TextQueryOptions): TextRange[]; // Method to find ranges of text within the geometry
-  coloredRanges?: ColoredRange[]; // If `color` option was used, an array of the resolved color ranges
+  query(options: TextQueryOptions): TextRange[];
+  coloredRanges?: ColoredRange[];
+}
+```
+
+#### ThreeTextGeometryInfo (Three.js Adapter)
+
+```typescript
+interface ThreeTextGeometryInfo {
+  geometry: BufferGeometry; // Three.js geometry
+  // Plus glyphs, planeBounds, stats, query, coloredRanges, utility methods
 }
 ```
 
@@ -947,18 +948,27 @@ The script then processes the TeX hyphenation data into optimized trie structure
 
 ## Build outputs
 
-The build generates multiple module formats:
+The build generates multiple module formats for core and all adapters:
 
-- **ESM**: `dist/index.js` - ES6 modules for modern bundlers
-- **CommonJS**: `dist/index.cjs` - Node.js compatibility
-- **UMD**: `dist/index.umd.js` - Universal module for browsers
-- **Types**: `dist/index.d.ts` - TypeScript declarations
+**Core:**
+- `dist/index.js` (ESM)
+- `dist/index.cjs` (CommonJS)
+- `dist/index.umd.js` (UMD)
+- `dist/index.d.ts` (TypeScript)
 
-Hyphenation patterns are available in both ESM and UMD formats in `dist/patterns/`
+**Adapters:**
+- `dist/three/` - Three.js adapter
+- `dist/three/react.js` - React component
+- `dist/webgl/` - WebGL utility
+- `dist/webgpu/` - WebGPU utility
+- `dist/p5/` - p5.js converter
+
+**Patterns:**
+- `dist/patterns/` - Hyphenation patterns (ESM and UMD)
 
 ## Acknowledgements
 
-`three-text` is built on top of HarfBuzz, TeX, and Three.js, and this library would not exist without the authors and communities who contibute to, support, and steward these projects. Thanks to Theo Honohan and Yasi Perera for the advice on graphics
+`three-text` is built on HarfBuzz and TeX, and this library would not exist without the authors and communities who contribute to, support, and steward these projects. Thanks to Theo Honohan and Yasi Perera for advice on graphics
 
 ## License
 

@@ -240,21 +240,21 @@ const rewriteImports = () => ({
   }
 });
 
-const reactConfig = {
-  input: 'src/react/index.ts',
+const threeConfig = {
+  input: 'src/three/index.ts',
   output: [
     {
-      file: 'dist/react/index.js',
+      file: 'dist/three/index.js',
       format: 'esm',
       sourcemap: false
     },
     {
-      file: 'dist/react/index.cjs',
+      file: 'dist/three/index.cjs',
       format: 'cjs',
       sourcemap: false
     }
   ],
-  external: ['react', 'three', 'react/jsx-runtime', /^\.\.\/core\//],
+  external: ['three', /^\.\.\/core\//],
   plugins: [
     replace({
       preventAssignment: true,
@@ -279,17 +279,209 @@ const reactConfig = {
   ]
 };
 
-const reactDtsConfig = {
-  input: 'dist/types/react/index.d.ts',
-  output: [{ file: 'dist/react/index.d.ts', format: 'es' }],
+const reactConfig = {
+  input: 'src/three/react.tsx',
+  output: [
+    {
+      file: 'dist/three/react.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/three/react.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: ['react', 'three', 'react/jsx-runtime', /^\.\/index/],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
+const threeDtsConfig = {
+  input: 'dist/types/three/index.d.ts',
+  output: [{ file: 'dist/three/index.d.ts', format: 'es' }],
   plugins: [dts()],
-  external: ['react', 'three', 'react/jsx-runtime', /^\.\.\/core\//]
+  external: ['three', /^\.\.\/core\//]
+};
+
+const reactDtsConfig = {
+  input: 'dist/types/three/react.d.ts',
+  output: [{ file: 'dist/three/react.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: ['react', 'three', 'react/jsx-runtime', /^\.\/index/]
+};
+
+const webgpuConfig = {
+  input: 'src/webgpu/index.ts',
+  output: [
+    {
+      file: 'dist/webgpu/index.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/webgpu/index.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: [/^\.\.\/core\//],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
+const webgpuDtsConfig = {
+  input: 'dist/types/webgpu/index.d.ts',
+  output: [{ file: 'dist/webgpu/index.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: [/^\.\.\/core\//]
+};
+
+const webglConfig = {
+  input: 'src/webgl/index.ts',
+  output: [
+    {
+      file: 'dist/webgl/index.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/webgl/index.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: [/^\.\.\/core\//],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
+const webglDtsConfig = {
+  input: 'dist/types/webgl/index.d.ts',
+  output: [{ file: 'dist/webgl/index.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: [/^\.\.\/core\//]
+};
+
+const p5Config = {
+  input: 'src/p5/index.ts',
+  output: [
+    {
+      file: 'dist/p5/index.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/p5/index.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: [/^\.\.\/core\//],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
+const p5DtsConfig = {
+  input: 'dist/types/p5/index.d.ts',
+  output: [{ file: 'dist/p5/index.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: [/^\.\.\/core\//]
 };
 
 export default defineConfig([
   mainLibraryConfig,
   umdConfig,
   dtsConfig,
+  threeConfig,
+  threeDtsConfig,
   reactConfig,
-  reactDtsConfig
+  reactDtsConfig,
+  webglConfig,
+  webglDtsConfig,
+  webgpuConfig,
+  webgpuDtsConfig,
+  p5Config,
+  p5DtsConfig
 ]);

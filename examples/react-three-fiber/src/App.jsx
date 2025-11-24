@@ -9,8 +9,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useControls, button, monitor } from "leva";
 import * as THREE from "three";
-import { Text as ThreeText } from "three-text";
-import { ThreeText as ThreeTextReact } from "three-text/react";
+import { Text } from "three-text/three/react";
 import FontDropzone from "./components/FontDropzone";
 import VariableFontControls from "./components/VariableFontControls";
 import flipVertexShader from "./shaders/flip.vert?raw";
@@ -22,7 +21,7 @@ import waveVertexShader from "./shaders/wave.vert?raw";
 import waveFragmentShader from "./shaders/wave.frag?raw";
 import offVertexShader from "./shaders/off.vert?raw";
 
-ThreeText.setHarfBuzzPath("/hb/hb.wasm");
+Text.setHarfBuzzPath("/hb/hb.wasm");
 
 function AnimationUpdater({ meshRef, animationMode, waveControls, flipControls, explodeControls, orbitControls, twisterControls }) {
   useFrame((state) => {
@@ -70,7 +69,8 @@ function App() {
     setCurrentFontName(fontName);
 
     // Detect variation axes by creating a small text sample
-    const tempResult = await ThreeText.create({
+    // Note: This uses the imperative API - normally you'd use onLoad callback instead
+    const tempResult = await Text.create({
       text: "temp",
       font: fontBuffer,
       size: 12
@@ -444,7 +444,7 @@ function App() {
           twisterControls={twisterControls}
         />
 
-        <ThreeTextReact
+        <Text
           key={geometryKey}
           ref={textMeshRef}
           font={customFont?.buffer || "./fonts/NimbusSanL-Reg.woff"}
@@ -508,7 +508,7 @@ function App() {
           onError={handleError}
         >
           {textControls.text}
-        </ThreeTextReact>
+        </Text>
 
         <OrbitControls
           enableDamping

@@ -36,7 +36,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-import { Vector2 } from 'three';
+import { Vec2 } from '../vectors';
 import { CurveFidelityConfig } from '../types';
 
 export const DEFAULT_CURVE_FIDELITY: CurveFidelityConfig = {
@@ -65,11 +65,11 @@ export class Polygonizer {
   }
 
   public polygonizeQuadratic(
-    start: Vector2,
-    control: Vector2,
-    end: Vector2
-  ): Vector2[] {
-    const points: Vector2[] = [];
+    start: Vec2,
+    control: Vec2,
+    end: Vec2
+  ): Vec2[] {
+    const points: Vec2[] = [];
     this.recursiveQuadratic(
       start.x,
       start.y,
@@ -84,12 +84,12 @@ export class Polygonizer {
   }
 
   public polygonizeCubic(
-    start: Vector2,
-    control1: Vector2,
-    control2: Vector2,
-    end: Vector2
-  ): Vector2[] {
-    const points: Vector2[] = [];
+    start: Vec2,
+    control1: Vec2,
+    control2: Vec2,
+    end: Vec2
+  ): Vec2[] {
+    const points: Vec2[] = [];
     this.recursiveCubic(
       start.x,
       start.y,
@@ -112,7 +112,7 @@ export class Polygonizer {
     y2: number,
     x3: number,
     y3: number,
-    points: Vector2[],
+    points: Vec2[],
     level: number = 0
   ) {
     if (level > RECURSION_LIMIT) return;
@@ -191,7 +191,7 @@ export class Polygonizer {
     y3: number,
     x4: number,
     y4: number,
-    points: Vector2[],
+    points: Vec2[],
     level: number = 0
   ) {
     if (level > RECURSION_LIMIT) return;
@@ -362,8 +362,8 @@ export class Polygonizer {
     );
   }
 
-  private addPoint(x: number, y: number, points: Vector2[]) {
-    const newPoint = new Vector2(x, y);
+  private addPoint(x: number, y: number, points: Vec2[]) {
+    const newPoint = new Vec2(x, y);
 
     if (points.length === 0) {
       points.push(newPoint);

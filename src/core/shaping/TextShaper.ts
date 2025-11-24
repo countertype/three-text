@@ -1,4 +1,4 @@
-import { Vector3, BufferGeometry } from 'three';
+import { Vec3 } from '../vectors';
 import {
   LoadedFont,
   GlyphGeometryInfo,
@@ -14,7 +14,7 @@ import { perfLogger } from '../../utils/PerformanceLogger';
 import { SPACE_STRETCH_RATIO, SPACE_SHRINK_RATIO } from '../layout/constants';
 
 export interface ShapedResult {
-  geometry: BufferGeometry;
+  geometry: any;
   glyphInfos: GlyphGeometryInfo[];
   planeBounds: {
     min: { x: number; y: number; z: number };
@@ -110,9 +110,9 @@ export class TextShaper {
     const clusters: GlyphCluster[] = [];
     let currentClusterGlyphs: HarfBuzzGlyph[] = [];
     let currentClusterText = '';
-    let clusterStartPosition = new Vector3();
+    let clusterStartPosition = new Vec3();
 
-    let cursor = new Vector3(
+    let cursor = new Vec3(
       lineInfo.xOffset,
       -lineIndex * scaledLineHeight,
       0
@@ -158,7 +158,7 @@ export class TextShaper {
 
       const absoluteGlyphPosition = cursor
         .clone()
-        .add(new Vector3(glyph.dx, glyph.dy, 0));
+        .add(new Vec3(glyph.dx, glyph.dy, 0));
 
       if (!isWhitespace) {
         if (currentClusterGlyphs.length === 0) {

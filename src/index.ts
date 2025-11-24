@@ -1,3 +1,4 @@
+// Export core Text class (framework-agnostic)
 export { Text } from './core/Text';
 export { DEFAULT_CURVE_FIDELITY } from './core/geometry/Polygonizer';
 export { FontMetadataExtractor } from './core/font/FontMetadata';

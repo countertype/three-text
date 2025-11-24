@@ -1,8 +1,8 @@
 /// <reference types="@react-three/fiber" />
 import { useEffect, useState, useMemo, useRef, forwardRef } from "react";
 import * as THREE from "three";
-import { Text } from "../core/Text";
-import type { TextOptions, TextGeometryInfo } from "../core/types";
+import { Text as ThreeText } from "./index";
+import type { TextOptions, ThreeTextGeometryInfo as TextGeometryInfo } from "./index";
 
 function deepEqual(a: any, b: any): boolean {
   if (a === b) return true;
@@ -44,8 +44,8 @@ export interface ThreeTextProps extends Omit<TextOptions, "text"> {
   vertexColors?: boolean;
 }
 
-export const ThreeText = forwardRef<THREE.Mesh, ThreeTextProps>(
-  function ThreeText(props, ref) {
+export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
+  function Text(props, ref) {
     const {
       children,
       font,
@@ -84,7 +84,7 @@ export const ThreeText = forwardRef<THREE.Mesh, ThreeTextProps>(
 
           if (cancelled) return;
 
-          const text = await Text.create({
+          const text = await ThreeText.create({
             text: children,
             font,
             ...memoizedTextOptions,

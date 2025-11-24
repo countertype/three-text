@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Vec3 } from '../vectors';
 import type { GlyphContours } from '../types';
 
 interface BBox {
@@ -15,7 +15,7 @@ export class BoundaryClusterer {
 
   public cluster(
     glyphContoursList: GlyphContours[],
-    positions: Vector3[]
+    positions: Vec3[]
   ): number[][] {
     if (glyphContoursList.length === 0) {
       return [];
@@ -26,7 +26,7 @@ export class BoundaryClusterer {
 
   private clusterSweepLine(
     glyphContoursList: GlyphContours[],
-    positions: Vector3[]
+    positions: Vec3[]
   ): number[][] {
     const n = glyphContoursList.length;
     if (n <= 1) return n === 0 ? [] : [[0]];
@@ -103,7 +103,7 @@ export class BoundaryClusterer {
     return Array.from(clusters.values());
   }
 
-  private getWorldBounds(contours: GlyphContours, position: Vector3): BBox {
+  private getWorldBounds(contours: GlyphContours, position: Vec3): BBox {
     return {
       minX: contours.bounds.min.x + position.x,
       minY: contours.bounds.min.y + position.y,

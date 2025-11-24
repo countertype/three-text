@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
-import { Vector2 } from 'three';
 import { Text } from '../src/core/Text';
 import { PathOptimizer } from '../src/core/geometry/PathOptimizer';
-import { Vector3 } from 'three';
+import { Vec2, Vec3 } from '../src/core/vectors';
 import enUs from '../src/hyphenation/en-us';
 
 // Minimal mocks for isolated testing
@@ -131,17 +130,9 @@ vi.mock('../src/core/shaping/DrawCallbacks', () => ({
 }));
 
 vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
-  const mockGeometry = {
-    attributes: {
-      position: { count: 100, array: new Float32Array(300).fill(0) }, // Zero-filled for snapshot consistency
-      color: { count: 100, array: new Float32Array(300) }
-    },
-    index: { count: 300 },
-    scale: vi.fn(),
-    setAttribute: vi.fn(),
-    computeBoundingBox: vi.fn(),
-    translate: vi.fn()
-  };
+  const mockVertices = new Float32Array(300).fill(0);
+  const mockNormals = new Float32Array(300).fill(0);
+  const mockIndices = new Uint32Array(300).fill(0);
 
   return {
     GlyphGeometryBuilder: vi.fn().mockImplementation(() => ({
@@ -149,12 +140,14 @@ vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
       setCurveFidelityConfig: vi.fn(),
       setGeometryOptimization: vi.fn(),
       getOptimizationStats: vi.fn().mockReturnValue({
-        pointsRemovedByVisvalingam: 5, // Return a non-zero value
-        pointsRemovedByColinear: 2, // Return a non-zero value
+        pointsRemovedByVisvalingam: 5,
+        pointsRemovedByColinear: 2,
         originalPointCount: 100
       }),
       buildInstancedGeometry: vi.fn().mockReturnValue({
-        geometry: mockGeometry,
+        vertices: mockVertices,
+        normals: mockNormals,
+        indices: mockIndices,
         glyphInfos: [],
         planeBounds: {
           min: { x: 0, y: 0, z: 0 },
@@ -186,7 +179,7 @@ vi.mock('../src/core/shaping/TextShaper', () => {
           {
             text: 'Hello',
             glyphs: [], // Glyphs not needed for this level of mock
-            position: new Vector3(0, 0, 0),
+            position: new Vec3(0, 0, 0),
             originalStart: 0
           }
         ]
@@ -221,11 +214,11 @@ describe('Text Library', () => {
 
       const input = {
         points: [
-          new Vector2(0, 0),
-          new Vector2(5, 0),
-          new Vector2(10, 0),
-          new Vector2(10, 10),
-          new Vector2(0, 10)
+          new Vec2(0, 0),
+          new Vec2(5, 0),
+          new Vec2(10, 0),
+          new Vec2(10, 10),
+          new Vec2(0, 10)
         ],
         glyphIndex: 1
       };
@@ -248,8 +241,8 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
-      expect(result.geometry.attributes.position.count).toBeGreaterThan(0);
+      expect(result.vertices).toBeDefined();
+      expect(result.vertices.length).toBeGreaterThan(0);
     });
 
     it('produces deterministic output', async () => {
@@ -260,7 +253,7 @@ describe('Text Library', () => {
         font: buffer,
         text: 'Hello'
       });
-      const positions = Array.from(result.geometry.attributes.position.array);
+      const positions = Array.from(result.vertices);
 
       expect(positions).toMatchSnapshot();
     });
@@ -321,7 +314,7 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
+      expect(result.vertices).toBeDefined();
     });
 
     it('applies hyphenation', async () => {
@@ -340,7 +333,7 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
+      expect(result.vertices).toBeDefined();
     });
 
     it('dynamically loads hyphenation patterns and uses them', async () => {
@@ -380,13 +373,9 @@ describe('Text Library', () => {
         }
       });
 
-      // With hyphenation, should be able to fit more text per line (more vertices for same text)
-      expect(
-        hyphenatedResult.geometry.attributes.position.count
-      ).toBeGreaterThan(0);
-      expect(
-        nonHyphenatedResult.geometry.attributes.position.count
-      ).toBeGreaterThan(0);
+      // With hyphenation, should be able to fit more text per line
+      expect(hyphenatedResult.vertices.length).toBeGreaterThan(0);
+      expect(nonHyphenatedResult.vertices.length).toBeGreaterThan(0);
     });
 
     it('handles multiline text', async () => {
@@ -398,7 +387,7 @@ describe('Text Library', () => {
         text: 'Line 1\nLine 2'
       });
 
-      expect(result.geometry.attributes.position.count).toBeGreaterThan(0);
+      expect(result.vertices.length).toBeGreaterThan(0);
       expect(result.planeBounds).toBeDefined();
     });
   });
@@ -437,7 +426,7 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry.attributes.position.count).toBeGreaterThan(0);
+      expect(result.vertices.length).toBeGreaterThan(0);
     });
   });
 
@@ -471,7 +460,7 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
+      expect(result.vertices).toBeDefined();
     });
   });
 
@@ -487,7 +476,7 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
+      expect(result.vertices).toBeDefined();
     });
   });
 
@@ -506,11 +495,8 @@ describe('Text Library', () => {
         text: 'A'
       });
 
-      expect(result1.geometry).toBeDefined();
-      expect(result2.geometry).toBeDefined();
-
-      // Both instances should benefit from shared tessellated glyph cache
-      // (same font content = same fontId = shared cache entries)
+      expect(result1.vertices).toBeDefined();
+      expect(result2.vertices).toBeDefined();
     });
 
     it('respects custom cache size configuration', async () => {
@@ -526,7 +512,7 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
+      expect(result.vertices).toBeDefined();
       expect(result.getCacheStatistics).toBeDefined();
 
       // Verify cache statistics are available
@@ -568,8 +554,8 @@ describe('Text Library', () => {
       });
 
       expect(result).toBeDefined();
-      expect(result.geometry).toBeDefined();
-      expect(result.geometry.attributes.position.count).toBeGreaterThan(0);
+      expect(result.vertices).toBeDefined();
+      expect(result.vertices.length).toBeGreaterThan(0);
     });
 
     it('reuses cached fonts across multiple calls', async () => {
@@ -588,8 +574,8 @@ describe('Text Library', () => {
         size: 72
       });
 
-      expect(result1.geometry).toBeDefined();
-      expect(result2.geometry).toBeDefined();
+      expect(result1.vertices).toBeDefined();
+      expect(result2.vertices).toBeDefined();
     });
 
     it('handles different font variations as separate cache entries', async () => {
@@ -609,8 +595,8 @@ describe('Text Library', () => {
         fontVariations: { wght: 700 }
       });
 
-      expect(normal.geometry).toBeDefined();
-      expect(bold.geometry).toBeDefined();
+      expect(normal.vertices).toBeDefined();
+      expect(bold.vertices).toBeDefined();
     });
   });
 
@@ -626,7 +612,7 @@ describe('Text Library', () => {
         color: [1, 0, 0]
       });
 
-      expect(result.geometry.attributes.color).toBeDefined();
+      expect(result.colors).toBeDefined();
       expect(result.coloredRanges).toBeDefined();
       expect(result.coloredRanges!.length).toBe(1);
     });
@@ -648,7 +634,7 @@ describe('Text Library', () => {
         }
       });
 
-      expect(result.geometry.attributes.color).toBeDefined();
+      expect(result.colors).toBeDefined();
       expect(result.coloredRanges).toBeDefined();
       expect(result.coloredRanges!.length).toBeGreaterThan(0);
     });
@@ -670,7 +656,7 @@ describe('Text Library', () => {
         }
       });
 
-      expect(result.geometry.attributes.color).toBeDefined();
+      expect(result.colors).toBeDefined();
       expect(result.coloredRanges).toBeDefined();
     });
 
