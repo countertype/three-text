@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-007acc.svg)](https://www.typescriptlang.org/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3_or_later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-A high fidelity font renderer and text layout engine for the web
+A high fidelity 3D font renderer and text layout engine for the web
 
 ![Screenshot of three-text example file](https://countertype.com/assets/three-text/3D.png)
 
