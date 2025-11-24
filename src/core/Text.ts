@@ -610,12 +610,9 @@ export class Text {
 
     const finalScale = size / this.loadedFont!.upem;
     
-    // Scale vertices and normals directly
+    // Scale vertices only (normals are unit vectors, don't scale)
     for (let i = 0; i < vertices.length; i++) {
       vertices[i] *= finalScale;
-    }
-    for (let i = 0; i < normals.length; i++) {
-      normals[i] *= finalScale;
     }
 
     planeBounds.min.x *= finalScale;

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1] - 2025-11-24
+
+### Fixed
+
+- Normal vectors are no longer scaled
+- Front face normals now point towards viewer
+
 ## [0.2.0] - 2025-11-24
 
 ### Breaking Changes

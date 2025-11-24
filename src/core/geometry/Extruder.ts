@@ -51,7 +51,7 @@ export class Extruder {
 
     for (let i = 0; i < points.length; i += 2) {
       vertices.push(points[i], points[i + 1], 0);
-      normals.push(0, 0, 1); // Front-facing normal for DoubleSide compatibility
+      normals.push(0, 0, -1);
     }
 
     // Add triangle indices
