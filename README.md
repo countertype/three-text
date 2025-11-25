@@ -91,6 +91,26 @@ const mesh = new THREE.Mesh(result.geometry, material);
 scene.add(mesh);
 ```
 
+#### React Three Fiber
+
+```jsx
+import { Canvas } from '@react-three/fiber';
+import { Text } from 'three-text/three/react';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+
+function App() {
+  return (
+    <Canvas>
+      <ambientLight />
+      <Text font="/fonts/Font.woff" size={72} depth={10}>
+        Hello React
+      </Text>
+    </Canvas>
+  );
+}
+```
+
 #### p5.js
 
 ```javascript
@@ -122,25 +142,6 @@ function draw() {
 
 `createThreeTextGeometry()` accepts all the same options as Three.js (`layout`, `fontVariations`, `depth`, etc.) and returns `{ geometry, planeBounds, glyphs }`. Use `planeBounds` to center the text
 
-#### React Three Fiber
-
-```jsx
-import { Canvas } from '@react-three/fiber';
-import { Text } from 'three-text/three/react';
-
-Text.setHarfBuzzPath('/hb/hb.wasm');
-
-function App() {
-  return (
-    <Canvas>
-      <ambientLight />
-      <Text font="/fonts/Font.woff" size={72} depth={10}>
-        Hello React
-      </Text>
-    </Canvas>
-  );
-}
-```
 
 ### Setup
 
