@@ -26,8 +26,8 @@ Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harf
 - [Overview](#overview)
 - [Getting started](#getting-started)
   - [Three.js](#threejs)
-  - [p5.js](#p5js)
   - [React Three Fiber](#react-three-fiber)
+  - [p5.js](#p5js)
 - [Development and examples](#development-and-examples)
 - [Architecture](#architecture)
 - [Why three-text?](#why-three-text)
@@ -989,7 +989,7 @@ The build generates multiple module formats for core and all adapters:
 
 ## Acknowledgements
 
-`three-text` is built on HarfBuzz and TeX, and this library would not exist without the authors and communities who contribute to, support, and steward these projects. Thanks to Theo Honohan and Yasi Perera for advice on graphics
+`three-text` is built on HarfBuzz and TeX, and started as a Three.js project; this library would not exist without the authors and communities who contribute to, support, and steward these projects. Thanks to Theo Honohan and Yasi Perera for the advice on graphics
 
 ## License
 
