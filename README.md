@@ -28,9 +28,6 @@ Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harf
   - [Three.js](#threejs)
   - [p5.js](#p5js)
   - [React Three Fiber](#react-three-fiber)
-  - [WebGL](#webgl)
-  - [WebGPU](#webgpu)
-  - [Core](#core)
 - [Development and examples](#development-and-examples)
 - [Architecture](#architecture)
 - [Why three-text?](#why-three-text)
@@ -120,6 +117,28 @@ function draw() {
   background(200);
   lights();
   if (textResult) model(textResult.geometry);
+}
+```
+
+`createThreeTextGeometry()` accepts all the same options as Three.js (`layout`, `fontVariations`, `depth`, etc.) and returns `{ geometry, planeBounds, glyphs }`. Use `planeBounds` to center the text
+
+#### React Three Fiber
+
+```jsx
+import { Canvas } from '@react-three/fiber';
+import { Text } from 'three-text/three/react';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+
+function App() {
+  return (
+    <Canvas>
+      <ambientLight />
+      <Text font="/fonts/Font.woff" size={72} depth={10}>
+        Hello React
+      </Text>
+    </Canvas>
+  );
 }
 ```
 

@@ -142,7 +142,8 @@ Text.setHarfBuzzPath('/hb/hb.wasm');
 function App() {
   return (
     <Canvas>
-      <Text font="/fonts/Font.woff" size={72}>
+      <ambientLight />
+      <Text font="/fonts/Font.woff" size={72} depth={10}>
         Hello React
       </Text>
     </Canvas>
