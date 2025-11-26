@@ -1215,6 +1215,7 @@
 
             const needsGlyphAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(params.shaderMode);
 
+            const startTime = performance.now();
             const result = await Text.create({
               text: params.text,
               font: font,
@@ -1311,7 +1312,8 @@
 
             scene.add(textMesh);
             
-            updateStatus(`Text rendered successfully: ${result.stats.trianglesGenerated.toLocaleString()} triangles`, "ready");
+            const renderTime = Math.round(performance.now() - startTime);
+            updateStatus(`${result.stats.trianglesGenerated.toLocaleString()} triangles in ${renderTime}ms`, "ready");
           } catch (error) {
             console.error("Error rendering text:", error);
             updateStatus(`Error: ${error.message}`, "error");
