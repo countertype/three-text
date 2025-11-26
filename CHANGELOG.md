@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.3] - 2025-11-26
+
+### Fixed
+
+- Three.js adapter now uses `Uint32BufferAttribute` instead of `Array.from()` for indices
+
+### Changed
+
+- Examples now display render timing: "X triangles in Yms"
+
 ## [0.2.2] - 2025-11-24
 
 ### Changed

@@ -1,7 +1,7 @@
 // Three.js adapter - wraps core text processing and returns BufferGeometry
 // This is a thin convenience layer for Three.js users
 
-import { BufferGeometry, Float32BufferAttribute } from 'three';
+import { BufferGeometry, Float32BufferAttribute, Uint32BufferAttribute } from 'three';
 import { Text as TextCore } from '../core/Text';
 import type { TextOptions, TextGeometryInfo as CoreTextGeometryInfo, LoadedFont } from '../core/types';
 import type { HyphenationTrieNode } from '../hyphenation';
@@ -32,7 +32,7 @@ export class Text {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new Float32BufferAttribute(coreResult.vertices, 3));
     geometry.setAttribute('normal', new Float32BufferAttribute(coreResult.normals, 3));
-    geometry.setIndex(Array.from(coreResult.indices));
+    geometry.setIndex(new Uint32BufferAttribute(coreResult.indices, 1));
     
     // Add optional attributes
     if (coreResult.colors) {
