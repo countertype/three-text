@@ -387,9 +387,9 @@
                 vec3 normal = normalize(vNormal);
                 
                 float diffuse = max(dot(normal, lightDirection), 0.0);
-                float ambient = 0.3;
-                float lightIntensity = ambient + diffuse * 0.7;
-                vec3 baseColor = vColor;
+                float ambient = 0.5;
+                float lightIntensity = ambient + diffuse * 0.5;
+                vec3 baseColor = length(vColor) > 0.0 ? vColor : vec3(1.0);
                 
                 vec3 finalColor = baseColor * lightIntensity;
                 
@@ -743,9 +743,9 @@
                 vec3 normal = normalize(vNormal);
 
                 float diffuse = max(dot(normal, lightDirection), 0.0);
-                float ambient = 0.3;
-                float lightIntensity = ambient + diffuse * 0.7;
-                vec3 baseColor = vColor;
+                float ambient = 0.5;
+                float lightIntensity = ambient + diffuse * 0.5;
+                vec3 baseColor = length(vColor) > 0.0 ? vColor : vec3(1.0);
 
                 vec3 finalColor = baseColor * lightIntensity;
 
@@ -1215,6 +1215,7 @@
 
             const needsGlyphAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(params.shaderMode);
 
+            const startTime = performance.now();
             const result = await Text.create({
               text: params.text,
               font: font,
@@ -1311,7 +1312,8 @@
 
             scene.add(textMesh);
             
-            updateStatus(`Text rendered successfully: ${result.stats.trianglesGenerated.toLocaleString()} triangles`, "ready");
+            const renderTime = Math.round(performance.now() - startTime);
+            updateStatus(`${result.stats.trianglesGenerated.toLocaleString()} triangles in ${renderTime}ms`, "ready");
           } catch (error) {
             console.error("Error rendering text:", error);
             updateStatus(`Error: ${error.message}`, "error");

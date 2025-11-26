@@ -90,19 +90,6 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
             ...memoizedTextOptions,
           });
 
-          if (
-            text.geometry &&
-            !text.geometry.attributes.color &&
-            vertexColors
-          ) {
-            const vertexCount = text.geometry.attributes.position.count;
-            const colors = new Float32Array(vertexCount * 3).fill(1.0);
-            text.geometry.setAttribute(
-              "color",
-              new THREE.BufferAttribute(colors, 3)
-            );
-          }
-
           if (!cancelled) {
             setGeometry(text.geometry);
             if (onLoad) onLoad(text.geometry, text);

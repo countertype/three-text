@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.3] - 2025-11-26
+
+### Fixed
+
+- Three.js adapter now uses `Uint32BufferAttribute` for indices
+
+### Changed
+
+- Examples display render timing showing total time for `Text.create()` call
+- Vertex colors are now optional - only added when explicitly provided
+
 ## [0.2.2] - 2025-11-24
 
 ### Changed

@@ -63,6 +63,7 @@ function App() {
   const [variationAxes, setVariationAxes] = useState(null);
   const [fontVariations, setFontVariations] = useState({});
   const textMeshRef = useRef();
+  const renderStartTimeRef = useRef(null);
 
   const handleFontLoad = async (fontBuffer, fontName) => {
     setCustomFont({ buffer: fontBuffer, name: fontName });
@@ -379,8 +380,12 @@ function App() {
     }
 
     const triangles = info?.stats?.trianglesGenerated;
+    const renderTime = renderStartTimeRef.current 
+      ? Math.round(performance.now() - renderStartTimeRef.current)
+      : null;
+    
     const message = triangles 
-      ? `Ready: ${triangles.toLocaleString()} triangles`
+      ? `${triangles.toLocaleString()} triangles${renderTime ? ` in ${renderTime}ms` : ''}`
       : "Ready";
     updateStatus(message, "ready");
   };
@@ -391,6 +396,7 @@ function App() {
 
   useEffect(() => {
     // This effect runs whenever text generation starts
+    renderStartTimeRef.current = performance.now();
     updateStatus("Rendering text...", "loading");
   }, [textControls.text, fontVariations, optimizationControls]);
 
