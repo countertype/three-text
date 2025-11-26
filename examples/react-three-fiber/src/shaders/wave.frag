@@ -8,9 +8,9 @@ void main() {
   vec3 normal = normalize(vNormal);
   
   float diffuse = max(dot(normal, lightDirection), 0.0);
-  float ambient = 0.3;
-  float lightIntensity = ambient + diffuse * 0.7;
-  vec3 baseColor = vColor;
+  float ambient = 0.5;
+  float lightIntensity = ambient + diffuse * 0.5;
+  vec3 baseColor = length(vColor) > 0.0 ? vColor : vec3(1.0);
   
   vec3 finalColor = baseColor * lightIntensity;
   

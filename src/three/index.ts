@@ -34,7 +34,7 @@ export class Text {
     geometry.setAttribute('normal', new Float32BufferAttribute(coreResult.normals, 3));
     geometry.setIndex(new Uint32BufferAttribute(coreResult.indices, 1));
     
-    // Add optional attributes
+    // Add optional color attribute (only if provided)
     if (coreResult.colors) {
       geometry.setAttribute('color', new Float32BufferAttribute(coreResult.colors, 3));
     }
