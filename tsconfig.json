@@ -13,7 +13,8 @@
     "declarationMap": false,
     "sourceMap": false,
     "downlevelIteration": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "typeRoots": ["./node_modules/@types", "./types"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "src/hyphenation/**/*.ts"]

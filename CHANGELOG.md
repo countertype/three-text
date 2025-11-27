@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.4] - 2025-11-26
+
+### Changed
+
+- Switched from `tess2-ts` to `libtess` - submitting type defitinitions to `@types` is a TODO
+
 ## [0.2.3] - 2025-11-26
 
 ### Fixed

@@ -1,5 +1,5 @@
 import type { Path, ProcessedGeometry } from '../types';
-import { tesselate, WINDING, ELEMENT } from 'tess2-ts';
+import * as libtess from 'libtess';
 import { debugLogger } from '../../utils/DebugLogger';
 
 export class Tessellator {
@@ -41,12 +41,9 @@ export class Tessellator {
       debugLogger.log('Two-pass: boundary extraction then triangulation');
 
       // Extract boundaries to remove overlaps
-      const boundaryResult = this.performTessellation(
-        contours,
-        ELEMENT.BOUNDARY_CONTOURS
-      );
+      const boundaryResult = this.performTessellation(contours, 'boundary');
       if (!boundaryResult) {
-        debugLogger.warn('Tess2 returned empty result from boundary pass');
+        debugLogger.warn('libtess returned empty result from boundary pass');
         return { triangles: { vertices: [], indices: [] }, contours: [] };
       }
 
@@ -59,20 +56,20 @@ export class Tessellator {
       debugLogger.log(`Single-pass triangulation for ${isCFF ? 'CFF' : 'TTF'}`);
     }
 
-    // Triangulate the (possibly cleaned) contours
-    const triangleResult = this.performTessellation(contours, ELEMENT.POLYGONS);
+    // Triangulate the contours
+    const triangleResult = this.performTessellation(contours, 'triangles');
     if (!triangleResult) {
       const warning = removeOverlaps
-        ? 'Tess2 returned empty result from triangulation pass'
-        : 'Tess2 returned empty result from single-pass triangulation';
+        ? 'libtess returned empty result from triangulation pass'
+        : 'libtess returned empty result from single-pass triangulation';
       debugLogger.warn(warning);
       return { triangles: { vertices: [], indices: [] }, contours };
     }
 
     return {
       triangles: {
-        vertices: Array.from(triangleResult.vertices),
-        indices: Array.from(triangleResult.elements)
+        vertices: triangleResult.vertices,
+        indices: triangleResult.indices || []
       },
       contours
     };
@@ -88,36 +85,104 @@ export class Tessellator {
     });
   }
 
-  private performTessellation(contours: number[][], elementType: number) {
-    const result = tesselate({
-      contours,
-      windingRule: WINDING.NONZERO,
-      elementType,
-      polySize: 3,
-      vertexSize: 2,
-      strict: false
+  private performTessellation(
+    contours: number[][],
+    mode: 'triangles' | 'boundary'
+  ): { vertices: number[]; indices?: number[]; contourIndices?: number[][] } | null {
+    const tess = new libtess.GluTesselator();
+    
+    // Set winding rule to NON-ZERO
+    tess.gluTessProperty(
+      libtess.gluEnum.GLU_TESS_WINDING_RULE,
+      libtess.windingRule.GLU_TESS_WINDING_NONZERO
+    );
+
+    const vertices: number[] = [];
+    const indices: number[] = [];
+    const contourIndices: number[][] = [];
+    let currentContour: number[] = [];
+
+    if (mode === 'boundary') {
+      tess.gluTessProperty(libtess.gluEnum.GLU_TESS_BOUNDARY_ONLY, true);
+    }
+
+    if (mode === 'triangles') {
+      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_VERTEX_DATA, (data: any) => {
+        indices.push(data);
+      });
+    } else {
+      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_BEGIN, () => {
+        currentContour = [];
+      });
+      
+      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_VERTEX_DATA, (data: any) => {
+        currentContour.push(data);
+      });
+      
+      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_END, () => {
+        if (currentContour.length > 0) {
+          contourIndices.push([...currentContour]);
+        }
+      });
+    }
+
+    tess.gluTessCallback(libtess.gluEnum.GLU_TESS_COMBINE, (coords: number[]) => {
+      const idx = vertices.length / 2;
+      vertices.push(coords[0], coords[1]);
+      return idx;
     });
 
-    return result?.vertices && result?.elements ? result : null;
+    tess.gluTessCallback(libtess.gluEnum.GLU_TESS_ERROR, (errno: number) => {
+      debugLogger.warn(`libtess error: ${errno}`);
+    });
+
+    tess.gluTessNormal(0, 0, 1);
+
+    tess.gluTessBeginPolygon(null);
+
+    for (const contour of contours) {
+      tess.gluTessBeginContour();
+      
+      for (let i = 0; i < contour.length; i += 2) {
+        const idx = vertices.length / 2;
+        vertices.push(contour[i], contour[i + 1]);
+        tess.gluTessVertex([contour[i], contour[i + 1], 0], idx);
+      }
+      
+      tess.gluTessEndContour();
+    }
+
+    tess.gluTessEndPolygon();
+
+    if (vertices.length === 0) {
+      return null;
+    }
+
+    if (mode === 'triangles') {
+      return { vertices, indices };
+    } else {
+      return { vertices, contourIndices };
+    }
   }
 
   private boundaryToContours(boundaryResult: {
     vertices: number[];
-    elements: number[];
+    contourIndices?: number[][];
   }): number[][] {
+    if (!boundaryResult.contourIndices) {
+      return [];
+    }
+
     const contours: number[][] = [];
 
-    // Elements format: [start_index, vertex_count, start_index, vertex_count, ...]
-    for (let i = 0; i < boundaryResult.elements.length; i += 2) {
-      const start = boundaryResult.elements[i];
-      const count = boundaryResult.elements[i + 1];
+    for (const indices of boundaryResult.contourIndices) {
       const contour: number[] = [];
-
-      for (let j = 0; j < count; j++) {
-        const idx = (start + j) * 2;
+      
+      for (const idx of indices) {
+        const vertIdx = idx * 2;
         contour.push(
-          boundaryResult.vertices[idx],
-          boundaryResult.vertices[idx + 1]
+          boundaryResult.vertices[vertIdx],
+          boundaryResult.vertices[vertIdx + 1]
         );
       }
 

@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "3D font rendering and text layout engine for the web",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
@@ -91,7 +91,7 @@
   },
   "dependencies": {
     "harfbuzzjs": "^0.4.11",
-    "tess2-ts": "^1.0.8"
+    "libtess": "^1.2.2"
   },
   "devDependencies": {
     "@react-three/fiber": ">=8.0.0",
