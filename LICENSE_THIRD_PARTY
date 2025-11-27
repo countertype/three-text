@@ -20,17 +20,18 @@ HarfBuzzJS is distributed under the MIT License, with some components
 
 ---
 
-2. libtess2 / tess2-ts
+2. libtess.js
 
-This software includes tess2-ts (https://github.com/eXponenta/tess2.js), a
-TypeScript fork of Mikko Mononen's tess2.js (https://github.com/memononen/tess2.js),
-which in turn is a port of libtess2, based on the GLU tesselator by Eric Veach.
+This software includes libtess.js (https://github.com/brendankenny/libtess.js),
+a JavaScript port of the polygon tessellation library from the OpenGL Utility
+Library (GLU), originally written by Eric Veach while at Silicon Graphics, Inc.
 
 Original GLU tesselator:
-Copyright (C) 1991-2000, 2000 Eric Veach, Silicon Graphics, Inc.
+Copyright (C) 1991-2000 Silicon Graphics, Inc.
 
-libtess2 and tess2.js:
-Copyright (C) 2012-2013 Mikko Mononen (memon@inside.org)
+libtess.js:
+Copyright (C) 2000 Silicon Graphics, Inc.
+Copyright (C) 2015 Google Inc.
 
 The software is licensed under the SGI Free Software License B, Version 2.0
 (See Appendix C for full license text)
