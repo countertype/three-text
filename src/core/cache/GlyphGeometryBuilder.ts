@@ -125,8 +125,7 @@ export class GlyphGeometryBuilder {
                 clusterPaths.push({
                   ...path,
                   points: path.points.map(
-                    (p) =>
-                      new Vec2(p.x + (glyph.x ?? 0), p.y + (glyph.y ?? 0))
+                    (p) => new Vec2(p.x + (glyph.x ?? 0), p.y + (glyph.y ?? 0))
                   )
                 });
               }
@@ -355,14 +354,18 @@ export class GlyphGeometryBuilder {
 
     // Compute bounding box from vertices
     const vertices = extrudedResult.vertices;
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
+
     for (let i = 0; i < vertices.length; i += 3) {
       const x = vertices[i];
       const y = vertices[i + 1];
       const z = vertices[i + 2];
-      
+
       if (x < minX) minX = x;
       if (x > maxX) maxX = x;
       if (y < minY) minY = y;

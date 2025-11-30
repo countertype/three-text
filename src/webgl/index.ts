@@ -73,23 +73,30 @@ export function createWebGLBuffers(
   // Optional glyph attribute buffers
   if (glyphAttributes) {
     const glyphCenterBuffer = gl.createBuffer();
-    if (!glyphCenterBuffer) throw new Error('Failed to create glyphCenter buffer');
+    if (!glyphCenterBuffer)
+      throw new Error('Failed to create glyphCenter buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphCenterBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphCenter, gl.STATIC_DRAW);
     buffers.glyphCenter = glyphCenterBuffer;
     attributes.glyphCenter = { size: 3, type: gl.FLOAT, normalized: false };
 
     const glyphIndexBuffer = gl.createBuffer();
-    if (!glyphIndexBuffer) throw new Error('Failed to create glyphIndex buffer');
+    if (!glyphIndexBuffer)
+      throw new Error('Failed to create glyphIndex buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphIndexBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphIndex, gl.STATIC_DRAW);
     buffers.glyphIndex = glyphIndexBuffer;
     attributes.glyphIndex = { size: 1, type: gl.FLOAT, normalized: false };
 
     const glyphLineIndexBuffer = gl.createBuffer();
-    if (!glyphLineIndexBuffer) throw new Error('Failed to create glyphLineIndex buffer');
+    if (!glyphLineIndexBuffer)
+      throw new Error('Failed to create glyphLineIndex buffer');
     gl.bindBuffer(gl.ARRAY_BUFFER, glyphLineIndexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, glyphAttributes.glyphLineIndex, gl.STATIC_DRAW);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      glyphAttributes.glyphLineIndex,
+      gl.STATIC_DRAW
+    );
     buffers.glyphLineIndex = glyphLineIndexBuffer;
     attributes.glyphLineIndex = { size: 1, type: gl.FLOAT, normalized: false };
   }

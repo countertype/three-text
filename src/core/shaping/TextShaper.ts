@@ -112,11 +112,7 @@ export class TextShaper {
     let currentClusterText = '';
     let clusterStartPosition = new Vec3();
 
-    let cursor = new Vec3(
-      lineInfo.xOffset,
-      -lineIndex * scaledLineHeight,
-      0
-    );
+    let cursor = new Vec3(lineInfo.xOffset, -lineIndex * scaledLineHeight, 0);
     const letterSpacingFU = letterSpacing * this.loadedFont.upem;
 
     const spaceAdjustment = this.calculateSpaceAdjustment(
@@ -220,11 +216,9 @@ export class TextShaper {
       const shrinkFactor = SPACE_SHRINK_RATIO;
 
       if (lineInfo.adjustmentRatio > 0) {
-        spaceAdjustment =
-          lineInfo.adjustmentRatio * width * stretchFactor;
+        spaceAdjustment = lineInfo.adjustmentRatio * width * stretchFactor;
       } else if (lineInfo.adjustmentRatio < 0) {
-        spaceAdjustment =
-          lineInfo.adjustmentRatio * width * shrinkFactor;
+        spaceAdjustment = lineInfo.adjustmentRatio * width * shrinkFactor;
       }
     }
 

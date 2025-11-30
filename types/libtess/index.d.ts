@@ -149,7 +149,14 @@ export class GluTesselator {
   ): void;
   gluTessCallback(
     which: gluEnum.GLU_TESS_COMBINE | gluEnum.GLU_TESS_COMBINE_DATA,
-    callback: ((coords: number[], vertexData: any[], weight: number[], polygonData?: any) => any) | null
+    callback:
+      | ((
+          coords: number[],
+          vertexData: any[],
+          weight: number[],
+          polygonData?: any
+        ) => any)
+      | null
   ): void;
 
   /**

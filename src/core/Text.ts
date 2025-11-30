@@ -609,7 +609,7 @@ export class Text {
     planeBounds.max.x = alignmentResult.adjustedBounds.max.x;
 
     const finalScale = size / this.loadedFont!.upem;
-    
+
     // Scale vertices only (normals are unit vectors, don't scale)
     for (let i = 0; i < vertices.length; i++) {
       vertices[i] *= finalScale;
@@ -640,7 +640,7 @@ export class Text {
 
     let colors: Float32Array | undefined;
     let coloredRanges: ColoredRange[] | undefined;
-    
+
     if (options.color) {
       const colorResult = this.applyColorSystem(
         vertices,

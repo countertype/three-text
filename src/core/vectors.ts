@@ -366,4 +366,3 @@ export function boundingBoxToBox3(bounds: BoundingBox): Box3 {
     new Vec3(bounds.max.x, bounds.max.y, bounds.max.z)
   );
 }
-

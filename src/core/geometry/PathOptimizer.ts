@@ -165,10 +165,7 @@ export class PathOptimizer {
     return simplifiedPoints;
   }
 
-  private removeColinearPoints(
-    points: Vec2[],
-    threshold: number
-  ): Vec2[] {
+  private removeColinearPoints(points: Vec2[], threshold: number): Vec2[] {
     if (points.length <= 2) return points;
 
     const result: Vec2[] = [points[0]];

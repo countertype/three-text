@@ -64,11 +64,7 @@ export class Polygonizer {
     };
   }
 
-  public polygonizeQuadratic(
-    start: Vec2,
-    control: Vec2,
-    end: Vec2
-  ): Vec2[] {
+  public polygonizeQuadratic(start: Vec2, control: Vec2, end: Vec2): Vec2[] {
     const points: Vec2[] = [];
     this.recursiveQuadratic(
       start.x,

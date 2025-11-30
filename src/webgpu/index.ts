@@ -6,7 +6,7 @@ import type { TextGeometryInfo } from '../core/types';
 
 export interface WebGPUBufferSet {
   buffers: {
-    vertex: GPUBuffer;  // Interleaved position + normal
+    vertex: GPUBuffer; // Interleaved position + normal
     color?: GPUBuffer;
     indices: GPUBuffer;
   };
@@ -32,12 +32,12 @@ export function createWebGPUBuffers(
   for (let i = 0; i < vertices.length / 3; i++) {
     const baseIndex = i * 6;
     const vertIndex = i * 3;
-    
+
     // Position (NO FLIP - pass through)
     interleavedData[baseIndex] = vertices[vertIndex];
     interleavedData[baseIndex + 1] = vertices[vertIndex + 1];
     interleavedData[baseIndex + 2] = vertices[vertIndex + 2];
-    
+
     // Normal (NO FLIP - pass through)
     interleavedData[baseIndex + 3] = normals[vertIndex];
     interleavedData[baseIndex + 4] = normals[vertIndex + 1];
@@ -128,4 +128,3 @@ export function createWebGPUBuffers(
     }
   };
 }
-

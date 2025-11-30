@@ -88,9 +88,13 @@ export class Tessellator {
   private performTessellation(
     contours: number[][],
     mode: 'triangles' | 'boundary'
-  ): { vertices: number[]; indices?: number[]; contourIndices?: number[][] } | null {
+  ): {
+    vertices: number[];
+    indices?: number[];
+    contourIndices?: number[][];
+  } | null {
     const tess = new libtess.GluTesselator();
-    
+
     // Set winding rule to NON-ZERO
     tess.gluTessProperty(
       libtess.gluEnum.GLU_TESS_WINDING_RULE,
@@ -107,18 +111,24 @@ export class Tessellator {
     }
 
     if (mode === 'triangles') {
-      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_VERTEX_DATA, (data: any) => {
-        indices.push(data);
-      });
+      tess.gluTessCallback(
+        libtess.gluEnum.GLU_TESS_VERTEX_DATA,
+        (data: any) => {
+          indices.push(data);
+        }
+      );
     } else {
       tess.gluTessCallback(libtess.gluEnum.GLU_TESS_BEGIN, () => {
         currentContour = [];
       });
-      
-      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_VERTEX_DATA, (data: any) => {
-        currentContour.push(data);
-      });
-      
+
+      tess.gluTessCallback(
+        libtess.gluEnum.GLU_TESS_VERTEX_DATA,
+        (data: any) => {
+          currentContour.push(data);
+        }
+      );
+
       tess.gluTessCallback(libtess.gluEnum.GLU_TESS_END, () => {
         if (currentContour.length > 0) {
           contourIndices.push([...currentContour]);
@@ -126,11 +136,14 @@ export class Tessellator {
       });
     }
 
-    tess.gluTessCallback(libtess.gluEnum.GLU_TESS_COMBINE, (coords: number[]) => {
-      const idx = vertices.length / 2;
-      vertices.push(coords[0], coords[1]);
-      return idx;
-    });
+    tess.gluTessCallback(
+      libtess.gluEnum.GLU_TESS_COMBINE,
+      (coords: number[]) => {
+        const idx = vertices.length / 2;
+        vertices.push(coords[0], coords[1]);
+        return idx;
+      }
+    );
 
     tess.gluTessCallback(libtess.gluEnum.GLU_TESS_ERROR, (errno: number) => {
       debugLogger.warn(`libtess error: ${errno}`);
@@ -142,13 +155,13 @@ export class Tessellator {
 
     for (const contour of contours) {
       tess.gluTessBeginContour();
-      
+
       for (let i = 0; i < contour.length; i += 2) {
         const idx = vertices.length / 2;
         vertices.push(contour[i], contour[i + 1]);
         tess.gluTessVertex([contour[i], contour[i + 1], 0], idx);
       }
-      
+
       tess.gluTessEndContour();
     }
 
@@ -177,7 +190,7 @@ export class Tessellator {
 
     for (const indices of boundaryResult.contourIndices) {
       const contour: number[] = [];
-      
+
       for (const idx of indices) {
         const vertIdx = idx * 2;
         contour.push(
