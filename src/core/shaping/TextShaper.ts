@@ -215,9 +215,7 @@ export class TextShaper {
         this.cachedSpaceWidth.set(letterSpacing, naturalSpaceWidth);
       }
 
-      // Ensure naturalSpaceWidth is treated as a number
       const width = naturalSpaceWidth!;
-
       const stretchFactor = SPACE_STRETCH_RATIO;
       const shrinkFactor = SPACE_SHRINK_RATIO;
 
