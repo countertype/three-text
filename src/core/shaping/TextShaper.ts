@@ -215,15 +215,16 @@ export class TextShaper {
         this.cachedSpaceWidth.set(letterSpacing, naturalSpaceWidth);
       }
 
+      const width = naturalSpaceWidth!;
       const stretchFactor = SPACE_STRETCH_RATIO;
       const shrinkFactor = SPACE_SHRINK_RATIO;
 
       if (lineInfo.adjustmentRatio > 0) {
         spaceAdjustment =
-          lineInfo.adjustmentRatio * naturalSpaceWidth * stretchFactor;
+          lineInfo.adjustmentRatio * width * stretchFactor;
       } else if (lineInfo.adjustmentRatio < 0) {
         spaceAdjustment =
-          lineInfo.adjustmentRatio * naturalSpaceWidth * shrinkFactor;
+          lineInfo.adjustmentRatio * width * shrinkFactor;
       }
     }
 

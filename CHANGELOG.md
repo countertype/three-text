@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.5] - 2025-11-30
+
+### Fixed
+
+- Letter spacing now correctly accounts for trailing spacing in width measurements
+
 ## [0.2.4] - 2025-11-26
 
 ### Changed

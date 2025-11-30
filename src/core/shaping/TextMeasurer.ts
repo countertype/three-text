@@ -16,13 +16,10 @@ export class TextMeasurer {
 
     // Calculate total advance width with letter spacing
     let totalWidth = 0;
-    glyphInfos.forEach((glyph: any, index: number) => {
+    glyphInfos.forEach((glyph: any) => {
       totalWidth += glyph.ax;
-      // Spaces measured alone need letter spacing to match final rendering
-      const isLastChar = index === glyphInfos.length - 1;
-      const isSingleSpace = text === ' ' || text === '  ' || /^\s+$/.test(text);
 
-      if (letterSpacingInFontUnits !== 0 && (!isLastChar || isSingleSpace)) {
+      if (letterSpacingInFontUnits !== 0) {
         totalWidth += letterSpacingInFontUnits;
       }
     });
