@@ -98,7 +98,7 @@ export class TextLayout {
           originalEnd: currentIndex + line.length - 1,
           xOffset: 0
         });
-        currentIndex += line.length + 1; // +1 for the newline character
+        currentIndex += line.length + 1;
       }
     }
 
@@ -132,7 +132,7 @@ export class TextLayout {
       }
 
       if (offset !== 0) {
-        // Translate vertices directly
+        // Translate vertices
         for (let i = 0; i < vertices.length; i += 3) {
           vertices[i] += offset;
         }
@@ -145,3 +145,4 @@ export class TextLayout {
     return { offset, adjustedBounds };
   }
 }
+
