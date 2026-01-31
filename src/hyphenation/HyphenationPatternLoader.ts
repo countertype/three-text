@@ -5,6 +5,7 @@ declare const __UMD__: boolean;
 const SAFE_LANGUAGE_RE = /^[a-z]{2,3}(?:-[a-z0-9]{2,16})*$/i;
 
 // Built-in patterns shipped with three-text (matches files in src/hyphenation/*)
+// Note: GPL-licensed patterns (cs, id, mk, sr-cyrl) are excluded for MIT compatibility
 const BUILTIN_PATTERN_LANGUAGES = new Set<string>([
   'af',
   'as',
@@ -12,7 +13,6 @@ const BUILTIN_PATTERN_LANGUAGES = new Set<string>([
   'bg',
   'bn',
   'ca',
-  'cs',
   'cy',
   'da',
   'de-1996',
@@ -36,7 +36,6 @@ const BUILTIN_PATTERN_LANGUAGES = new Set<string>([
   'hu',
   'hy',
   'ia',
-  'id',
   'is',
   'it',
   'ka',
@@ -45,7 +44,6 @@ const BUILTIN_PATTERN_LANGUAGES = new Set<string>([
   'la',
   'lt',
   'lv',
-  'mk',
   'ml',
   'mn-cyrl',
   'mr',
@@ -68,7 +66,6 @@ const BUILTIN_PATTERN_LANGUAGES = new Set<string>([
   'sk',
   'sl',
   'sq',
-  'sr-cyrl',
   'sv',
   'ta',
   'te',

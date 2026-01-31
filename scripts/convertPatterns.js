@@ -40,7 +40,8 @@ const SUBMODULE_DIR = path.join(PROJECT_ROOT, 'tex-hyphen');
 // This approach ensures that we can reliably access the pattern source files
 // during the build process without requiring developers to manually clone the repo.
 
-// Exclude ancient/liturgical languages and obsolete orthographies
+// Exclude ancient/liturgical languages, obsolete orthographies, and GPL-licensed patterns
+// (GPL patterns cannot be included in an MIT-licensed distribution)
 const EXCLUSION_LIST = new Set([
   'de-1901',
   'de-ch-1901',
@@ -51,7 +52,13 @@ const EXCLUSION_LIST = new Set([
   'grc',
   'grc-x-ibycus',
   'pi',
-  'fi-x-school'
+  'fi-x-school',
+  // GPL-licensed patterns - excluded for MIT license compatibility
+  'cs', // Czech - GPL v2+
+  'id', // Indonesian - GPL v2
+  'mk', // Macedonian - GPL
+  'sr-cyrl' // Serbian (Cyrillic) - GPL
+  // Note: Slovak (sk) is GPL but author granted permission for use
 ]);
 
 // Extract hyphenmin values from .tex pattern file

@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/three-text.svg)](https://www.npmjs.com/package/three-text)
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-007acc.svg)](https://www.typescriptlang.org/)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3_or_later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 High fidelity 3D mesh font geometry and text layout engine for the web
 
@@ -63,21 +63,22 @@ npm install three
 
 three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats:
 
-- **`three-text`** - Core (returns raw arrays)
-- **`three-text/three`** - Three.js (returns BufferGeometry)
+- **`three-text`** - Three.js adapter (default export, returns BufferGeometry)
+- **`three-text/three`** - Same as above (explicit alias)
 - **`three-text/three/react`** - React Three Fiber component
+- **`three-text/core`** - Framework-agnostic core (returns raw arrays)
 - **`three-text/webgl`** - WebGL buffer utility
 - **`three-text/webgpu`** - WebGPU buffer utility
 - **`three-text/p5`** - p5.js adapter
 
-Choose the import that matches your stack. Most users will use `three-text/three` or `three-text/p5`
+Most users will just `import { Text } from 'three-text'` for Three.js projects
 
 ### Basic Usage
 
 #### Three.js
 
 ```javascript
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 import * as THREE from 'three';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
@@ -168,7 +169,7 @@ cp node_modules/harfbuzzjs/hb.wasm public/hb/
 Then, before any `Text.create()` calls, configure the path:
 
 ```javascript
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 Text.setHarfBuzzPath('/hb/hb.wasm');
 ```
 
@@ -180,7 +181,7 @@ This method is essential for applications that use Web Workers, as it is the onl
 
 
 ```javascript
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 
 // Main thread
 const wasmResponse = await fetch('/hb/hb.wasm');
@@ -199,7 +200,7 @@ The library will prioritize the buffer if both a path and a buffer have been set
 
 **NW.js with CommonJS:** If using `require()` to load the CJS build in NW.js, use Option 2 (buffer-based loading). NW.js's [dual-context architecture](https://docs.nwjs.io/For%20Users/Advanced/JavaScript%20Contexts%20in%20NW.js/#separate-context-mode) causes path resolution issues in this specific scenario. ESM imports and bundled code work normally
 
-**Electron with `file://` protocol:** If loading HTML directly from the filesystem (not via a dev server), use Option 2 (buffer-based loading) or enable `nodeIntegration` in your BrowserWindow
+**Electron with `file://` protocol:** If loading HTML directly from the filesystem (not via a dev server), use Option 2 (buffer-based loading) or enable `nodeIntegration` in your `BrowserWindow`
 
 ### Hyphenation patterns
 
@@ -207,7 +208,7 @@ The library will prioritize the buffer if both a path and a buffer have been set
 
 ```javascript
 import enUs from 'three-text/patterns/en-us';
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 
 Text.registerPattern('en-us', enUs);
 ```
@@ -1030,6 +1031,6 @@ The build generates multiple module formats for core and all adapters:
 
 ## License
 
-`three-text` was written by Jeremy Tribby ([@jpt](https://github.com/jpt)) and is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See the [LICENSE](LICENSE) file for details
+`three-text` was written by Jeremy Tribby ([@jpt](https://github.com/jpt)) and is licensed under the MIT License. See the [LICENSE](LICENSE) file for details
 
 This software includes code from third-party libraries under compatible permissive licenses. For full license details, see the [LICENSE_THIRD_PARTY](LICENSE_THIRD_PARTY) file

@@ -78,8 +78,8 @@
     "knuth-plass",
     "harfbuzz"
   ],
-  "author": "Jeremy Tribby, Countertype LLC",
-  "license": "AGPL-3.0-or-later",
+  "author": "Jeremy Tribby <jeremy@countertype.com>",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/countertype/three-text.git"

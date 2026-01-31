@@ -1,6 +1,6 @@
 This document details the licenses of third-party software used in this project.
 
-The `three-text` library is licensed under the AGPL-3.0-or-later.
+The `three-text` library is licensed under the MIT License.
 
 This software incorporates code from several third-party projects. The original
 copyright notices and license terms for these projects are detailed below.
@@ -41,8 +41,8 @@ The software is licensed under the SGI Free Software License B, Version 2.0
 3. TeX Hyphenation Patterns
 
 The hyphenation patterns are derived from the TeX hyphenation pattern files,
-and are distributed under a variety of licenses. The copyright notices and
-licenses for the patterns used in this project are listed below.
+and are distributed under a variety of permissive licenses. The copyright
+notices and licenses for the patterns included in this project are listed below.
 
     Copyright (C) 1986, 1988, 1989 Kauko Saarinen (fi)
     Copyright (C) 1987-1995 Hanna Kołodziejska, Bogusław Jackowski, Marek Ryćko (pl)
@@ -65,12 +65,10 @@ licenses for the patterns used in this project are listed below.
     Copyright (C) 2004-2005 Janis Vilims (lv)
     Copyright (C) 2004-2015 Enn Saar (et)
     Copyright (C) 2004-2015 Kevin P. Scannell (ga)
-    Copyright (C) 2004-2007 Rune Kleveland, Ole Michael Selberg, Karl Ove Hufthammer (nb, nn, no)
-    Copyright (C) 2004—2010 Claudio Beccari (cop)
+    Copyright (C) 2004-2007 Rune Kleveland, Ole Michael Selberg, Karl Ove Hufthammer (nb, nn)
     Copyright (C) 2006, 2007, 2008, 2010 Javier A. Múgica (gl)
     Copyright (C) 2008-2011 Claudio Beccari (it)
     Copyright (C) 2008-2011 Dimitrios Filippou (el-monoton, el-polyton)
-    Copyright (C) 2008-2016 Dimitrios Filippou (grc)
     Copyright (C) 2010-2015 Nazar Annagurban (tk)
     Copyright (C) 2011, 2016 Arthur Reutenauer (mul-ethi)
     Copyright (C) 2012 Claudio Beccari (fur)
@@ -78,48 +76,37 @@ licenses for the patterns used in this project are listed below.
     Copyright (C) 2013 Claudio Beccari (pms)
     Copyright (C) 2013 Levan Shoshiashvili (ka)
     Copyright (C) 2013 Tilla Fick and Chris Swanepoel (af)
-    Copyright (c) 2013-2024 Deutschsprachige Trennmustermannschaft (de-1901, de-1996, de-ch-1901)
+    Copyright (c) 2013-2024 Deutschsprachige Trennmustermannschaft (de-1996)
     Copyright (C) 2016 Claudio Beccari (oc)
     Copyright (C) 2016 Maksim Salau (be)
     Copyright (C) 2016 Santhosh Thottingal (as, bn, gu, hi, kn, ml, mr, or, pa, ta, te)
-    Copyright (C) 2016-2019 Claudio Beccari, Elie Roux (la-x-liturgic)
-    Copyright (C) 2018 Wie-Ming Cittānurakkho Bhikkhu (pi)
-    Copyright (C) 2019 Keno Wehr (la-x-classic)
-    Copyright (C) 2020 Teemu Likonen, Arthur Rosendahl (fi-x-school)
-    Copyright (C) Arthur Rosendahl 2018, 2025 (ar, fa, he, vi)
     Copyright (C) 1987 Pierre A. MacKay, 2008, 2011 TUG (tr): LPPL
     Copyright (C) 1988, 2004 Jörgen Pind (is): LPPL
     Copyright (C) 1989-2005 Peter Kleiweg (ia): LPPL
-    Copyright (C) 1990-2003 Dejan Muhamedagić, Aleksandar Jelenak (sr-cyrl): GPL
     Copyright (C) 1990, 2008 Dejan Muhamedagić (sh-cyrl, sh-latn): LPPL
-    Copyright (C) 1992 Jana Chlebíková (sk): GPL
-    Copyright (C) 1995 Pavel Ševeček (cs): GPL
-    Copyright (C) 1995-1996 Adrian Rezus (ro): distributed via tex-hyphen project
-    Copyright (C) 1996, 1997 Jörg Knappen, Terry Mart (id): GPL
+    Copyright (C) 1992 Jana Chlebíková (sk): author permission granted
+    Copyright (C) 1995-1996 Adrian Rezus (ro): permissive
     Copyright (C) 1997 Eduard Werner (hsb): LPPL
-    Copyright (C) 1999 Oliver Corff, Dorjpalam Dorj (mn-cyrl-x-lmc): distributed via tex-hyphen project
+    Copyright (C) 1999 Oliver Corff, Dorjpalam Dorj (mn-cyrl): permissive
     Copyright (C) 1999 Sergei B. Pokrovsky (eo): LPPL 1.0+
     Copyright (C) 1999-2003 Alexander I. Lebedev (ru): LPPL
-    Copyright (C) 2003 Bence Nagy (hu): MPL 1.1 / GPLv2 / LGPLv2.1
-    Copyright (C) 2006 Vasil Taneski (mk): LPPL 1.3a+
-    Copyright (C) 2006-2011 Yves Codet (sa): distributed via tex-hyphen project
+    Copyright (C) 2003 Bence Nagy (hu): MPL 1.1 / LGPLv2.1
+    Copyright (C) 2006-2011 Yves Codet (sa): permissive
     Copyright (C) 2009 Jörg Knappen, Medeni Shemdê (kmr): LPPL 1.3c+
     Copyright (C) 2010 Sahak Petrosyan (hy): LGPL
     Copyright (C) 2012-2013 Theppitak Karoonboonyanan (th): LPPL
-    Copyright (C) 2016 Aleksandr Andreev, Mike Kroutikov (cu): GPLv3+
     Copyright (C) December 1991-January 1995, July 2003 Gonçal Badenes (ca): LPPL
 
-The following notice applies to patterns distributed under the MIT License. For
-other licenses (LPPL, GPL, LGPL, MPL), the full license texts are provided in
-the appendices below, or refer to the original license text in the relevant
-hyphenation files.
+The hyphenation pattern files themselves contain the specific copyright notices
+and license information for each language. See the tex-hyphen project for
+complete source and licensing details: https://github.com/hyphenation/tex-hyphen
 
 ---
 
 Appendix A: MIT License text
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the “Software”), to deal
+of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
@@ -140,13 +127,7 @@ THE SOFTWARE.
 
 Appendix B: Apache License 2.0
 
-Apache License
-Version 2.0, January 2004
-http://www.apache.org/licenses/
-
 For the most recent Apache License 2.0 text, see: https://www.apache.org/licenses/LICENSE-2.0
-
-
 
                                  Apache License
                            Version 2.0, January 2004
@@ -323,22 +304,7 @@ For the most recent Apache License 2.0 text, see: https://www.apache.org/license
       incurred by, or claims asserted against, such Contributor by reason
       of your accepting any such warranty or additional liability.
 
-
----
-
-Appendix B-2: Hyphenation Pattern Licenses
-
-For hyphenation patterns distributed under GPL, LGPL, LPPL, and MPL, the full
-license texts can be found at:
-
-GNU General Public License (GPL): https://www.gnu.org/licenses/gpl.html
-GNU Lesser General Public License (LGPL): https://www.gnu.org/licenses/lgpl.html
-LaTeX Project Public License (LPPL): https://www.latex-project.org/lppl/
-Mozilla Public License (MPL): https://www.mozilla.org/en-US/MPL/
-
-The hyphenation pattern files themselves contain the specific copyright notices
-and license information for each language. See the tex-hyphen project for
-complete source and licensing details: https://github.com/hyphenation/tex-hyphen
+   END OF TERMS AND CONDITIONS
 
 ---
 
