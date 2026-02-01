@@ -1,5 +1,6 @@
 import { logger } from '../../utils/Logger';
 import { FONT_SIGNATURE_WOFF, FONT_SIGNATURE_WOFF2 } from './constants';
+import { decode as decodeWoff2 } from 'woff2-decode';
 
 // Uses DecompressionStream to decompress WOFF (WOFF is just zlib compressed TTF/OTF so we can use deflate)
 export class WoffConverter {
@@ -139,6 +140,18 @@ export class WoffConverter {
 
     logger.log('WOFF font decompressed successfully');
     return sfntData.buffer.slice(0, sfntOffset);
+  }
+
+  public static decompressWoff2(woff2Buffer: ArrayBuffer): ArrayBuffer {
+    const view = new DataView(woff2Buffer);
+    const signature = view.getUint32(0);
+    if (signature !== FONT_SIGNATURE_WOFF2) {
+      throw new Error('Not a valid WOFF2 font');
+    }
+
+    const decoded = decodeWoff2(woff2Buffer);
+    logger.log('WOFF2 font decompressed successfully');
+    return decoded.buffer as ArrayBuffer;
   }
 
   private static async decompressZlib(

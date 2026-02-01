@@ -49,7 +49,7 @@ export class FontMetadataExtractor {
 
     if (!validSignatures.includes(sfntVersion)) {
       throw new Error(
-        `Invalid font format. Expected TTF/OTF (or WOFF), got signature: 0x${sfntVersion.toString(
+        `Invalid font format. Expected TTF/OTF/WOFF/WOFF2, got signature: 0x${sfntVersion.toString(
           16
         )}`
       );
@@ -313,7 +313,7 @@ export class FontMetadataExtractor {
 
     if (!validSignatures.includes(sfntVersion)) {
       throw new Error(
-        `Invalid font format. Expected TTF/OTF (or WOFF), got signature: 0x${sfntVersion.toString(
+        `Invalid font format. Expected TTF/OTF/WOFF/WOFF2, got signature: 0x${sfntVersion.toString(
           16
         )}`
       );

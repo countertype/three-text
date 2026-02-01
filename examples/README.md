@@ -53,7 +53,7 @@ All examples include parameter controls for real-time adjustment:
 - **Text settings**: Content, size, depth, spacing
 - **Layout**: Line width, alignment, hyphenation
 - **Geometry optimization**: V-W simplification, overlap removal
-- **Font loading**: Drag-and-drop support for TTF, OTF, and WOFF files
+- **Font loading**: Drag-and-drop support for TTF, OTF, WOFF, and WOFF2 files
 
 Variable fonts automatically expose sliders for each axis (weight, width, etc)
 
@@ -210,7 +210,7 @@ npm run serve
 
 ### Static font loading
 
-Place your WOFF, TTF, or OTF font file in a publicly accessible folder and use it directly:
+Place your WOFF2, WOFF, TTF, or OTF font file in a publicly accessible folder and use it directly:
 
 ```javascript
 const text = await Text.create({
@@ -222,7 +222,7 @@ const text = await Text.create({
 
 ### Custom fonts in examples
 
-The interactive examples include custom font functionality for TTF, OTF, and WOFF files. Click "Add custom font" in the font controls panel or drag the font file directly onto the viewport
+The interactive examples include custom font functionality for TTF, OTF, WOFF, and WOFF2 files. Click "Add custom font" in the font controls panel or drag the font file directly onto the viewport
 
 Font files are processed entirely in the browser and no data is uploaded to any server
 
