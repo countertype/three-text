@@ -234,8 +234,17 @@ export const readFileSync = (...args) => {
   }
 });
 
+// Suppress circular dependency warnings from brotli package
+const onwarn = (warning, warn) => {
+  if (warning.code === 'CIRCULAR_DEPENDENCY' && warning.ids?.some(id => id.includes('brotli'))) {
+    return;
+  }
+  warn(warning);
+};
+
 const mainLibraryConfig = {
   input: 'src/index.ts',
+  onwarn,
   output: [
     // ESM
     {
@@ -298,6 +307,7 @@ const mainLibraryConfig = {
 
 const umdConfig = {
   input: 'src/index.ts',
+  onwarn,
   output: [
     {
       file: 'dist/index.umd.js',

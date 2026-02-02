@@ -108,7 +108,9 @@
   },
   "dependencies": {
     "harfbuzzjs": "^0.4.15",
-    "libtess": "^1.2.2",
+    "libtess": "^1.2.2"
+  },
+  "dependencies": {
     "woff2-decode": "^0.1.4"
   },
   "devDependencies": {

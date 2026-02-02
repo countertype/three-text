@@ -1,6 +1,14 @@
 import { logger } from '../../utils/Logger';
 import { FONT_SIGNATURE_WOFF, FONT_SIGNATURE_WOFF2 } from './constants';
-import { decode as decodeWoff2 } from 'woff2-decode';
+
+// Optional WOFF2 decoder - not bundled by default to save ~45KB
+// Enable via: import { decode } from 'woff2-decode'; Text.enableWoff2(decode);
+type Woff2Decoder = (data: ArrayBuffer | Uint8Array) => Uint8Array;
+let woff2Decoder: Woff2Decoder | null = null;
+
+export function setWoff2Decoder(decoder: Woff2Decoder): void {
+  woff2Decoder = decoder;
+}
 
 // Uses DecompressionStream to decompress WOFF (WOFF is just zlib compressed TTF/OTF so we can use deflate)
 export class WoffConverter {
@@ -149,7 +157,15 @@ export class WoffConverter {
       throw new Error('Not a valid WOFF2 font');
     }
 
-    const decoded = decodeWoff2(woff2Buffer);
+    if (!woff2Decoder) {
+      throw new Error(
+        'WOFF2 fonts require enabling the decoder. Add to your code:\n' +
+        "  import { decode } from 'woff2-decode';\n" +
+        '  Text.enableWoff2(decode);'
+      );
+    }
+
+    const decoded = woff2Decoder(woff2Buffer);
     logger.log('WOFF2 font decompressed successfully');
     return decoded.buffer as ArrayBuffer;
   }
