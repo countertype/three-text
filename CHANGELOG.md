@@ -1,10 +1,11 @@
 # Changelog
 
-## [0.5.0] - 2026-02-01
+## [0.5.0] - 2026-02-02
 
 ### Changed
 
-- License changed from AGPL-3.0 to MIT!
+- License changed from AGPL-3.0 to MIT
+- WOFF2 decoder accepts async functions (for `woff2-decode` 0.2.0 with native `DecompressionStream` support)
 
 ### Breaking changes
 
@@ -14,7 +15,7 @@
 
 ### Added
 
-- Optional support for WOFF2 font files via the new `woff2-decode` dependency
+- Optional WOFF2 font support via `woff2-decode`
 
 ## [0.4.5] - 2026-01-26
 

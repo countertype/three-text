@@ -3,7 +3,7 @@ import { FONT_SIGNATURE_WOFF, FONT_SIGNATURE_WOFF2 } from './constants';
 
 // Optional WOFF2 decoder - not bundled by default to save ~45KB
 // Enable via: import { decode } from 'woff2-decode'; Text.enableWoff2(decode);
-type Woff2Decoder = (data: ArrayBuffer | Uint8Array) => Uint8Array;
+type Woff2Decoder = (data: ArrayBuffer | Uint8Array) => Uint8Array | Promise<Uint8Array>;
 let woff2Decoder: Woff2Decoder | null = null;
 
 export function setWoff2Decoder(decoder: Woff2Decoder): void {
@@ -150,7 +150,7 @@ export class WoffConverter {
     return sfntData.buffer.slice(0, sfntOffset);
   }
 
-  public static decompressWoff2(woff2Buffer: ArrayBuffer): ArrayBuffer {
+  public static async decompressWoff2(woff2Buffer: ArrayBuffer): Promise<ArrayBuffer> {
     const view = new DataView(woff2Buffer);
     const signature = view.getUint32(0);
     if (signature !== FONT_SIGNATURE_WOFF2) {
@@ -165,7 +165,7 @@ export class WoffConverter {
       );
     }
 
-    const decoded = woff2Decoder(woff2Buffer);
+    const decoded = await woff2Decoder(woff2Buffer);
     logger.log('WOFF2 font decompressed successfully');
     return decoded.buffer as ArrayBuffer;
   }

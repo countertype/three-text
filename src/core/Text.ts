@@ -51,7 +51,7 @@ export class Text {
 
   // Enable WOFF2 font support (adds ~45KB to bundle if imported)
   // Usage: import { decode } from 'woff2-decode'; Text.enableWoff2(decode);
-  public static enableWoff2(decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array): void {
+  public static enableWoff2(decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array | Promise<Uint8Array>): void {
     setWoff2Decoder(decoder);
   }
 
