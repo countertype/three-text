@@ -105,7 +105,7 @@ if (typeof window !== 'undefined' && window.p5) {
       });
   };
 
-  p5.prototype.enableThreeTextWoff2 = function (decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array) {
+  p5.prototype.enableThreeTextWoff2 = function (decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array | Promise<Uint8Array>) {
     TextCore.enableWoff2(decoder);
   };
 

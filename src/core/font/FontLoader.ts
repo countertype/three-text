@@ -34,7 +34,7 @@ export class FontLoader {
       fontBuffer = await WoffConverter.decompressWoff(fontBuffer);
     } else if (format === 'woff2') {
       logger.log('WOFF2 font detected, decompressing...');
-      fontBuffer = WoffConverter.decompressWoff2(fontBuffer);
+      fontBuffer = await WoffConverter.decompressWoff2(fontBuffer);
     }
 
     const view = new DataView(fontBuffer);

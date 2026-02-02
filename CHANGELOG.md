@@ -1,10 +1,16 @@
 # Changelog
 
+## [0.4.7] - 2026-02-02
+
+### Changed
+
+- WOFF2 decoder accepts async functions (for `woff2-decode` 0.2.0 with native `DecompressionStream` support)
+
 ## [0.4.6] - 2026-02-01
 
 ### Added
 
-- Optional support for WOFF2 font files via the new `woff2-decode` dependency
+- Optional WOFF2 font support via `woff2-decode`
 
 ## [0.4.5] - 2026-01-26
 

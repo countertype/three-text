@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.4.6",
+  "version": "0.4.7",
   "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
@@ -109,7 +109,7 @@
   "dependencies": {
     "harfbuzzjs": "^0.4.15",
     "libtess": "^1.2.2",
-    "woff2-decode": "^0.1.4"
+    "woff2-decode": "^0.2.0"
   },
   "devDependencies": {
     "@react-three/fiber": ">=8.0.0",
