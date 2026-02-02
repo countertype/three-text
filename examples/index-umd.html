@@ -858,8 +858,13 @@
 
     <script src="../dist/index.umd.js"></script>
     <script src="../dist/patterns/en-us.umd.js"></script>
+    <script src="../node_modules/woff2-decode/dist/index.umd.js"></script>
 
     <script>
+      // Enable WOFF2 support
+      if (window.woff2Decode) {
+        window.ThreeText.Text.enableWoff2(window.woff2Decode.decode);
+      }
       
       function updateStatus(message, type = "loading") {
         const status = document.getElementById("status");

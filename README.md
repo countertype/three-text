@@ -78,13 +78,14 @@ Choose the import that matches your stack. Most users will use `three-text/three
 
 ```javascript
 import { Text } from 'three-text/three';
+import { decode } from 'woff2-decode'; // Optional
 import * as THREE from 'three';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
-
+Text.enableWoff2(decode); // Enabling WOFF2 support adds ~45kb to the bundle
 const result = await Text.create({
   text: 'Hello World',
-  font: '/fonts/Font.woff',
+  font: '/fonts/Font.woff2',
   size: 72
 });
 
@@ -913,7 +914,9 @@ The library requires WebAssembly support for HarfBuzz text shaping:
 - Safari 16.4+
 - Edge 80+
 
-WOFF fonts are automatically decompressed to TTF/OTF using the browser's native `DecompressionStream` API with zero bundle cost. WOFF2 fonts are decompressed using the [`woff2-decode`](https://github.com/nickshanks/woff2-decode) library (~33KB). For older browsers without `DecompressionStream`, use TTF or OTF fonts directly
+WOFF fonts are automatically decompressed to TTF/OTF using the browser's native `DecompressionStream` API with zero bundle cost. For older browsers without `DecompressionStream`, use TTF or OTF fonts directly
+
+**WOFF2 font support** is opt-in (see [Basic Usage](#basic-usage))
 
 **ES modules** (recommended) are supported in:
 

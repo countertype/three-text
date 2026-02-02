@@ -232,7 +232,8 @@
           "three": "../node_modules/three/build/three.module.js",
           "three/addons/": "../node_modules/three/examples/jsm/",
           "three-text": "../dist/index.js",
-          "three-text/three": "../dist/three/index.js"
+          "three-text/three": "../dist/three/index.js",
+          "woff2-decode": "../node_modules/woff2-decode/dist/index.js"
         }
       }
     </script>
@@ -242,8 +243,10 @@
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       import { GUI } from "three/addons/libs/lil-gui.module.min.js";
       import { Text } from "three-text/three";
+      import { decode as decodeWoff2 } from "woff2-decode";
 
       Text.setHarfBuzzPath("/examples/hb/hb.wasm");
+      Text.enableWoff2(decodeWoff2);
 
       (async () => {
         const scene = new THREE.Scene();
