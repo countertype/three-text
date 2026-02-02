@@ -104,6 +104,7 @@ export class Text {
   static registerPattern = TextCore.registerPattern;
   static preloadPatterns = TextCore.preloadPatterns;
   static setMaxFontCacheMemoryMB = TextCore.setMaxFontCacheMemoryMB;
+  static enableWoff2 = TextCore.enableWoff2;
 
   // Main API - wraps core result in BufferGeometry
   static async create(options: TextOptions): Promise<ThreeTextGeometryInfo> {
