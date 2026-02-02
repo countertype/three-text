@@ -117,13 +117,15 @@ function App() {
 
 ```javascript
 import 'three-text/p5';
+import { decode } from 'woff2-decode';
 
 let font;
 let textResult;
 
 function preload() {
   loadThreeTextShaper('/hb/hb.wasm');
-  font = loadThreeTextFont('/fonts/Font.woff');
+  enableThreeTextWoff2(decode); // Optional, adds ~45KB to bundle
+  font = loadThreeTextFont('/fonts/Font.woff2');
 }
 
 async function setup() {

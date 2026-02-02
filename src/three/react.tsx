@@ -11,6 +11,7 @@ export const Text = Object.assign(TextComponent, {
   registerPattern: ThreeTextCore.registerPattern,
   preloadPatterns: ThreeTextCore.preloadPatterns,
   setMaxFontCacheMemoryMB: ThreeTextCore.setMaxFontCacheMemoryMB,
+  enableWoff2: ThreeTextCore.enableWoff2,
   create: ThreeTextCore.create
 });
 

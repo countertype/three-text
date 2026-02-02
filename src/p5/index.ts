@@ -105,6 +105,10 @@ if (typeof window !== 'undefined' && window.p5) {
       });
   };
 
+  p5.prototype.enableThreeTextWoff2 = function (decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array) {
+    TextCore.enableWoff2(decoder);
+  };
+
   p5.prototype.loadThreeTextFont = function (
     fontPath: string,
     fontVariations?: { [key: string]: number }
