@@ -15,14 +15,14 @@ const FontDropzone = ({ onFontLoad, currentFontName = 'Default Font' }) => {
   }, []);
 
   const handleFile = async (file) => {
-    const validTypes = ['font/ttf', 'font/otf', 'font/woff'];
-    const validExtensions = ['.ttf', '.otf', '.woff'];
+    const validTypes = ['font/ttf', 'font/otf', 'font/woff', 'font/woff2'];
+    const validExtensions = ['.ttf', '.otf', '.woff', '.woff2'];
     
     const isValidType = validTypes.some(type => file.type === type);
     const isValidExtension = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
     
     if (!isValidType && !isValidExtension) {
-      alert('Please select a valid font file (TTF, OTF, or WOFF)');
+      alert('Please select a valid font file (TTF, OTF, WOFF, or WOFF2)');
       return;
     }
 
@@ -43,7 +43,7 @@ const FontDropzone = ({ onFontLoad, currentFontName = 'Default Font' }) => {
       const items = Array.from(e.dataTransfer.items);
       const hasFont = items.some(item => {
         const type = item.type;
-        return type === 'font/ttf' || type === 'font/otf' || type === 'font/woff';
+        return type === 'font/ttf' || type === 'font/otf' || type === 'font/woff' || type === 'font/woff2';
       });
       
       if (hasFont) {
@@ -64,7 +64,7 @@ const FontDropzone = ({ onFontLoad, currentFontName = 'Default Font' }) => {
       const files = Array.from(e.dataTransfer.files);
       const fontFile = files.find(file => {
         const ext = file.name.toLowerCase();
-        return ext.endsWith('.ttf') || ext.endsWith('.otf') || ext.endsWith('.woff');
+        return ext.endsWith('.ttf') || ext.endsWith('.otf') || ext.endsWith('.woff') || ext.endsWith('.woff2');
       });
       
       if (fontFile) {
@@ -124,7 +124,7 @@ const FontDropzone = ({ onFontLoad, currentFontName = 'Default Font' }) => {
         </h2>
         
         <p style={{ margin: '0 0 8px 0', fontSize: '24px', color: '#ccc' }}>
-          TTF, OTF, or WOFF supported. No files uploaded, all are local in your browser
+          TTF, OTF, WOFF, or WOFF2 supported. No files uploaded, all are local in your browser
         </p>
         
         <p style={{ margin: '0', fontSize: '18px', color: '#888' }}>

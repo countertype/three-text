@@ -23,6 +23,7 @@ import { perfLogger } from '../utils/PerformanceLogger';
 import { logger } from '../utils/Logger';
 import { FontLoader } from './font/FontLoader';
 import { FontMetadataExtractor } from './font/FontMetadata';
+import { setWoff2Decoder } from './font/WoffConverter';
 import { TextMeasurer } from './shaping/TextMeasurer';
 import { loadPattern } from '../hyphenation/HyphenationPatternLoader';
 import type { HyphenationTrieNode } from '../hyphenation';
@@ -47,6 +48,12 @@ export class Text {
   private static fontCacheMemoryBytes = 0;
   private static maxFontCacheMemoryBytes = Infinity;
   private static fontIdCounter = 0;
+
+  // Enable WOFF2 font support (adds ~45KB to bundle if imported)
+  // Usage: import { decode } from 'woff2-decode'; Text.enableWoff2(decode);
+  public static enableWoff2(decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array): void {
+    setWoff2Decoder(decoder);
+  }
 
   // Stringify with sorted keys for cache stability
   private static stableStringify(obj: { [key: string]: any }): string {

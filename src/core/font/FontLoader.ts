@@ -33,9 +33,8 @@ export class FontLoader {
       logger.log('WOFF font detected, decompressing...');
       fontBuffer = await WoffConverter.decompressWoff(fontBuffer);
     } else if (format === 'woff2') {
-      throw new Error(
-        'WOFF2 fonts are not yet supported. Please use WOFF or TTF/OTF format.'
-      );
+      logger.log('WOFF2 font detected, decompressing...');
+      fontBuffer = WoffConverter.decompressWoff2(fontBuffer);
     }
 
     const view = new DataView(fontBuffer);
@@ -48,7 +47,7 @@ export class FontLoader {
 
     if (!validSignatures.includes(sfntVersion)) {
       throw new Error(
-        `Invalid font format. Expected TTF/OTF (or WOFF), got signature: 0x${sfntVersion.toString(
+        `Invalid font format. Expected TTF/OTF/WOFF/WOFF2, got signature: 0x${sfntVersion.toString(
           16
         )}`
       );

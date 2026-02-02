@@ -9,7 +9,7 @@ import type { LineInfo, LoadedFont } from '../src/core/types';
 
 const require = createRequire(import.meta.url);
 
-const SAMPLE_TEXT = `three-text renders and formats text from TTF, OTF, and WOFF font files as 3D geometry. It uses Tex-based parameters for breaking text into paragraphs across multiple lines.`;
+const SAMPLE_TEXT = `three-text renders and formats text from TTF, OTF, WOFF, and WOFF2 font files as 3D geometry. It uses Tex-based parameters for breaking text into paragraphs across multiple lines.`;
 
 const CJK_TEXT = `这是一段中文测试文本，用于测试中日韩字符的处理性能。文字排版需要特殊处理。`;
 

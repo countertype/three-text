@@ -15,11 +15,11 @@ High fidelity 3D mesh font geometry and text layout engine for the web
 > [!CAUTION]
 > three-text is an alpha release and the API may break rapidly. This warning will likely last until the end of March 2026. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, and WOFF font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
+**three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
 
 The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
-Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harfbuzzjs) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking, [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation, [libtess.js](https://github.com/brendankenny/libtess.js) (based on the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), and [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/)
+Under the hood, three-text relies on [harbuzzjs](https://github.com/harfbuzz/harfbuzzjs) (based on [HarfBuzz](https://github.com/harfbuzz/harfbuzz) by Behdad Esfabod et al) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking (with [SILE](https://github.com/sile-typesetter/sile/blob/master/core/break.lua) being the cleanest modern reference), [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation and the [Tex hyphenaton patterns](https://github.com/hyphenation/tex-hyphen), [libtess.js](https://github.com/brendankenny/libtess.js) (based on the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, adaptive curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/), and the [woff2-decode](https://github.com/countertype/woff2-decode) library for WOFF2 decoding
 
 ## Table of contents
 
@@ -78,14 +78,15 @@ Most users will just `import { Text } from 'three-text'` for Three.js projects
 #### Three.js
 
 ```javascript
-import { Text } from 'three-text';
+import { Text } from 'three-text/three';
+import { decode } from 'woff2-decode';
 import * as THREE from 'three';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
-
+Text.enableWoff2(decode); // Optional, adds ~45KB to bundle
 const result = await Text.create({
   text: 'Hello World',
-  font: '/fonts/Font.woff',
+  font: '/fonts/Font.woff2',
   size: 72
 });
 
@@ -117,13 +118,15 @@ function App() {
 
 ```javascript
 import 'three-text/p5';
+import { decode } from 'woff2-decode';
 
 let font;
 let textResult;
 
 function preload() {
   loadThreeTextShaper('/hb/hb.wasm');
-  font = loadThreeTextFont('/fonts/Font.woff');
+  enableThreeTextWoff2(decode); // Optional, adds ~45KB to bundle
+  font = loadThreeTextFont('/fonts/Font.woff2');
 }
 
 async function setup() {
@@ -306,6 +309,8 @@ The algorithm models text using three fundamental elements:
 Line badness is calculated based on how much glue must stretch or shrink from its natural width to achieve the target line length. The algorithm finds the sequence of breaks that minimizes total badness across the paragraph
 
 This uses a three-pass approach: first without hyphenation (pretolerance), then with hyphenation (tolerance), and finally with emergency stretch for difficult paragraphs that cannot be broken acceptably
+
+For book typesetting, TeX uses delta nodes to efficiently handle long paragraphs that may span multiple pages with many possible break points. Since three-text isn't a page layout engine, we take a simpler approach and store cumulative widths directly on each break candidate
 
 #### Hyphenation
 
@@ -731,7 +736,7 @@ Below are the most important configuration interfaces. For a complete list of al
 ```typescript
 interface TextOptions {
   text: string; // Text content to render
-  font: string | ArrayBuffer; // Font file path or buffer (TTF, OTF, or WOFF)
+  font: string | ArrayBuffer; // Font file path or buffer (TTF, OTF, WOFF, or WOFF2)
   size?: number; // Font size in scene units (default: 72)
   depth?: number; // Extrusion depth (default: 0)
   lineHeight?: number; // Line height multiplier (default: 1.0)
@@ -914,7 +919,9 @@ The library requires WebAssembly support for HarfBuzz text shaping:
 - Safari 16.4+
 - Edge 80+
 
-WOFF fonts are automatically decompressed to TTF/OTF using the browser's native decompression with zero bundle cost. For older browsers, use TTF or OTF fonts directly
+WOFF fonts are automatically decompressed to TTF/OTF using the browser's native `DecompressionStream` API with zero bundle cost. For older browsers without `DecompressionStream`, use TTF or OTF fonts directly
+
+**WOFF2 font support** is opt-in (see [Basic Usage](#basic-usage))
 
 **ES modules** (recommended) are supported in:
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.5.0] - 2026-02-01
+
+### Changed
+
+- License changed from AGPL-3.0 to MIT!
+
+### Breaking changes
+
+- Removed hyphenation patterns for Czech, Indonesian, Macedonian, and Serbian due to incompatible licensing
+
+## [0.4.6] - 2026-02-01
+
+### Added
+
+- Optional support for WOFF2 font files via the new `woff2-decode` dependency
+
 ## [0.4.5] - 2026-01-26
 
 ### Fixed
