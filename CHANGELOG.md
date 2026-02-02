@@ -5,11 +5,16 @@
 ### Changed
 
 - License changed from AGPL-3.0 to MIT
-- WOFF2 decoder accepts async functions (for `woff2-decode` 0.2.0 with native `DecompressionStream` support)
 
 ### Breaking changes
 
 - Removed hyphenation patterns for Czech, Indonesian, Macedonian, and Serbian due to incompatible licensing
+
+## [0.4.7] - 2026-02-02
+
+### Changed
+
+- WOFF2 decoder accepts async functions (for `woff2-decode` 0.2.0 with native `DecompressionStream` support)
 
 ## [0.4.6] - 2026-02-01
 
