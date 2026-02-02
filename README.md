@@ -63,14 +63,15 @@ npm install three
 
 three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats:
 
-- **`three-text`** - Core (returns raw arrays)
+- **`three-text`** - Three.js (alias for `three-text/three` - returns BufferGeometry)
 - **`three-text/three`** - Three.js (returns BufferGeometry)
 - **`three-text/three/react`** - React Three Fiber component
+- **`three-text/core`** - Core (returns raw arrays)
 - **`three-text/webgl`** - WebGL buffer utility
 - **`three-text/webgpu`** - WebGPU buffer utility
 - **`three-text/p5`** - p5.js adapter
 
-Choose the import that matches your stack. Most users will use `three-text/three` or `three-text/p5`
+Choose the import that matches your stack. Most users will use `three-text` (or `three-text/three`) or `three-text/p5`
 
 ### Basic Usage
 
