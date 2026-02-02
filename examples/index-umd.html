@@ -911,7 +911,7 @@
         let lastFontBuffer = null;
 
       const params = {
-        text: `three-text is a 3D font geometry and text layout library for the web. Its supports TTF, OTF, and WOFF font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for tessellation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`,
+        text: `three-text is a 3D font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for tessellation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`,
         lineWidth: 1400,
         fontSize: 72,
         lineHeight: 1.33,
@@ -1711,7 +1711,7 @@
           uploadFont: function() {
             const input = document.createElement('input');
             input.type = 'file';
-            input.accept = '.ttf,.otf,.woff';
+            input.accept = '.ttf,.otf,.woff,.woff2';
             input.onchange = handleFontUpload;
             input.click();
           }
@@ -1733,7 +1733,7 @@
           <div class="drag-border"></div>
           <div class="drag-content">
             <h2>Drop Font File Here</h2>
-            <p>TTF, OTF, or WOFF supported. No files uploaded, all are local in your browser</p>
+            <p>TTF, OTF, WOFF, or WOFF2 supported. No files uploaded, all are local in your browser</p>
             <p class="current">Current: <span>${currentFontName}</span></p>
           </div>
         `;
@@ -1836,7 +1836,7 @@
           const files = Array.from(e.dataTransfer.files);
           const fontFile = files.find(file => {
             const ext = file.name.toLowerCase();
-            return ext.endsWith('.ttf') || ext.endsWith('.otf') || ext.endsWith('.woff');
+            return ext.endsWith('.ttf') || ext.endsWith('.otf') || ext.endsWith('.woff') || ext.endsWith('.woff2');
           });
           
           if (fontFile) {

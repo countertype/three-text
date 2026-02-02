@@ -42,7 +42,7 @@ This example demonstrates how to use the `<ThreeText>` component with React Thre
 - Real-time parameter adjustment with Leva controls
 - Text layout options (alignment, line breaking, hyphenation)
 - Geometry optimization settings (V-W simplification, overlap removal)
-- Loading custom fonts (WOFF, TTF, OTF) via drag-and-drop
+- Loading custom fonts (WOFF2, WOFF, TTF, OTF) via drag-and-drop
 
 ### Using the Text Component
 

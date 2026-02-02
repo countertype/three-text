@@ -15,7 +15,7 @@ High fidelity 3D mesh font geometry and text layout engine for the web
 > [!CAUTION]
 > three-text is an alpha release and the API may break rapidly. This warning will likely last until the end of March 2026. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, and WOFF font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
+**three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
 
 The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
@@ -730,7 +730,7 @@ Below are the most important configuration interfaces. For a complete list of al
 ```typescript
 interface TextOptions {
   text: string; // Text content to render
-  font: string | ArrayBuffer; // Font file path or buffer (TTF, OTF, or WOFF)
+  font: string | ArrayBuffer; // Font file path or buffer (TTF, OTF, WOFF, or WOFF2)
   size?: number; // Font size in scene units (default: 72)
   depth?: number; // Extrusion depth (default: 0)
   lineHeight?: number; // Line height multiplier (default: 1.0)
@@ -913,7 +913,7 @@ The library requires WebAssembly support for HarfBuzz text shaping:
 - Safari 16.4+
 - Edge 80+
 
-WOFF fonts are automatically decompressed to TTF/OTF using the browser's native decompression with zero bundle cost. For older browsers, use TTF or OTF fonts directly
+WOFF fonts are automatically decompressed to TTF/OTF using the browser's native `DecompressionStream` API with zero bundle cost. WOFF2 fonts are decompressed using the [`woff2-decode`](https://github.com/nickshanks/woff2-decode) library (~33KB). For older browsers without `DecompressionStream`, use TTF or OTF fonts directly
 
 **ES modules** (recommended) are supported in:
 

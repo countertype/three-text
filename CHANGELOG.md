@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.6] - 2026-02-01
+
+### Added
+
+- WOFF2 support: full support for WOFF2 font files via the new `woff2-decode` dependency
+
 ## [0.4.5] - 2026-01-26
 
 ### Fixed

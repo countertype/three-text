@@ -57,4 +57,6 @@ describe('Text integration with real HarfBuzz and font', () => {
     expect(loadedFont).toBeDefined();
     expect(loadedFont?.upem).toBeGreaterThan(0);
   });
+
+  // WOFF2 decoding is tested in the woff2-decode package
 });
