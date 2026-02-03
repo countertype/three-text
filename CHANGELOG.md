@@ -10,6 +10,12 @@
 
 - Removed hyphenation patterns for Czech, Indonesian, Macedonian, and Serbian due to incompatible licensing
 
+## [0.4.8] - 2026-02-03
+
+### Changed
+
+- Update `woff2-decode` to 0.3.0 (renamed `decode` to `woff2Decode`, now uses `brotli-lib`)
+
 ## [0.4.7] - 2026-02-02
 
 ### Changed

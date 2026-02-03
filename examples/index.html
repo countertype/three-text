@@ -247,8 +247,8 @@
 
       (async () => {
         // Load woff2-decode asynchronously to avoid blocking
-        const { decode: decodeWoff2 } = await import("woff2-decode");
-        Text.enableWoff2(decodeWoff2);
+        const { woff2Decode } = await import("woff2-decode");
+        Text.enableWoff2(woff2Decode);
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111);
 

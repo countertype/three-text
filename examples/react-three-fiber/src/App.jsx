@@ -10,7 +10,7 @@ import { OrbitControls } from "@react-three/drei";
 import { useControls, button, monitor, folder } from "leva";
 import * as THREE from "three";
 import { Text } from "three-text/three/react";
-import { decode as decodeWoff2 } from "woff2-decode";
+import { woff2Decode } from "woff2-decode";
 import FontDropzone from "./components/FontDropzone";
 import VariableFontControls from "./components/VariableFontControls";
 import flipVertexShader from "./shaders/flip.vert?raw";
@@ -23,7 +23,7 @@ import waveFragmentShader from "./shaders/wave.frag?raw";
 import offVertexShader from "./shaders/off.vert?raw";
 
 Text.setHarfBuzzPath("/hb/hb.wasm");
-Text.enableWoff2(decodeWoff2);
+Text.enableWoff2(woff2Decode);
 
 const DEFAULT_TEXT = `three-text is a 3D font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGPU, and WebGL`;
 
