@@ -9,7 +9,6 @@
 ### Changed
 
 - Switched from `woff2-decode` to `woff-lib` for WOFF2 support (same API, new package)
-- Switched from Rollup to Rolldown for ~8x faster builds
 
 ## [0.4.8] - 2026-02-03
 
