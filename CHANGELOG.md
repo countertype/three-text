@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.9] - 2026-02-04
+
+### Changed
+
+- Switched from `woff2-decode` to `woff-lib` for WOFF2 support (same API, new package name)
+
 ## [0.4.8] - 2026-02-03
 
 ### Changed

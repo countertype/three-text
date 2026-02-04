@@ -10,7 +10,7 @@ import { OrbitControls } from "@react-three/drei";
 import { useControls, button, monitor, folder } from "leva";
 import * as THREE from "three";
 import { Text } from "three-text/three/react";
-import { woff2Decode } from "woff2-decode";
+import { woff2Decode } from "woff-lib/woff2/decode";
 import FontDropzone from "./components/FontDropzone";
 import VariableFontControls from "./components/VariableFontControls";
 import flipVertexShader from "./shaders/flip.vert?raw";

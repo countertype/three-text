@@ -233,7 +233,8 @@
           "three/addons/": "../node_modules/three/examples/jsm/",
           "three-text": "../dist/index.js",
           "three-text/three": "../dist/three/index.js",
-          "woff2-decode": "../woff2-decode/dist/index.browser.js"
+          "woff-lib": "../woff-lib/dist/woff2-decode.js",
+          "brotli-lib/decode": "../brotli-lib/dist/decode.js"
         }
       }
     </script>
@@ -246,8 +247,8 @@
       Text.setHarfBuzzPath("/examples/hb/hb.wasm");
 
       (async () => {
-        // Load woff2-decode asynchronously to avoid blocking
-        const { woff2Decode } = await import("woff2-decode");
+        // Load woff-lib asynchronously to avoid blocking
+        const { woff2Decode } = await import("woff-lib");
         Text.enableWoff2(woff2Decode);
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x111111);

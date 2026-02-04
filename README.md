@@ -19,7 +19,7 @@ High fidelity 3D mesh font geometry and text layout engine for the web
 
 The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
-Under the hood, three-text relies on [HarfBuzz](https://github.com/harfbuzz/harfbuzzjs) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking, [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation, [libtess.js](https://github.com/brendankenny/libtess.js) (based on the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), and [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/)
+Under the hood, three-text relies on [harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs) (based on [HarfBuzz](https://github.com/harfbuzz/harfbuzz) by Behdad Esfahbod et al) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking (with [SILE](https://github.com/sile-typesetter/sile/blob/master/core/break.lua) being the cleanest modern reference), [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation and the [TeX hyphenation patterns](https://github.com/hyphenation/tex-hyphen), [libtess.js](https://github.com/brendankenny/libtess.js) (based on the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, adaptive curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/), as well as [woff-lib](https://github.com/countertype/woff-lib) and [brotli-lib](https://github.com/countertype/brotli-lib)
 
 ## Table of contents
 
@@ -79,11 +79,19 @@ Most users will just `import { Text } from 'three-text'` for Three.js projects
 
 ```javascript
 import { Text } from 'three-text/three';
+<<<<<<< Updated upstream
 import { decode } from 'woff2-decode'; // Optional
 import * as THREE from 'three';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
 Text.enableWoff2(decode); // Enabling WOFF2 support adds ~45kb to the bundle
+=======
+import { woff2Decode } from 'woff-lib/woff2/decode';
+import * as THREE from 'three';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+Text.enableWoff2(woff2Decode); // Optional, for WOFF2 support
+>>>>>>> Stashed changes
 const result = await Text.create({
   text: 'Hello World',
   font: '/fonts/Font.woff2',
@@ -118,14 +126,14 @@ function App() {
 
 ```javascript
 import 'three-text/p5';
-import { decode } from 'woff2-decode';
+import { woff2Decode } from 'woff-lib/woff2/decode';
 
 let font;
 let textResult;
 
 function preload() {
   loadThreeTextShaper('/hb/hb.wasm');
-  enableThreeTextWoff2(decode); // Optional, adds ~45KB to bundle
+  enableThreeTextWoff2(woff2Decode); // Optional, for WOFF2 support
   font = loadThreeTextFont('/fonts/Font.woff2');
 }
 
