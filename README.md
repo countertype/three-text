@@ -79,19 +79,11 @@ Most users will just `import { Text } from 'three-text'` for Three.js projects
 
 ```javascript
 import { Text } from 'three-text/three';
-<<<<<<< Updated upstream
-import { decode } from 'woff2-decode'; // Optional
-import * as THREE from 'three';
-
-Text.setHarfBuzzPath('/hb/hb.wasm');
-Text.enableWoff2(decode); // Enabling WOFF2 support adds ~45kb to the bundle
-=======
 import { woff2Decode } from 'woff-lib/woff2/decode';
 import * as THREE from 'three';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
 Text.enableWoff2(woff2Decode); // Optional, for WOFF2 support
->>>>>>> Stashed changes
 const result = await Text.create({
   text: 'Hello World',
   font: '/fonts/Font.woff2',
@@ -991,7 +983,7 @@ Synthetic component benchmarks for tessellation, extrusion, and layout are avail
 ### Development
 
 ```bash
-npm run dev          # Watch mode with rollup
+npm run dev          # Watch mode with rolldown
 npm run serve        # Start development server for demos
 ```
 

@@ -2,9 +2,14 @@
 
 ## [0.4.9] - 2026-02-04
 
+### Fixed
+
+- UMD build now uses Three.js adapter (returns `geometry` property instead of raw arrays)
+
 ### Changed
 
-- Switched from `woff2-decode` to `woff-lib` for WOFF2 support (same API, new package name)
+- Switched from `woff2-decode` to `woff-lib` for WOFF2 support (same API, new package)
+- Switched from Rollup to Rolldown for ~8x faster builds
 
 ## [0.4.8] - 2026-02-03
 
