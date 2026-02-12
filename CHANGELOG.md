@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.10] - 2026-02-12
+
+### Changed
+
+- Migrated from `libtess.js` to `libtess-ts` for tessellation (same algorithm, 15-30% faster)
+- Updated `woff-lib` to 0.0.3
+
 ## [0.4.9] - 2026-02-04
 
 ### Fixed

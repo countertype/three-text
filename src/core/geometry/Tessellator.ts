@@ -1,5 +1,5 @@
 import type { Path, ProcessedGeometry } from '../types';
-import * as libtess from 'libtess';
+import { GluTesselator, GLU_TESS, WINDING } from 'libtess-ts';
 import { logger } from '../../utils/Logger';
 import { perfLogger } from '../../utils/PerformanceLogger';
 
@@ -299,12 +299,9 @@ export class Tessellator {
     indices?: number[];
     contourIndices?: number[][];
   } | null {
-    const tess = new libtess.GluTesselator();
+    const tess = new GluTesselator();
 
-    tess.gluTessProperty(
-      libtess.gluEnum.GLU_TESS_WINDING_RULE,
-      libtess.windingRule.GLU_TESS_WINDING_NONZERO
-    );
+    tess.gluTessProperty(GLU_TESS.WINDING_RULE, WINDING.NONZERO);
 
     const vertices: number[] = [];
     const indices: number[] = [];
@@ -312,51 +309,42 @@ export class Tessellator {
     let currentContour: number[] = [];
 
     if (mode === 'boundary') {
-      tess.gluTessProperty(libtess.gluEnum.GLU_TESS_BOUNDARY_ONLY, true);
+      tess.gluTessProperty(GLU_TESS.BOUNDARY_ONLY, 1);
     }
 
     if (mode === 'triangles') {
-      tess.gluTessCallback(
-        libtess.gluEnum.GLU_TESS_VERTEX_DATA,
-        (data: any) => {
-          indices.push(data);
-        }
-      );
+      tess.gluTessCallback(GLU_TESS.VERTEX_DATA, (data: any) => {
+        indices.push(data);
+      });
     } else {
-      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_BEGIN, () => {
+      tess.gluTessCallback(GLU_TESS.BEGIN, () => {
         currentContour = [];
       });
 
-      tess.gluTessCallback(
-        libtess.gluEnum.GLU_TESS_VERTEX_DATA,
-        (data: any) => {
-          currentContour.push(data);
-        }
-      );
+      tess.gluTessCallback(GLU_TESS.VERTEX_DATA, (data: any) => {
+        currentContour.push(data);
+      });
 
-      tess.gluTessCallback(libtess.gluEnum.GLU_TESS_END, () => {
+      tess.gluTessCallback(GLU_TESS.END, () => {
         if (currentContour.length > 0) {
           contourIndices.push(currentContour);
         }
       });
     }
 
-    tess.gluTessCallback(
-      libtess.gluEnum.GLU_TESS_COMBINE,
-      (coords: number[]) => {
-        const idx = vertices.length / 2;
-        vertices.push(coords[0], coords[1]);
-        return idx;
-      }
-    );
+    tess.gluTessCallback(GLU_TESS.COMBINE, (coords: number[]) => {
+      const idx = vertices.length / 2;
+      vertices.push(coords[0], coords[1]);
+      return idx;
+    });
 
-    tess.gluTessCallback(libtess.gluEnum.GLU_TESS_ERROR, (errno: number) => {
+    tess.gluTessCallback(GLU_TESS.ERROR, (errno: number) => {
       logger.warn(`libtess error: ${errno}`);
     });
 
     tess.gluTessNormal(0, 0, 1);
 
-    tess.gluTessBeginPolygon(null);
+    tess.gluTessBeginPolygon();
 
     for (const contour of contours) {
       tess.gluTessBeginContour();
@@ -364,7 +352,7 @@ export class Tessellator {
       for (let i = 0; i < contour.length; i += 2) {
         const idx = vertices.length / 2;
         vertices.push(contour[i], contour[i + 1]);
-        tess.gluTessVertex([contour[i], contour[i + 1], 0], idx);
+        tess.gluTessVertex([contour[i], contour[i + 1]], idx);
       }
 
       tess.gluTessEndContour();
