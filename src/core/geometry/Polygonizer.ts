@@ -41,21 +41,290 @@ import { CurveFidelityConfig } from '../types';
 
 export const DEFAULT_CURVE_FIDELITY: CurveFidelityConfig = {
   distanceTolerance: 0.5,
-  angleTolerance: 0.2 // ~11.5 degrees
+  angleTolerance: 0.2,
+  cuspLimit: 0,
+  collinearityEpsilon: 1e-6,
+  recursionLimit: 16
 };
 
-export const COLLINEARITY_EPSILON = 1e-6;
-const RECURSION_LIMIT = 16;
+export const COLLINEARITY_EPSILON =
+  DEFAULT_CURVE_FIDELITY.collinearityEpsilon!;
+
+// Module-level state for the recursive subdivision functions,
+// set from instance config before each polygonize call
+
+// Output array, reset before each polygonize call
+let _out: Vec2[];
+
+// Cached tolerance state
+let _distTolSq = 0;
+let _colEps = 0;
+let _maxLvl = 0;
+let _angleTol = 0;
+let _tanAngSq = 0;
+let _cuspLim = 0;
+let _tanCuspSq = 0;
+
+// Collinearity checks in the recursive core prevent near-duplicate points
+function emit(x: number, y: number): void {
+  _out.push(new Vec2(x, y));
+}
+
+// Quadratic recursive subdivision (AGG curve3_div)
+function quadRec(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  x3: number, y3: number,
+  level: number
+): void {
+  if (level > _maxLvl) return;
+
+  const x12 = (x1 + x2) * 0.5;
+  const y12 = (y1 + y2) * 0.5;
+  const x23 = (x2 + x3) * 0.5;
+  const y23 = (y2 + y3) * 0.5;
+  const x123 = (x12 + x23) * 0.5;
+  const y123 = (y12 + y23) * 0.5;
+
+  const dx = x3 - x1;
+  const dy = y3 - y1;
+  let d = Math.abs((x2 - x3) * dy - (y2 - y3) * dx);
+
+  if (d > _colEps) {
+    if (d * d <= _distTolSq * (dx * dx + dy * dy)) {
+      if (_angleTol > 0) {
+        const v1x = x2 - x1;
+        const v1y = y2 - y1;
+        const v2x = x3 - x2;
+        const v2y = y3 - y2;
+        const cross = v1x * v2y - v1y * v2x;
+        const dot = v1x * v2x + v1y * v2y;
+        if (dot > 0 && cross * cross < _tanAngSq * dot * dot) {
+          emit(x123, y123);
+          return;
+        }
+      } else {
+        emit(x123, y123);
+        return;
+      }
+    }
+  } else {
+    let da = dx * dx + dy * dy;
+    if (da === 0) {
+      d = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+    } else {
+      d = ((x2 - x1) * dx + (y2 - y1) * dy) / da;
+      if (d > 0 && d < 1) return;
+      if (d <= 0) d = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+      else if (d >= 1) d = (x2 - x3) * (x2 - x3) + (y2 - y3) * (y2 - y3);
+      else {
+        const px = x1 + d * dx;
+        const py = y1 + d * dy;
+        d = (x2 - px) * (x2 - px) + (y2 - py) * (y2 - py);
+      }
+    }
+    if (d < _distTolSq) {
+      emit(x2, y2);
+      return;
+    }
+  }
+
+  const nl = level + 1;
+  quadRec(x1, y1, x12, y12, x123, y123, nl);
+  quadRec(x123, y123, x23, y23, x3, y3, nl);
+}
+
+// Cubic recursive subdivision (AGG curve4_div)
+// cubicBegin handles level 0, which always subdivides
+function cubicBegin(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  x3: number, y3: number,
+  x4: number, y4: number
+): void {
+  const x12 = (x1 + x2) * 0.5;
+  const y12 = (y1 + y2) * 0.5;
+  const x23 = (x2 + x3) * 0.5;
+  const y23 = (y2 + y3) * 0.5;
+  const x34 = (x3 + x4) * 0.5;
+  const y34 = (y3 + y4) * 0.5;
+  const x123 = (x12 + x23) * 0.5;
+  const y123 = (y12 + y23) * 0.5;
+  const x234 = (x23 + x34) * 0.5;
+  const y234 = (y23 + y34) * 0.5;
+  const x1234 = (x123 + x234) * 0.5;
+  const y1234 = (y123 + y234) * 0.5;
+  cubicRec(x1, y1, x12, y12, x123, y123, x1234, y1234, 1);
+  cubicRec(x1234, y1234, x234, y234, x34, y34, x4, y4, 1);
+}
+
+function cubicRec(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  x3: number, y3: number,
+  x4: number, y4: number,
+  level: number
+): void {
+  if (level > _maxLvl) return;
+
+  const x12 = (x1 + x2) * 0.5;
+  const y12 = (y1 + y2) * 0.5;
+  const x23 = (x2 + x3) * 0.5;
+  const y23 = (y2 + y3) * 0.5;
+  const x34 = (x3 + x4) * 0.5;
+  const y34 = (y3 + y4) * 0.5;
+  const x123 = (x12 + x23) * 0.5;
+  const y123 = (y12 + y23) * 0.5;
+  const x234 = (x23 + x34) * 0.5;
+  const y234 = (y23 + y34) * 0.5;
+  const x1234 = (x123 + x234) * 0.5;
+  const y1234 = (y123 + y234) * 0.5;
+
+  const dx = x4 - x1;
+  const dy = y4 - y1;
+  let d2 = Math.abs((x2 - x4) * dy - (y2 - y4) * dx);
+  let d3 = Math.abs((x3 - x4) * dy - (y3 - y4) * dx);
+
+  const sc = (d2 > _colEps ? 2 : 0) + (d3 > _colEps ? 1 : 0);
+
+  switch (sc) {
+    case 0: {
+      let k = dx * dx + dy * dy;
+      if (k === 0) {
+        d2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+        d3 = (x3 - x1) * (x3 - x1) + (y3 - y1) * (y3 - y1);
+      } else {
+        k = 1 / k;
+        let t1 = x2 - x1;
+        let t2 = y2 - y1;
+        d2 = k * (t1 * dx + t2 * dy);
+        t1 = x3 - x1;
+        t2 = y3 - y1;
+        d3 = k * (t1 * dx + t2 * dy);
+        if (d2 > 0 && d2 < 1 && d3 > 0 && d3 < 1) return;
+        if (d2 <= 0) d2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+        else if (d2 >= 1) d2 = (x2 - x4) * (x2 - x4) + (y2 - y4) * (y2 - y4);
+        else {
+          const px = x1 + d2 * dx, py = y1 + d2 * dy;
+          d2 = (x2 - px) * (x2 - px) + (y2 - py) * (y2 - py);
+        }
+        if (d3 <= 0) d3 = (x3 - x1) * (x3 - x1) + (y3 - y1) * (y3 - y1);
+        else if (d3 >= 1) d3 = (x3 - x4) * (x3 - x4) + (y3 - y4) * (y3 - y4);
+        else {
+          const px = x1 + d3 * dx, py = y1 + d3 * dy;
+          d3 = (x3 - px) * (x3 - px) + (y3 - py) * (y3 - py);
+        }
+      }
+      if (d2 > d3) {
+        if (d2 < _distTolSq) { emit(x2, y2); return; }
+      } else {
+        if (d3 < _distTolSq) { emit(x3, y3); return; }
+      }
+      break;
+    }
+
+    case 1:
+      if (d3 * d3 <= _distTolSq * (dx * dx + dy * dy)) {
+        if (_angleTol > 0) {
+          const v1x = x3 - x2, v1y = y3 - y2;
+          const v2x = x4 - x3, v2y = y4 - y3;
+          const cross = v1x * v2y - v1y * v2x;
+          const dot = v1x * v2x + v1y * v2y;
+          if (dot > 0 && cross * cross < _tanAngSq * dot * dot) {
+            emit(x2, y2); emit(x3, y3); return;
+          }
+          if (_cuspLim > 0 &&
+              (dot <= 0 || cross * cross > _tanCuspSq * dot * dot)) {
+            emit(x3, y3); return;
+          }
+        } else {
+          emit(x23, y23); return;
+        }
+      }
+      break;
+
+    case 2:
+      if (d2 * d2 <= _distTolSq * (dx * dx + dy * dy)) {
+        if (_angleTol > 0) {
+          const v1x = x2 - x1, v1y = y2 - y1;
+          const v2x = x3 - x2, v2y = y3 - y2;
+          const cross = v1x * v2y - v1y * v2x;
+          const dot = v1x * v2x + v1y * v2y;
+          if (dot > 0 && cross * cross < _tanAngSq * dot * dot) {
+            emit(x2, y2); emit(x3, y3); return;
+          }
+          if (_cuspLim > 0 &&
+              (dot <= 0 || cross * cross > _tanCuspSq * dot * dot)) {
+            emit(x2, y2); return;
+          }
+        } else {
+          emit(x23, y23); return;
+        }
+      }
+      break;
+
+    case 3: {
+      if ((d2 + d3) * (d2 + d3) <= _distTolSq * (dx * dx + dy * dy)) {
+        if (_angleTol > 0) {
+          const a1x = x2 - x1, a1y = y2 - y1;
+          const a2x = x3 - x2, a2y = y3 - y2;
+          const c1 = a1x * a2y - a1y * a2x;
+          const dot1 = a1x * a2x + a1y * a2y;
+          const b2x = x4 - x3, b2y = y4 - y3;
+          const c2 = a2x * b2y - a2y * b2x;
+          const dot2 = a2x * b2x + a2y * b2y;
+
+          // Sum of unsigned angles via tangent addition identity
+          if (dot1 > 0 && dot2 > 0) {
+            const ac1 = c1 < 0 ? -c1 : c1;
+            const ac2 = c2 < 0 ? -c2 : c2;
+            const cc = ac1 * dot2 + ac2 * dot1;
+            const cd = dot1 * dot2 - ac1 * ac2;
+            if (cd > 0 && cc * cc < _tanAngSq * cd * cd) {
+              emit(x23, y23); return;
+            }
+          }
+
+          if (_cuspLim > 0) {
+            if (dot1 <= 0 || c1 * c1 > _tanCuspSq * dot1 * dot1) {
+              emit(x2, y2); return;
+            }
+            if (dot2 <= 0 || c2 * c2 > _tanCuspSq * dot2 * dot2) {
+              emit(x3, y3); return;
+            }
+          }
+        } else {
+          emit(x23, y23); return;
+        }
+      }
+      break;
+    }
+  }
+
+  const nl = level + 1;
+  cubicRec(x1, y1, x12, y12, x123, y123, x1234, y1234, nl);
+  cubicRec(x1234, y1234, x234, y234, x34, y34, x4, y4, nl);
+}
 
 export class Polygonizer {
   private curveFidelityConfig: CurveFidelityConfig;
   private curveSteps: number | null = null;
+
+  // Precomputed tolerances
+  private _distTolSq: number = 0;
+  private _angleTol: number = 0;
+  private _tanAngSq: number = 0;
+  private _cuspLim: number = 0;
+  private _tanCuspSq: number = 0;
+  private _colEps: number = 0;
+  private _maxLvl: number = 0;
 
   constructor(curveFidelityConfig?: CurveFidelityConfig) {
     this.curveFidelityConfig = {
       ...DEFAULT_CURVE_FIDELITY,
       ...curveFidelityConfig
     };
+    this.precompute();
   }
 
   public setCurveFidelityConfig(curveFidelityConfig?: CurveFidelityConfig) {
@@ -63,6 +332,33 @@ export class Polygonizer {
       ...DEFAULT_CURVE_FIDELITY,
       ...curveFidelityConfig
     };
+    this.precompute();
+  }
+
+  private precompute() {
+    const c = this.curveFidelityConfig;
+    const dt = c.distanceTolerance ?? DEFAULT_CURVE_FIDELITY.distanceTolerance!;
+    this._distTolSq = dt * dt;
+    this._angleTol = c.angleTolerance ?? DEFAULT_CURVE_FIDELITY.angleTolerance!;
+    this._tanAngSq = this._angleTol > 0
+      ? Math.tan(this._angleTol) ** 2 : 0;
+    this._cuspLim = c.cuspLimit ?? 0;
+    this._tanCuspSq = this._cuspLim > 0
+      ? Math.tan(this._cuspLim) ** 2 : 0;
+    this._colEps = c.collinearityEpsilon ?? DEFAULT_CURVE_FIDELITY.collinearityEpsilon!;
+    this._maxLvl = c.recursionLimit ?? DEFAULT_CURVE_FIDELITY.recursionLimit!;
+  }
+
+  // Set module-level state from instance tolerances
+  private activate(): void {
+    _distTolSq = this._distTolSq;
+    _angleTol = this._angleTol;
+    _tanAngSq = this._tanAngSq;
+    _cuspLim = this._cuspLim;
+    _tanCuspSq = this._tanCuspSq;
+    _colEps = this._colEps;
+    _maxLvl = this._maxLvl;
+    _out = [];
   }
 
   // Fixed-step subdivision; overrides adaptive curveFidelity when set
@@ -82,414 +378,67 @@ export class Polygonizer {
   public polygonizeQuadratic(start: Vec2, control: Vec2, end: Vec2): Vec2[] {
     if (this.curveSteps !== null) {
       return this.polygonizeQuadraticFixedSteps(
-        start,
-        control,
-        end,
-        this.curveSteps
+        start, control, end, this.curveSteps
       );
     }
 
-    const points: Vec2[] = [];
-    this.recursiveQuadratic(
-      start.x,
-      start.y,
-      control.x,
-      control.y,
-      end.x,
-      end.y,
-      points
-    );
-    this.addPoint(end.x, end.y, points);
-    return points;
+    this.activate();
+    quadRec(start.x, start.y, control.x, control.y, end.x, end.y, 0);
+    emit(end.x, end.y);
+    return _out;
   }
 
   public polygonizeCubic(
-    start: Vec2,
-    control1: Vec2,
-    control2: Vec2,
-    end: Vec2
+    start: Vec2, control1: Vec2, control2: Vec2, end: Vec2
   ): Vec2[] {
     if (this.curveSteps !== null) {
       return this.polygonizeCubicFixedSteps(
-        start,
-        control1,
-        control2,
-        end,
-        this.curveSteps
+        start, control1, control2, end, this.curveSteps
       );
     }
 
-    const points: Vec2[] = [];
-    this.recursiveCubic(
-      start.x,
-      start.y,
-      control1.x,
-      control1.y,
-      control2.x,
-      control2.y,
-      end.x,
-      end.y,
-      points
+    this.activate();
+    cubicBegin(
+      start.x, start.y, control1.x, control1.y,
+      control2.x, control2.y, end.x, end.y
     );
-    this.addPoint(end.x, end.y, points);
-    return points;
-  }
-
-  private lerp(a: number, b: number, t: number): number {
-    return a + (b - a) * t;
+    emit(end.x, end.y);
+    return _out;
   }
 
   private polygonizeQuadraticFixedSteps(
-    start: Vec2,
-    control: Vec2,
-    end: Vec2,
-    steps: number
+    start: Vec2, control: Vec2, end: Vec2, steps: number
   ): Vec2[] {
-    const points: Vec2[] = [];
-
-    // Emit intermediate points; caller already has start
+    this.activate();
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
-      const x12 = this.lerp(start.x, control.x, t);
-      const y12 = this.lerp(start.y, control.y, t);
-      const x23 = this.lerp(control.x, end.x, t);
-      const y23 = this.lerp(control.y, end.y, t);
-      const x = this.lerp(x12, x23, t);
-      const y = this.lerp(y12, y23, t);
-      this.addPoint(x, y, points);
+      const x12 = start.x + (control.x - start.x) * t;
+      const y12 = start.y + (control.y - start.y) * t;
+      const x23 = control.x + (end.x - control.x) * t;
+      const y23 = control.y + (end.y - control.y) * t;
+      emit(x12 + (x23 - x12) * t, y12 + (y23 - y12) * t);
     }
-
-    return points;
+    return _out;
   }
 
   private polygonizeCubicFixedSteps(
-    start: Vec2,
-    control1: Vec2,
-    control2: Vec2,
-    end: Vec2,
-    steps: number
+    start: Vec2, control1: Vec2, control2: Vec2, end: Vec2, steps: number
   ): Vec2[] {
-    const points: Vec2[] = [];
-
-    // Emit intermediate points; caller already has start
+    this.activate();
     for (let i = 1; i <= steps; i++) {
       const t = i / steps;
-
-      // De Casteljau
-      const x12 = this.lerp(start.x, control1.x, t);
-      const y12 = this.lerp(start.y, control1.y, t);
-      const x23 = this.lerp(control1.x, control2.x, t);
-      const y23 = this.lerp(control1.y, control2.y, t);
-      const x34 = this.lerp(control2.x, end.x, t);
-      const y34 = this.lerp(control2.y, end.y, t);
-
-      const x123 = this.lerp(x12, x23, t);
-      const y123 = this.lerp(y12, y23, t);
-      const x234 = this.lerp(x23, x34, t);
-      const y234 = this.lerp(y23, y34, t);
-
-      const x = this.lerp(x123, x234, t);
-      const y = this.lerp(y123, y234, t);
-      this.addPoint(x, y, points);
+      const x12 = start.x + (control1.x - start.x) * t;
+      const y12 = start.y + (control1.y - start.y) * t;
+      const x23 = control1.x + (control2.x - control1.x) * t;
+      const y23 = control1.y + (control2.y - control1.y) * t;
+      const x34 = control2.x + (end.x - control2.x) * t;
+      const y34 = control2.y + (end.y - control2.y) * t;
+      const x123 = x12 + (x23 - x12) * t;
+      const y123 = y12 + (y23 - y12) * t;
+      const x234 = x23 + (x34 - x23) * t;
+      const y234 = y23 + (y34 - y23) * t;
+      emit(x123 + (x234 - x123) * t, y123 + (y234 - y123) * t);
     }
-
-    return points;
-  }
-
-  private recursiveQuadratic(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-    points: Vec2[],
-    level: number = 0
-  ) {
-    if (level > RECURSION_LIMIT) return;
-
-    // De Casteljau subdivision: split the curve at t=0.5
-    // First calculate midpoints of the two line segments
-    const x12 = (x1 + x2) / 2;
-    const y12 = (y1 + y2) / 2;
-    const x23 = (x2 + x3) / 2;
-    const y23 = (y2 + y3) / 2;
-    // Then find the midpoint of those midpoints - this is the curve point at t=0.5
-    const x123 = (x12 + x23) / 2;
-    const y123 = (y12 + y23) / 2;
-
-    const dx = x3 - x1;
-    const dy = y3 - y1;
-    const d = Math.abs((x2 - x3) * dy - (y2 - y3) * dx);
-
-    const baseTolerance =
-      this.curveFidelityConfig.distanceTolerance ??
-      DEFAULT_CURVE_FIDELITY.distanceTolerance!;
-    const distanceTolerance = baseTolerance * baseTolerance;
-
-    if (d > COLLINEARITY_EPSILON) {
-      // Regular case
-      // Recursion terminates when the curve is flat enough (deviation from straight line is within tolerance)
-      if (d * d <= distanceTolerance * (dx * dx + dy * dy)) {
-        // Angle check
-        const angleTolerance =
-          this.curveFidelityConfig.angleTolerance ??
-          DEFAULT_CURVE_FIDELITY.angleTolerance!;
-        if (angleTolerance > 0) {
-          // Angle between segments (p1->p2) and (p2->p3)
-          // atan2(cross, dot) avoids computing 2 separate atan2() values
-          const v1x = x2 - x1;
-          const v1y = y2 - y1;
-          const v2x = x3 - x2;
-          const v2y = y3 - y2;
-          const da = Math.abs(
-            Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
-          );
-
-          if (da < angleTolerance) {
-            this.addPoint(x2, y2, points);
-            return;
-          }
-        } else {
-          this.addPoint(x2, y2, points);
-          return;
-        }
-      }
-    } else {
-      // Collinear case
-      const da = dx * dx + dy * dy;
-      if (da === 0) {
-        const d2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
-        if (d2 <= distanceTolerance) {
-          this.addPoint(x2, y2, points);
-          return;
-        }
-      } else {
-        const d2 = ((x2 - x1) * dx + (y2 - y1) * dy) / da;
-        if (d2 > 0 && d2 < 1 && d * d <= distanceTolerance * da) {
-          this.addPoint(x2, y2, points);
-          return;
-        }
-      }
-    }
-
-    // Continue subdividing
-    this.recursiveQuadratic(x1, y1, x12, y12, x123, y123, points, level + 1);
-    this.recursiveQuadratic(x123, y123, x23, y23, x3, y3, points, level + 1);
-  }
-
-  private recursiveCubic(
-    x1: number,
-    y1: number,
-    x2: number,
-    y2: number,
-    x3: number,
-    y3: number,
-    x4: number,
-    y4: number,
-    points: Vec2[],
-    level: number = 0
-  ) {
-    if (level > RECURSION_LIMIT) return;
-
-    // De Casteljau subdivision for cubic curves
-    const x12 = (x1 + x2) / 2;
-    const y12 = (y1 + y2) / 2;
-    const x23 = (x2 + x3) / 2;
-    const y23 = (y2 + y3) / 2;
-    const x34 = (x3 + x4) / 2;
-    const y34 = (y3 + y4) / 2;
-    const x123 = (x12 + x23) / 2;
-    const y123 = (y12 + y23) / 2;
-    const x234 = (x23 + x34) / 2;
-    const y234 = (y23 + y34) / 2;
-    const x1234 = (x123 + x234) / 2;
-    const y1234 = (y123 + y234) / 2;
-
-    const dx = x4 - x1;
-    const dy = y4 - y1;
-
-    const d2 = Math.abs((x2 - x4) * dy - (y2 - y4) * dx);
-    const d3 = Math.abs((x3 - x4) * dy - (y3 - y4) * dx);
-
-    const baseTolerance =
-      this.curveFidelityConfig.distanceTolerance ??
-      DEFAULT_CURVE_FIDELITY.distanceTolerance!;
-    const distanceTolerance = baseTolerance * baseTolerance;
-
-    let switchCondition = 0;
-
-    if (d2 > COLLINEARITY_EPSILON) switchCondition |= 1;
-    if (d3 > COLLINEARITY_EPSILON) switchCondition |= 2;
-
-    switch (switchCondition) {
-      case 0:
-        // All collinear OR p1==p4
-        const k = dx * dx + dy * dy;
-        if (k === 0) {
-          const d2_sq = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
-          const d3_sq = (x3 - x1) * (x3 - x1) + (y3 - y1) * (y3 - y1);
-          if (d2_sq <= distanceTolerance && d3_sq <= distanceTolerance) {
-            this.addPoint(x2, y2, points);
-            this.addPoint(x3, y3, points);
-            return;
-          }
-        } else {
-          const da1 = ((x2 - x1) * dx + (y2 - y1) * dy) / k;
-          const da2 = ((x3 - x1) * dx + (y3 - y1) * dy) / k;
-          if (
-            da1 > 0 &&
-            da1 < 1 &&
-            da2 > 0 &&
-            da2 < 1 &&
-            (d2 + d3) * (d2 + d3) <= distanceTolerance * k
-          ) {
-            this.addPoint(x2, y2, points);
-            this.addPoint(x3, y3, points);
-            return;
-          }
-        }
-        break;
-
-      case 1:
-        // p1,p2,p4 are collinear, p3 is not
-        if (d3 * d3 <= distanceTolerance * (dx * dx + dy * dy)) {
-          const angleTolerance =
-            this.curveFidelityConfig.angleTolerance ??
-            DEFAULT_CURVE_FIDELITY.angleTolerance!;
-          if (angleTolerance > 0) {
-            // Angle between segments (p2->p3) and (p3->p4)
-            const v1x = x3 - x2;
-            const v1y = y3 - y2;
-            const v2x = x4 - x3;
-            const v2y = y4 - y3;
-            const da1 = Math.abs(
-              Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
-            );
-
-            if (da1 < angleTolerance) {
-              this.addPoint(x2, y2, points);
-              this.addPoint(x3, y3, points);
-              return;
-            }
-          } else {
-            this.addPoint(x2, y2, points);
-            this.addPoint(x3, y3, points);
-            return;
-          }
-        }
-        break;
-
-      case 2:
-        // p1,p3,p4 are collinear, p2 is not
-        if (d2 * d2 <= distanceTolerance * (dx * dx + dy * dy)) {
-          const angleTolerance =
-            this.curveFidelityConfig.angleTolerance ??
-            DEFAULT_CURVE_FIDELITY.angleTolerance!;
-          if (angleTolerance > 0) {
-            // Angle between segments (p1->p2) and (p2->p3)
-            const v1x = x2 - x1;
-            const v1y = y2 - y1;
-            const v2x = x3 - x2;
-            const v2y = y3 - y2;
-            const da1 = Math.abs(
-              Math.atan2(v1x * v2y - v1y * v2x, v1x * v2x + v1y * v2y)
-            );
-
-            if (da1 < angleTolerance) {
-              this.addPoint(x2, y2, points);
-              this.addPoint(x3, y3, points);
-              return;
-            }
-          } else {
-            this.addPoint(x2, y2, points);
-            this.addPoint(x3, y3, points);
-            return;
-          }
-        }
-        break;
-
-      case 3:
-        // Regular case
-        if ((d2 + d3) * (d2 + d3) <= distanceTolerance * (dx * dx + dy * dy)) {
-          const angleTolerance =
-            this.curveFidelityConfig.angleTolerance ??
-            DEFAULT_CURVE_FIDELITY.angleTolerance!;
-          if (angleTolerance > 0) {
-            // da1: angle between (p1->p2) and (p2->p3)
-            const a1x = x2 - x1;
-            const a1y = y2 - y1;
-            const a2x = x3 - x2;
-            const a2y = y3 - y2;
-            const da1 = Math.abs(
-              Math.atan2(a1x * a2y - a1y * a2x, a1x * a2x + a1y * a2y)
-            );
-
-            // da2: angle between (p2->p3) and (p3->p4)
-            const b1x = a2x;
-            const b1y = a2y;
-            const b2x = x4 - x3;
-            const b2y = y4 - y3;
-            const da2 = Math.abs(
-              Math.atan2(b1x * b2y - b1y * b2x, b1x * b2x + b1y * b2y)
-            );
-
-            if (da1 + da2 < angleTolerance) {
-              this.addPoint(x2, y2, points);
-              this.addPoint(x3, y3, points);
-              return;
-            }
-          } else {
-            this.addPoint(x2, y2, points);
-            this.addPoint(x3, y3, points);
-            return;
-          }
-        }
-        break;
-    }
-
-    // Continue subdividing
-    this.recursiveCubic(
-      x1,
-      y1,
-      x12,
-      y12,
-      x123,
-      y123,
-      x1234,
-      y1234,
-      points,
-      level + 1
-    );
-    this.recursiveCubic(
-      x1234,
-      y1234,
-      x234,
-      y234,
-      x34,
-      y34,
-      x4,
-      y4,
-      points,
-      level + 1
-    );
-  }
-
-  private addPoint(x: number, y: number, points: Vec2[]) {
-    const newPoint = new Vec2(x, y);
-
-    if (points.length === 0) {
-      points.push(newPoint);
-      return;
-    }
-
-    const lastPoint = points[points.length - 1];
-    const dx = newPoint.x - lastPoint.x;
-    const dy = newPoint.y - lastPoint.y;
-    const distanceSquared = dx * dx + dy * dy;
-
-    if (distanceSquared > COLLINEARITY_EPSILON * COLLINEARITY_EPSILON) {
-      points.push(newPoint);
-    }
+    return _out;
   }
 }
