@@ -299,7 +299,7 @@ const mainLibraryConfig = {
 };
 
 const umdConfig = {
-  input: 'src/index.ts',
+  input: 'src/three/index.ts',
   onwarn,
   output: [
     {

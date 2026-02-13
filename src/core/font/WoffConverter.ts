@@ -1,8 +1,7 @@
 import { logger } from '../../utils/Logger';
 import { FONT_SIGNATURE_WOFF, FONT_SIGNATURE_WOFF2 } from './constants';
 
-// Optional WOFF2 decoder - not bundled by default to save ~45KB
-// Enable via: import { woff2Decode } from 'woff2-decode'; Text.enableWoff2(woff2Decode);
+// Optional WOFF2 decoder - set via Text.enableWoff2()
 type Woff2Decoder = (data: ArrayBuffer | Uint8Array) => Uint8Array | Promise<Uint8Array>;
 let woff2Decoder: Woff2Decoder | null = null;
 
@@ -160,7 +159,7 @@ export class WoffConverter {
     if (!woff2Decoder) {
       throw new Error(
         'WOFF2 fonts require enabling the decoder. Add to your code:\n' +
-        "  import { woff2Decode } from 'woff2-decode';\n" +
+        "  import { woff2Decode } from 'woff-lib/woff2/decode';\n" +
         '  Text.enableWoff2(woff2Decode);'
       );
     }

@@ -858,12 +858,12 @@
 
     <script src="../dist/index.umd.js"></script>
     <script src="../dist/patterns/en-us.umd.js"></script>
-    <script src="../woff2-decode/dist/index.umd.js"></script>
+    <script src="../node_modules/woff-lib/dist/woff2-decode.umd.js"></script>
 
     <script>
       // Enable WOFF2 support
-      if (window.woff2Decode) {
-        window.ThreeText.Text.enableWoff2(window.woff2Decode.woff2Decode);
+      if (window.woffLib) {
+        window.ThreeText.Text.enableWoff2(window.woffLib.woff2Decode);
       }
       
       function updateStatus(message, type = "loading") {
@@ -924,7 +924,7 @@
         direction: "ltr",
         depth: 7,
         alignment: "justify",
-        optimizationEnabled: true,
+        optimizationEnabled: false,
         areaThreshold: 1.0,
         removeOverlaps: null,
         textColor: "#ffffff",

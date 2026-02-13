@@ -17,7 +17,7 @@
     "react-dom": "^18.2.0",
     "three": "^0.160.0",
     "three-text": "file:../..",
-    "woff2-decode": "^0.3.0"
+    "woff-lib": "^0.0.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.0",

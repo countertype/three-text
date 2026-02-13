@@ -49,8 +49,7 @@ export class Text {
   private static maxFontCacheMemoryBytes = Infinity;
   private static fontIdCounter = 0;
 
-  // Enable WOFF2 font support (adds ~45KB to bundle if imported)
-  // Usage: import { woff2Decode } from 'woff2-decode'; Text.enableWoff2(woff2Decode);
+  // Enable WOFF2 font support
   public static enableWoff2(decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array | Promise<Uint8Array>): void {
     setWoff2Decoder(decoder);
   }

@@ -6,8 +6,7 @@ export default defineConfig({
     globals: true,
     exclude: [
       '**/node_modules/**',
-      '**/dist/**',
-      '**/woff2-decode/**'
+      '**/dist/**'
     ]
   }
 });

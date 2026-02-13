@@ -10,6 +10,40 @@
 
 - Removed hyphenation patterns for Czech, Indonesian, Macedonian, and Serbian due to incompatible licensing
 
+## [0.4.11] - 2026-02-12
+
+### Performance
+
+- `Polygonizer`:
+  - Rewrite adaptive subdivision as module-level functions with precomputed tolerances, eliminating instance property lookups and `this` dispatch from the recursive hot path
+  - Replace `atan2` angle checks with equivalent cross/dot product comparisons
+  - Split cubic level-0 subdivision into a separate entry point to remove a branch from the recursive path
+- `PathOptimizer`:
+  - Replace object-based linked list and generic `MinHeap` with flat typed arrays (`Float64Array`/`Int32Array`) and an inlined binary min-heap with index-based position map
+  - Reuse scratch buffers across calls
+- Remove `MinHeap` utility
+
+### Changed
+
+- Disable Visvalingam-Whyatt simplification by default in examples. After fixing AGG, V-W removes very few points from AGG's adaptive output at additional cost. The option remains available in the GUI, but it may be on the path to deprecation
+
+## [0.4.10] - 2026-02-12
+
+### Changed
+
+- Migrated from `libtess.js` to `libtess-ts` for tessellation (same algorithm, 15-30% faster)
+- Updated `woff-lib` to 0.0.3
+
+## [0.4.9] - 2026-02-04
+
+### Fixed
+
+- UMD build now uses Three.js adapter (returns `geometry` property instead of raw arrays)
+
+### Changed
+
+- Switched from `woff2-decode` to `woff-lib` for WOFF2 support (same API, new package)
+
 ## [0.4.8] - 2026-02-03
 
 ### Changed

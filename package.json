@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.4.8",
+  "version": "0.4.11",
   "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
@@ -108,8 +108,8 @@
   },
   "dependencies": {
     "harfbuzzjs": "^0.4.15",
-    "libtess": "^1.2.2",
-    "woff2-decode": "^0.3.0"
+    "libtess-ts": "^0.0.1",
+    "woff-lib": "^0.0.3"
   },
   "devDependencies": {
     "@react-three/fiber": ">=8.0.0",
@@ -118,10 +118,10 @@
     "@rollup/plugin-replace": "^6.0.2",
     "@rollup/plugin-terser": "^0.4.0",
     "@rollup/plugin-typescript": "^11.0.0",
-    "@types/libtess": "^1.2.0",
     "@types/react": ">=17.0.0",
     "@types/three": ">=0.175.0",
     "@webgpu/types": "^0.1.64",
+    "brotli-lib": "^0.0.3",
     "http-server": "^14.1.1",
     "jsdom": "^26.1.0",
     "prettier": "^3.6.2",
