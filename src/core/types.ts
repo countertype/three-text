@@ -300,7 +300,10 @@ export interface HyphenationPatternsMap {
 
 export interface CurveFidelityConfig {
   distanceTolerance?: number; // max deviation from true curve, in font units (default: 0.5)
-  angleTolerance?: number; // max angle between segments in radians (default: 0.2)
+  angleTolerance?: number; // min angle between segments before subdivision stops, in radians (default: 0.2)
+  cuspLimit?: number; // per-segment angle ceiling for cusp detection on cubics (default: 0, disabled)
+  collinearityEpsilon?: number; // threshold below which points are treated as collinear (default: 1e-6)
+  recursionLimit?: number; // max subdivision depth (default: 16)
 }
 
 export interface GeometryOptimizationOptions {
