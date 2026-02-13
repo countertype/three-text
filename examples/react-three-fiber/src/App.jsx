@@ -243,7 +243,7 @@ function App() {
   const [optimizationControls] = useControls(
     "Geometry optimization", 
     () => ({
-      optimizationEnabled: true,
+      optimizationEnabled: false,
       areaThreshold: { value: 1.0, min: 0.1, max: 15.0, step: 0.1 },
     }),
     [variationAxes]
