@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.11] - 2026-02-12
+
+### Performance
+
+- `Polygonizer`:
+  - Rewrite adaptive subdivision as module-level functions with precomputed tolerances, eliminating instance property lookups and `this` dispatch from the recursive hot path
+  - Replace `atan2` angle checks with equivalent cross/dot product comparisons
+  - Split cubic level-0 subdivision into a separate entry point to remove a branch from the recursive path
+- `PathOptimizer`:
+  - Replace object-based linked list and generic `MinHeap` with flat typed arrays (`Float64Array`/`Int32Array`) and an inlined binary min-heap with index-based position map
+  - Reuse scratch buffers across calls
+- Remove `MinHeap` utility
+
+### Changed
+
+- Disable Visvalingam-Whyatt simplification by default in examples. After fixing AGG, V-W removes very few points from AGG's adaptive output at additional cost. The option remains available in the GUI, but it may be on the path to deprecation
+
 ## [0.4.10] - 2026-02-12
 
 ### Changed
