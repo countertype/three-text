@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>three-text WebGPU Vector Example</title>
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100vh;
+      touch-action: none;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    #status {
+      position: fixed;
+      bottom: 50px;
+      left: 20px;
+      padding: 10px 15px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 4px;
+      font-size: 12px;
+      z-index: 100;
+      backdrop-filter: blur(10px);
+    }
+    .status-loading { color: #ffa500; }
+    .status-ready { color: #00ff00; }
+    .status-error { color: #ff4444; }
+  </style>
+</head>
+<body>
+  <div id="status" class="status-loading">Initializing WebGPU vector renderer...</div>
+  <canvas id="canvas"></canvas>
+
+  <script type="module">
+    import { Text, buildLoopBlinnMeshData } from '../dist/vector/index.js';
+    import { createWebGPUVectorRenderer } from '../dist/vector/webgpu/index.js';
+
+    const status = document.getElementById('status');
+
+    async function main() {
+      if (!navigator.gpu) {
+        status.textContent = 'WebGPU is not supported in this browser';
+        status.className = 'status-error';
+        return;
+      }
+
+      const adapter = await navigator.gpu.requestAdapter();
+      if (!adapter) {
+        status.textContent = 'Unable to acquire GPU adapter';
+        status.className = 'status-error';
+        return;
+      }
+
+      const device = await adapter.requestDevice();
+      const canvas = document.getElementById('canvas');
+      const context = canvas.getContext('webgpu');
+      const colorFormat = navigator.gpu.getPreferredCanvasFormat();
+      const sampleCount = 4;
+      const depthStencilFormat = 'depth24plus-stencil8';
+      const devicePixelRatio = window.devicePixelRatio || 1;
+
+      context.configure({
+        device,
+        format: colorFormat,
+        alphaMode: 'premultiplied'
+      });
+
+      let msaaColorTexture = null;
+      let depthStencilTexture = null;
+
+      const resize = () => {
+        canvas.width = Math.max(1, Math.floor(canvas.clientWidth * devicePixelRatio));
+        canvas.height = Math.max(1, Math.floor(canvas.clientHeight * devicePixelRatio));
+
+        if (msaaColorTexture) msaaColorTexture.destroy();
+        if (depthStencilTexture) depthStencilTexture.destroy();
+
+        msaaColorTexture = device.createTexture({
+          size: [canvas.width, canvas.height],
+          sampleCount,
+          format: colorFormat,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+
+        depthStencilTexture = device.createTexture({
+          size: [canvas.width, canvas.height],
+          sampleCount,
+          format: depthStencilFormat,
+          usage: GPUTextureUsage.RENDER_ATTACHMENT
+        });
+      };
+      resize();
+
+      status.textContent = 'Loading font and shaping text...';
+      Text.setHarfBuzzPath('/examples/hb/hb.wasm');
+
+      const vectorText = await Text.create({
+        text: 'Hello WebGPU!',
+        font: './fonts/NimbusSanL-Reg.woff',
+        size: 72
+      });
+
+      const loopBlinnMeshData = buildLoopBlinnMeshData(vectorText);
+      const renderer = createWebGPUVectorRenderer(device, colorFormat, {
+        depthStencilFormat,
+        sampleCount
+      });
+      renderer.setGeometry(loopBlinnMeshData);
+
+      const bounds = loopBlinnMeshData.planeBounds;
+      const centerX = (bounds.min.x + bounds.max.x) * 0.5;
+      const centerY = (bounds.min.y + bounds.max.y) * 0.5;
+      const width = Math.max(1, bounds.max.x - bounds.min.x);
+
+      let yaw = 0.4;
+      let pitch = 0.2;
+      let zoom = 1.0;
+      let dragging = false;
+      let lastX = 0;
+      let lastY = 0;
+
+      const color = new Float32Array([1, 1, 1, 1]);
+
+      function buildMvp() {
+        const aspect = canvas.width / canvas.height;
+        const baseScale = 2 / (width * 1.8);
+        const scaleX = baseScale / zoom;
+        const scaleY = (baseScale * aspect) / zoom;
+
+        const cy = Math.cos(yaw);
+        const sy = Math.sin(yaw);
+        const cp = Math.cos(pitch);
+        const sp = Math.sin(pitch);
+
+        const tx = -centerX * scaleX;
+        const ty = -centerY * scaleY;
+
+        return new Float32Array([
+          scaleX * cy, scaleX * sy * sp, scaleX * sy * cp, 0,
+          0, scaleY * cp, scaleY * -sp, 0,
+          -0.001 * sy, 0.001 * cy * sp, 0.001 * cy * cp, 0,
+          tx, ty, 0.5, 1
+        ]);
+      }
+
+      canvas.addEventListener('pointerdown', (event) => {
+        dragging = true;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        canvas.setPointerCapture(event.pointerId);
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (!dragging) return;
+        const dx = event.clientX - lastX;
+        const dy = event.clientY - lastY;
+        lastX = event.clientX;
+        lastY = event.clientY;
+        yaw += dx * 0.005;
+        pitch = Math.max(-1.2, Math.min(1.2, pitch + dy * 0.005));
+      });
+
+      const endDrag = (event) => {
+        dragging = false;
+        if (canvas.hasPointerCapture(event.pointerId)) {
+          canvas.releasePointerCapture(event.pointerId);
+        }
+      };
+      canvas.addEventListener('pointerup', endDrag);
+      canvas.addEventListener('pointercancel', endDrag);
+
+      canvas.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        const delta = Math.sign(event.deltaY);
+        zoom = Math.max(0.5, Math.min(3.0, zoom * (delta > 0 ? 1.08 : 0.92)));
+      }, { passive: false });
+
+      status.textContent = `Ready: ${loopBlinnMeshData.stats.interiorTriangleCount + loopBlinnMeshData.stats.curveTriangleCount} triangles`;
+      status.className = 'status-ready';
+
+      const frame = () => {
+        const commandEncoder = device.createCommandEncoder();
+        const currentTextureView = context.getCurrentTexture().createView();
+        const passEncoder = commandEncoder.beginRenderPass({
+          colorAttachments: [
+            {
+              view: msaaColorTexture.createView(),
+              resolveTarget: currentTextureView,
+              loadOp: 'clear',
+              storeOp: 'store',
+              clearValue: { r: 0.05, g: 0.05, b: 0.05, a: 1.0 }
+            }
+          ],
+          depthStencilAttachment: {
+            view: depthStencilTexture.createView(),
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+            depthClearValue: 1.0,
+            stencilLoadOp: 'clear',
+            stencilStoreOp: 'store',
+            stencilClearValue: 0
+          }
+        });
+
+        renderer.render(passEncoder, buildMvp(), color);
+        passEncoder.end();
+        device.queue.submit([commandEncoder.finish()]);
+        requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+
+      window.addEventListener('resize', resize);
+      window.addEventListener('beforeunload', () => {
+        renderer.dispose();
+        if (msaaColorTexture) msaaColorTexture.destroy();
+        if (depthStencilTexture) depthStencilTexture.destroy();
+      });
+    }
+
+    main().catch((error) => {
+      console.error(error);
+      status.textContent = `Error: ${error.message}`;
+      status.className = 'status-error';
+    });
+  </script>
+</body>
+</html>

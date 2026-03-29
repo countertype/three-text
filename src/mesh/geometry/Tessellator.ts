@@ -1,4 +1,4 @@
-import type { Path, ProcessedGeometry } from '../types';
+import type { Path, ProcessedGeometry } from '../../core/types';
 import { GluTesselator, GLU_TESS, WINDING } from 'libtess-ts';
 import { logger } from '../../utils/Logger';
 import { perfLogger } from '../../utils/PerformanceLogger';

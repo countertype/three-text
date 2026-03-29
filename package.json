@@ -38,6 +38,21 @@
       "import": "./dist/webgpu/index.js",
       "require": "./dist/webgpu/index.cjs"
     },
+    "./vector/webgl": {
+      "types": "./dist/vector/webgl/index.d.ts",
+      "import": "./dist/vector/webgl/index.js",
+      "require": "./dist/vector/webgl/index.cjs"
+    },
+    "./vector/webgpu": {
+      "types": "./dist/vector/webgpu/index.d.ts",
+      "import": "./dist/vector/webgpu/index.js",
+      "require": "./dist/vector/webgpu/index.cjs"
+    },
+    "./vector": {
+      "types": "./dist/vector/index.d.ts",
+      "import": "./dist/vector/index.js",
+      "require": "./dist/vector/index.cjs"
+    },
     "./p5": {
       "types": "./dist/p5/index.d.ts",
       "import": "./dist/p5/index.js",

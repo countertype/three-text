@@ -250,6 +250,93 @@ export interface TextHandle extends TextGeometryInfo {
   update(options: Partial<TextOptions>): Promise<TextHandle>;
 }
 
+export type OutlineSegmentType = 0 | 1 | 2; // 0=line, 1=quadratic, 2=cubic
+
+export interface OutlineSegment {
+  type: OutlineSegmentType;
+  contourId: number;
+  p0: Vec2;
+  p1: Vec2;
+  p2?: Vec2;
+  p3?: Vec2;
+}
+
+export interface GlyphOutline {
+  glyphId: number;
+  textIndex: number;
+  segments: OutlineSegment[];
+  bounds: {
+    min: { x: number; y: number };
+    max: { x: number; y: number };
+  };
+}
+
+export interface VectorGlyphInfo extends GlyphGeometryInfo {
+  segmentStart: number;
+  segmentCount: number;
+}
+
+export interface PackedFloatTexture {
+  width: number;
+  height: number;
+  data: Float32Array;
+}
+
+export interface VectorTextGeometryInfo {
+  quadVertices: Float32Array;
+  quadIndices: Uint16Array;
+  instances: {
+    position: Float32Array;
+    bounds: Float32Array;
+    segmentRange: Uint32Array;
+    glyphDataIndex: Uint32Array;
+    glyphIndex: Uint32Array;
+    textIndex: Uint32Array;
+    lineIndex: Uint32Array;
+  };
+  segmentTexelsPerSegment: number;
+  segments: PackedFloatTexture;
+  segmentBounds?: PackedFloatTexture;
+  bandCount?: number;
+  bandRanges?: PackedFloatTexture;
+  bandIndices?: PackedFloatTexture;
+  xBandCount?: number;
+  xBandRanges?: PackedFloatTexture;
+  xBandIndices?: PackedFloatTexture;
+  tileCountX?: number;
+  tileCountY?: number;
+  tileRanges?: PackedFloatTexture;
+  tileIndices?: PackedFloatTexture;
+  glyphs: VectorGlyphInfo[];
+  planeBounds: BoundingBox;
+}
+
+export interface TextLayoutData {
+  lines: LineInfo[];
+  scaledLineHeight: number;
+  letterSpacing: number;
+  align: string;
+  direction: TextDirection;
+  depth: number;
+  size: number;
+  pixelsPerFontUnit: number;
+}
+
+export interface TextLayoutResult {
+  clustersByLine: GlyphCluster[][];
+  layoutData: TextLayoutData;
+  options: TextOptions;
+  loadedFont: LoadedFont;
+  fontId: string;
+}
+
+export interface TextLayoutHandle extends TextLayoutResult {
+  getLoadedFont(): LoadedFont | undefined;
+  measureTextWidth(text: string, letterSpacing?: number): number;
+  update(options: Partial<TextOptions>): Promise<TextLayoutHandle>;
+  dispose(): void;
+}
+
 export interface ColorByRange {
   start: number;
   end: number;

@@ -233,6 +233,7 @@
           "three/addons/": "../node_modules/three/examples/jsm/",
           "three-text": "../dist/index.js",
           "three-text/three": "../dist/three/index.js",
+          "three-text/vector": "../dist/vector/index.js",
           "woff-lib": "../node_modules/woff-lib/dist/woff2-decode.js",
           "brotli-lib/decode": "../node_modules/brotli-lib/dist/decode.js"
         }
@@ -244,6 +245,7 @@
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       import { GUI } from "three/addons/libs/lil-gui.module.min.js";
       import { Text } from "three-text/three";
+      import { Text as VectorText, buildLoopBlinnMeshData } from "three-text/vector";
       Text.setHarfBuzzPath("/examples/hb/hb.wasm");
 
       (async () => {
@@ -278,6 +280,7 @@
         let camera, renderer, controls, textMesh;
         let isRendering = false;
         let currentTextInstance = null;
+        let currentVectorInstance = null;
                 let time = 0;
         let gui;
         let textFolder;
@@ -289,12 +292,28 @@
         let currentShaderMode = 'wave';
         let shaderFolders = {};
         let lastFontBuffer = null;
+
+        // Vector (Loop-Blinn) rendering state
+        let vectorInteriorMesh = null;
+        let vectorCurveMesh = null;
+        let vectorFillMesh = null;
+        let vectorStencilInteriorScene = null;
+        let vectorStencilCurveScene = null;
+        let vectorColorScene = null;
+        let vectorStencilFirstFrame = true;
+        let vectorUniforms = { u_color: { value: new THREE.Vector4(1, 1, 1, 1) } };
+        let vectorWireframeScene = null;
+        let vectorWireInteriorMesh = null;
+        let vectorWireCurveMesh = null;
+        let meshSpecificFolders = [];
+        let animationFolder = null;
         const debouncedRender = () => {
           renderText();
         };
          
 
         const params = {
+          renderMode: "mesh",
           text: `three-text is a 3D font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for tessellation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`,
           lineWidth: 1400,
           fontSize: 72,
@@ -783,6 +802,7 @@
 
           renderer = new THREE.WebGLRenderer({
             antialias: true,
+            stencil: true,
             precision: "highp",
             powerPreference: "high-performance",
           });
@@ -812,9 +832,32 @@
           animate();
         }
 
+        function setMeshControlsVisible(visible) {
+          for (const f of meshSpecificFolders) {
+            if (visible) f.show(); else f.hide();
+          }
+          if (animationFolder) {
+            animationFolder.controllersRecursive().forEach(c =>
+              visible ? c.enable() : c.disable()
+            );
+            animationFolder.domElement.style.opacity = visible ? '' : '0.5';
+          }
+        }
+
         function initGUI() {
           gui = new GUI();
           gui.title("Text settings");
+
+          gui
+            .add(params, "renderMode", ["mesh", "vector"])
+            .name("Rendering mode")
+            .onChange((mode) => {
+              const isMesh = mode === "mesh";
+              setMeshControlsVisible(isMesh);
+              currentTextInstance = null;
+              currentVectorInstance = null;
+              renderText();
+            });
 
           addFontUploadGUI();
 
@@ -843,16 +886,16 @@
             .addColor(params, "textColor")
             .name("Text color")
             .onChange((value) => {
-              // Fast path: update color attribute directly without re-tessellation
-              if (textMesh && textMesh.geometry.attributes.color) {
-                const rgb = hexToRgb(value);
+              const rgb = hexToRgb(value);
+              if (params.renderMode === 'vector') {
+                vectorUniforms.u_color.value.set(rgb[0], rgb[1], rgb[2], 1.0);
+              } else if (textMesh && textMesh.geometry.attributes.color) {
                 const colors = textMesh.geometry.attributes.color;
                 for (let i = 0; i < colors.count; i++) {
                   colors.setXYZ(i, rgb[0], rgb[1], rgb[2]);
                 }
                 colors.needsUpdate = true;
               } else {
-                // No color attribute yet, need full render
                 debouncedRender();
               }
             });
@@ -866,7 +909,9 @@
             .add(params, "wireframe")
             .name("Wireframe")
             .onChange((value) => {
-              if (textMesh && textMesh.material) {
+              if (params.renderMode === 'vector') {
+                // Vector wireframe visibility is handled in the animate loop
+              } else if (textMesh && textMesh.material) {
                 if (Array.isArray(textMesh.material)) {
                   textMesh.material.forEach(m => m.wireframe = value);
                 } else {
@@ -879,7 +924,7 @@
             .name("Overlap removal")
             .onChange(debouncedRender);
 
-          const animationFolder = gui.addFolder("Animation");
+          animationFolder = gui.addFolder("Animation");
           animationFolder
             .add(params, "shaderMode", ["off", "wave", "flip", "explode", "orbit", "twister"])
             .name("Animation mode")
@@ -1002,6 +1047,7 @@
             .onChange(debouncedRender);
 
           const curveFolder = gui.addFolder("Curve fidelity");
+          meshSpecificFolders.push(curveFolder);
           const curveFolders = {};
 
           curveFolder
@@ -1046,6 +1092,7 @@
           updateCurveFolderVisibility(params.curveMode);
 
           const optimizationFolder = gui.addFolder("Geometry optimization");
+          meshSpecificFolders.push(optimizationFolder);
           optimizationFolder
             .add(params, "optimizationEnabled")
             .name("V-W optimization")
@@ -1222,40 +1269,380 @@
         function animate() {
           requestAnimationFrame(animate);
           time += 0.01;
-          
-          if (textMesh?.material instanceof THREE.ShaderMaterial) {
-            textMesh.material.uniforms.time.value = time;
-            
-            // Update mode-specific uniforms
-            const uniforms = textMesh.material.uniforms;
-            switch (currentShaderMode) {
-              case 'wave':
-                if (uniforms.waveHeight) uniforms.waveHeight.value = params.waveHeight;
-                if (uniforms.waveFrequency) uniforms.waveFrequency.value = params.waveFrequency;
-                break;
-              case 'flip':
-                if (uniforms.flipSpeed) uniforms.flipSpeed.value = params.flipSpeed;
-                if (uniforms.flipPauseDuration) uniforms.flipPauseDuration.value = params.flipPauseDuration;
-                break;
-              case 'explode':
-                if (uniforms.explodeSpeed) uniforms.explodeSpeed.value = params.explodeSpeed;
-                if (uniforms.explodeDistance) uniforms.explodeDistance.value = params.explodeDistance;
-                break;
-            case 'orbit':
-              if (uniforms.orbitRadius) uniforms.orbitRadius.value = params.orbitRadius;
-              if (uniforms.orbitSpeed) uniforms.orbitSpeed.value = params.orbitSpeed;
-              break;
-            case 'twister':
-              if (uniforms.twisterSpeed) uniforms.twisterSpeed.value = params.twisterSpeed;
-              if (uniforms.twisterHeight) uniforms.twisterHeight.value = params.twisterHeight;
-              if (uniforms.twisterRadius) uniforms.twisterRadius.value = params.twisterRadius;
-              break;
+          controls.update();
+
+          if (params.renderMode === 'vector') {
+            // Stencil-based Loop-Blinn rendering
+            if (!vectorInteriorMesh || !vectorCurveMesh || !vectorFillMesh) {
+              renderer.render(scene, camera);
+              return;
+            }
+
+            renderer.autoClear = false;
+            renderer.setClearColor(scene.background || 0x111111);
+            renderer.clearColor();
+            renderer.clearDepth();
+
+            const gl = renderer.getContext();
+            if (vectorStencilFirstFrame) {
+              renderer.clearStencil();
+              vectorStencilFirstFrame = false;
+            }
+
+            // Stencil XOR pass
+            gl.enable(gl.STENCIL_TEST);
+            gl.stencilMask(0xFF);
+            gl.stencilFunc(gl.ALWAYS, 0, 0xFF);
+            gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+            gl.colorMask(false, false, false, false);
+            gl.depthMask(false);
+
+            renderer.render(vectorStencilInteriorScene, camera);
+
+            gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+            renderer.render(vectorStencilCurveScene, camera);
+            gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+
+            // Color pass
+            gl.stencilFunc(gl.NOTEQUAL, 0, 0xFF);
+            gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
+            gl.colorMask(true, true, true, true);
+
+            renderer.render(vectorColorScene, camera);
+
+            gl.disable(gl.STENCIL_TEST);
+            gl.depthMask(true);
+
+            if (params.wireframe && vectorWireframeScene) {
+              renderer.render(vectorWireframeScene, camera);
+            }
+          } else {
+            renderer.autoClear = true;
+
+            if (textMesh?.material instanceof THREE.ShaderMaterial) {
+              textMesh.material.uniforms.time.value = time;
+              const uniforms = textMesh.material.uniforms;
+              switch (currentShaderMode) {
+                case 'wave':
+                  if (uniforms.waveHeight) uniforms.waveHeight.value = params.waveHeight;
+                  if (uniforms.waveFrequency) uniforms.waveFrequency.value = params.waveFrequency;
+                  break;
+                case 'flip':
+                  if (uniforms.flipSpeed) uniforms.flipSpeed.value = params.flipSpeed;
+                  if (uniforms.flipPauseDuration) uniforms.flipPauseDuration.value = params.flipPauseDuration;
+                  break;
+                case 'explode':
+                  if (uniforms.explodeSpeed) uniforms.explodeSpeed.value = params.explodeSpeed;
+                  if (uniforms.explodeDistance) uniforms.explodeDistance.value = params.explodeDistance;
+                  break;
+                case 'orbit':
+                  if (uniforms.orbitRadius) uniforms.orbitRadius.value = params.orbitRadius;
+                  if (uniforms.orbitSpeed) uniforms.orbitSpeed.value = params.orbitSpeed;
+                  break;
+                case 'twister':
+                  if (uniforms.twisterSpeed) uniforms.twisterSpeed.value = params.twisterSpeed;
+                  if (uniforms.twisterHeight) uniforms.twisterHeight.value = params.twisterHeight;
+                  if (uniforms.twisterRadius) uniforms.twisterRadius.value = params.twisterRadius;
+                  break;
+              }
+            }
+
+            renderer.render(scene, camera);
           }
         }
-        
-        controls.update();
-        renderer.render(scene, camera);
-      }
+
+        function getSharedTextOptions() {
+          const fontVariations = {};
+          for (const key in params) {
+            if (key.startsWith('fontVar_')) fontVariations[key.replace('fontVar_', '')] = params[key];
+          }
+          const fontFeatures = {};
+          for (const key in params) {
+            if (key.startsWith('fontFeat_')) fontFeatures[key.replace('fontFeat_', '')] = params[key];
+          }
+          const font = customFontBuffer || "./fonts/NimbusSanL-Reg.woff";
+          return {
+            text: params.text,
+            font,
+            size: params.fontSize,
+            lineHeight: params.lineHeight,
+            letterSpacing: params.letterSpacing,
+            fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
+            fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
+            layout: {
+              width: params.lineWidth,
+              align: params.alignment,
+              direction: params.direction,
+              hyphenate: params.hyphenate,
+              language: params.language,
+              tolerance: params.tolerance,
+              pretolerance: params.pretolerance,
+              emergencyStretch: params.emergencyStretch,
+              respectExistingBreaks: params.respectExistingBreaks,
+              lefthyphenmin: params.lefthyphenmin,
+              righthyphenmin: params.righthyphenmin,
+              linepenalty: params.linepenalty,
+              adjdemerits: params.adjdemerits,
+              hyphenpenalty: params.hyphenpenalty,
+              exhyphenpenalty: params.exhyphenpenalty,
+              doublehyphendemerits: params.doublehyphendemerits,
+              singleworddemerits: params.singleworddemerits,
+            },
+          };
+        }
+
+        function clearVectorScenes() {
+          if (vectorStencilInteriorScene) {
+            vectorStencilInteriorScene.clear();
+            vectorStencilCurveScene.clear();
+            vectorColorScene.clear();
+          }
+          if (vectorWireframeScene) { vectorWireframeScene.clear(); vectorWireframeScene = null; }
+          if (vectorInteriorMesh) { vectorInteriorMesh.geometry.dispose(); vectorInteriorMesh = null; }
+          if (vectorCurveMesh) { vectorCurveMesh.geometry.dispose(); vectorCurveMesh = null; }
+          if (vectorFillMesh) { vectorFillMesh.geometry.dispose(); vectorFillMesh = null; }
+          if (vectorWireInteriorMesh) { vectorWireInteriorMesh.geometry.dispose(); vectorWireInteriorMesh = null; }
+          if (vectorWireCurveMesh) { vectorWireCurveMesh.geometry.dispose(); vectorWireCurveMesh = null; }
+        }
+
+        function updateFontControls(loadedFont) {
+          const currentFontBuffer = customFontBuffer || "./fonts/NimbusSanL-Reg.woff";
+          if (lastFontBuffer !== currentFontBuffer) {
+            lastFontBuffer = currentFontBuffer;
+            clearVariableFontControls();
+            clearFeatureControls();
+            const axes = loadedFont?.variationAxes || null;
+            if (customFontBuffer && axes) addVariableFontControls(axes, textFolder);
+            const features = loadedFont?.availableFeatures || null;
+            const featureNames = loadedFont?.featureNames || {};
+            if (features && features.length > 0) addOpenTypeFeatureControls(features, featureNames, textFolder);
+          }
+        }
+
+        async function renderTextMesh(opts) {
+          const needsGlyphAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(params.shaderMode);
+          const textColorRgb = hexToRgb(params.textColor);
+          const meshOpts = {
+            ...opts,
+            depth: params.depth,
+            color: textColorRgb,
+            removeOverlaps: params.removeOverlaps,
+            perGlyphAttributes: needsGlyphAttributes,
+            curveSteps: params.curveMode === "steps" ? params.curveSteps : 0,
+            curveFidelity: {
+              distanceTolerance: params.distanceTolerance,
+              angleTolerance: params.angleTolerance,
+            },
+            geometryOptimization: {
+              enabled: params.optimizationEnabled,
+              areaThreshold: params.areaThreshold,
+            },
+          };
+
+          let result;
+          if (currentTextInstance) {
+            result = await currentTextInstance.update(meshOpts);
+          } else {
+            result = await Text.create(meshOpts);
+          }
+          currentTextInstance = result;
+
+          updateFontControls(result.getLoadedFont());
+
+          // Hide vector objects, show mesh scene
+          clearVectorScenes();
+          if (textMesh) textMesh.visible = true;
+
+          result.geometry.computeBoundingBox();
+          const center = new THREE.Vector3();
+          result.geometry.boundingBox.getCenter(center);
+          result.geometry.translate(-center.x, -center.y, -center.z);
+
+          let minDiagonal = 0, maxDiagonal = 1;
+          if (needsGlyphAttributes && result.geometry.attributes.glyphCenter) {
+            const glyphCenterAttr = result.geometry.attributes.glyphCenter;
+            minDiagonal = Infinity;
+            maxDiagonal = -Infinity;
+            for (let i = 0; i < glyphCenterAttr.count; i++) {
+              const newX = glyphCenterAttr.getX(i) - center.x;
+              const newY = glyphCenterAttr.getY(i) - center.y;
+              const newZ = glyphCenterAttr.getZ(i) - center.z;
+              glyphCenterAttr.setX(i, newX);
+              glyphCenterAttr.setY(i, newY);
+              glyphCenterAttr.setZ(i, newZ);
+              const diagonal = newX + newY;
+              minDiagonal = Math.min(minDiagonal, diagonal);
+              maxDiagonal = Math.max(maxDiagonal, diagonal);
+            }
+            glyphCenterAttr.needsUpdate = true;
+          }
+
+          const material = createMaterialForMode(params.shaderMode, new THREE.Vector3(0, 0, 0), minDiagonal, maxDiagonal);
+
+          if (textMesh) {
+            const oldGeo = textMesh.geometry, oldMat = textMesh.material;
+            textMesh.geometry = result.geometry;
+            textMesh.material = material;
+            if (oldGeo) oldGeo.dispose();
+            if (oldMat) oldMat.dispose();
+          } else {
+            textMesh = new THREE.Mesh(result.geometry, material);
+            textMesh.rotation.x = 0;
+            textMesh.rotation.y = 0.5;
+            scene.add(textMesh);
+          }
+
+          return result;
+        }
+
+        async function renderTextVector(opts) {
+          // Hide mesh, set up vector scenes
+          if (textMesh) textMesh.visible = false;
+
+          let result;
+          if (currentVectorInstance) {
+            result = await currentVectorInstance.update(opts);
+          } else {
+            result = await VectorText.create(opts);
+          }
+          currentVectorInstance = result;
+
+          updateFontControls(result.getLoadedFont());
+
+          const vector = result;
+          const loopBlinnData = buildLoopBlinnMeshData(vector);
+          const { interiorPositions, interiorIndices, curvePositions } = loopBlinnData;
+
+          clearVectorScenes();
+
+          const interiorGeo = new THREE.BufferGeometry();
+          interiorGeo.setAttribute('position', new THREE.Float32BufferAttribute(interiorPositions, 3));
+          interiorGeo.setIndex(new THREE.BufferAttribute(interiorIndices, 1));
+
+          const curveGeo = new THREE.BufferGeometry();
+          curveGeo.setAttribute('position', new THREE.Float32BufferAttribute(curvePositions, 3));
+
+          // Stencil materials
+          const stencilInteriorMat = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: vectorUniforms,
+            vertexShader: `precision highp float;
+in vec3 position;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `precision highp float;
+out vec4 outColor;
+void main() { outColor = vec4(1.0); }`,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+
+          const stencilCurveMat = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: vectorUniforms,
+            vertexShader: `precision highp float;
+in vec3 position;
+out vec2 vUV;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+void main() {
+  int local = gl_VertexID % 3;
+  float u = float(local) * 0.5;
+  vUV = vec2(u, floor(u));
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`,
+            fragmentShader: `precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+void main() {
+  vec2 px = dFdx(vUV);
+  vec2 py = dFdy(vUV);
+  float fx = 2.0 * vUV.x * px.x - px.y;
+  float fy = 2.0 * vUV.x * py.x - py.y;
+  float denom = sqrt(fx * fx + fy * fy);
+  if (denom < 1e-6) discard;
+  float sd = (vUV.x * vUV.x - vUV.y) / denom;
+  float alpha = clamp(0.5 - sd, 0.0, 1.0);
+  if (alpha <= 0.0) discard;
+  outColor = vec4(1.0, 1.0, 1.0, alpha);
+}`,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+
+          const colorMat = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: vectorUniforms,
+            vertexShader: `precision highp float;
+in vec3 position;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+            fragmentShader: `precision highp float;
+uniform vec4 u_color;
+out vec4 outColor;
+void main() { outColor = u_color; }`,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+
+          // Center geometry at origin (like mesh mode does) so rotation works correctly
+          const bounds = loopBlinnData.planeBounds;
+          const centerX = (bounds.min.x + bounds.max.x) / 2;
+          const centerY = (bounds.min.y + bounds.max.y) / 2;
+
+          interiorGeo.translate(-centerX, -centerY, 0);
+          curveGeo.translate(-centerX, -centerY, 0);
+
+          vectorInteriorMesh = new THREE.Mesh(interiorGeo, stencilInteriorMat);
+          vectorInteriorMesh.rotation.y = 0.5;
+
+          vectorCurveMesh = new THREE.Mesh(curveGeo, stencilCurveMat);
+          vectorCurveMesh.rotation.y = 0.5;
+
+          const fillGeo = new THREE.BufferGeometry();
+          fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(loopBlinnData.fillPositions, 3));
+          fillGeo.setIndex(new THREE.BufferAttribute(loopBlinnData.fillIndices, 1));
+          fillGeo.translate(-centerX, -centerY, 0);
+          vectorFillMesh = new THREE.Mesh(fillGeo, colorMat);
+          vectorFillMesh.rotation.y = 0.5;
+
+          // Set vector color from text color
+          const rgb = hexToRgb(params.textColor);
+          vectorUniforms.u_color.value.set(rgb[0], rgb[1], rgb[2], 1.0);
+
+          // Set up three separate scenes for stencil rendering
+          vectorStencilInteriorScene = new THREE.Scene();
+          vectorStencilInteriorScene.add(vectorInteriorMesh);
+          vectorStencilCurveScene = new THREE.Scene();
+          vectorStencilCurveScene.add(vectorCurveMesh);
+          vectorColorScene = new THREE.Scene();
+          vectorColorScene.add(vectorFillMesh);
+
+          // Wireframe overlay for interior triangles
+          const wireframeMat = new THREE.MeshBasicMaterial({
+            color: 0x00ff00,
+            wireframe: true,
+            transparent: true,
+            opacity: 0.4,
+            depthTest: false
+          });
+          vectorWireInteriorMesh = new THREE.Mesh(interiorGeo, wireframeMat);
+          vectorWireInteriorMesh.rotation.y = 0.5;
+          vectorWireCurveMesh = new THREE.Mesh(curveGeo, wireframeMat);
+          vectorWireCurveMesh.rotation.y = 0.5;
+          vectorWireframeScene = new THREE.Scene();
+          vectorWireframeScene.add(vectorWireInteriorMesh);
+          vectorWireframeScene.add(vectorWireCurveMesh);
+
+          vectorStencilFirstFrame = true;
+
+          return {
+            totalInteriorTris: loopBlinnData.stats.interiorTriangleCount,
+            totalCurveTris: loopBlinnData.stats.curveTriangleCount
+          };
+        }
 
         async function renderText() {
           if (isRendering) return;
@@ -1263,201 +1650,18 @@
 
           try {
             updateStatus("Rendering text...", "loading");
-
-            const fontVariations = {};
-            for (const key in params) {
-              if (key.startsWith('fontVar_')) {
-                const tag = key.replace('fontVar_', '');
-                fontVariations[tag] = params[key];
-              }
-            }
-            
-            const fontFeatures = {};
-            for (const key in params) {
-              if (key.startsWith('fontFeat_')) {
-                const tag = key.replace('fontFeat_', '');
-                fontFeatures[tag] = params[key];
-              }
-            }
-
-            let font;
-            if (customFontBuffer) {
-              font = customFontBuffer;
-            } else {
-              font = "./fonts/NimbusSanL-Reg.woff";
-            }
-
-            const needsGlyphAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(params.shaderMode);
-
             const startTime = performance.now();
-            let result;
-            const textColorRgb = hexToRgb(params.textColor);
-            
-            if (currentTextInstance) {
-              // For updates, just pass everything - API handles font cache internally
-              result = await currentTextInstance.update({
-                text: params.text,
-                font: font,
-                size: params.fontSize,
-                depth: params.depth,
-                lineHeight: params.lineHeight,
-                letterSpacing: params.letterSpacing,
-                color: textColorRgb,
-                fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
-                fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
-                removeOverlaps: params.removeOverlaps,
-                perGlyphAttributes: needsGlyphAttributes,
-                curveSteps: params.curveMode === "steps" ? params.curveSteps : 0,
-                curveFidelity: {
-                  distanceTolerance: params.distanceTolerance,
-                  angleTolerance: params.angleTolerance,
-                },
-                geometryOptimization: {
-                  enabled: params.optimizationEnabled,
-                  areaThreshold: params.areaThreshold,
-                },
-                layout: {
-                  width: params.lineWidth,
-                  align: params.alignment,
-                  direction: params.direction,
-                  hyphenate: params.hyphenate,
-                  language: params.language,
-                  tolerance: params.tolerance,
-                  pretolerance: params.pretolerance,
-                  emergencyStretch: params.emergencyStretch,
-                  respectExistingBreaks: params.respectExistingBreaks,
-                  lefthyphenmin: params.lefthyphenmin,
-                  righthyphenmin: params.righthyphenmin,
-                  linepenalty: params.linepenalty,
-                  adjdemerits: params.adjdemerits,
-                  hyphenpenalty: params.hyphenpenalty,
-                  exhyphenpenalty: params.exhyphenpenalty,
-                  doublehyphendemerits: params.doublehyphendemerits,
-                  singleworddemerits: params.singleworddemerits,
-                },
-              });
+            const opts = getSharedTextOptions();
+
+            if (params.renderMode === 'vector') {
+              const { totalInteriorTris, totalCurveTris } = await renderTextVector(opts);
+              const renderTime = Math.round(performance.now() - startTime);
+              updateStatus(`Vector: ${totalInteriorTris + totalCurveTris} tris (${totalInteriorTris} interior + ${totalCurveTris} curve) in ${renderTime}ms`, "ready");
             } else {
-              // For initial creation, include font
-              result = await Text.create({
-                text: params.text,
-                font: font,
-                size: params.fontSize,
-                depth: params.depth,
-                lineHeight: params.lineHeight,
-                letterSpacing: params.letterSpacing,
-                color: textColorRgb,
-                fontVariations: Object.keys(fontVariations).length > 0 ? fontVariations : undefined,
-                fontFeatures: Object.keys(fontFeatures).length > 0 ? fontFeatures : undefined,
-                removeOverlaps: params.removeOverlaps,
-                perGlyphAttributes: needsGlyphAttributes,
-                curveSteps: params.curveMode === "steps" ? params.curveSteps : 0,
-                curveFidelity: {
-                  distanceTolerance: params.distanceTolerance,
-                  angleTolerance: params.angleTolerance,
-                },
-                geometryOptimization: {
-                  enabled: params.optimizationEnabled,
-                  areaThreshold: params.areaThreshold,
-                },
-                layout: {
-                  width: params.lineWidth,
-                  align: params.alignment,
-                  direction: params.direction,
-                  hyphenate: params.hyphenate,
-                  language: params.language,
-                  tolerance: params.tolerance,
-                  pretolerance: params.pretolerance,
-                  emergencyStretch: params.emergencyStretch,
-                  respectExistingBreaks: params.respectExistingBreaks,
-                  lefthyphenmin: params.lefthyphenmin,
-                  righthyphenmin: params.righthyphenmin,
-                  linepenalty: params.linepenalty,
-                  adjdemerits: params.adjdemerits,
-                  hyphenpenalty: params.hyphenpenalty,
-                  exhyphenpenalty: params.exhyphenpenalty,
-                  doublehyphendemerits: params.doublehyphendemerits,
-                  singleworddemerits: params.singleworddemerits,
-                },
-              });
+              const result = await renderTextMesh(opts);
+              const renderTime = Math.round(performance.now() - startTime);
+              updateStatus(`${result.stats.trianglesGenerated.toLocaleString()} triangles in ${renderTime}ms`, "ready");
             }
-            currentTextInstance = result;
-
-            const loadedFont = result.getLoadedFont();
-            
-            // Only rebuild controls when font changes
-            const currentFontBuffer = customFontBuffer || "./fonts/NimbusSanL-Reg.woff";
-            if (lastFontBuffer !== currentFontBuffer) {
-              lastFontBuffer = currentFontBuffer;
-              
-              clearVariableFontControls();
-              clearFeatureControls();
-              
-              const axes = loadedFont?.variationAxes || null;
-              if (customFontBuffer && axes) {
-                addVariableFontControls(axes, textFolder);
-              }
-              
-              const features = loadedFont?.availableFeatures || null;
-            const featureNames = loadedFont?.featureNames || {};
-            if (features && features.length > 0) {
-              addOpenTypeFeatureControls(features, featureNames, textFolder);
-            }
-            }
-
-            // Center the geometry
-            result.geometry.computeBoundingBox();
-            const center = new THREE.Vector3();
-            result.geometry.boundingBox.getCenter(center);
-            result.geometry.translate(-center.x, -center.y, -center.z);
-
-            // Update glyphCenter attributes and calculate diagonal range in single pass
-            let minDiagonal = 0;
-            let maxDiagonal = 1;
-            
-            if (needsGlyphAttributes && result.geometry.attributes.glyphCenter) {
-              const glyphCenterAttr = result.geometry.attributes.glyphCenter;
-              minDiagonal = Infinity;
-              maxDiagonal = -Infinity;
-              
-              for (let i = 0; i < glyphCenterAttr.count; i++) {
-                // Update position
-                const newX = glyphCenterAttr.getX(i) - center.x;
-                const newY = glyphCenterAttr.getY(i) - center.y;
-                const newZ = glyphCenterAttr.getZ(i) - center.z;
-                
-                glyphCenterAttr.setX(i, newX);
-                glyphCenterAttr.setY(i, newY);
-                glyphCenterAttr.setZ(i, newZ);
-                
-                // Calculate diagonal
-                const diagonal = newX + newY;
-                minDiagonal = Math.min(minDiagonal, diagonal);
-                maxDiagonal = Math.max(maxDiagonal, diagonal);
-              }
-              glyphCenterAttr.needsUpdate = true;
-            }
-
-            const paragraphCenter = new THREE.Vector3(0, 0, 0);
-            const material = createMaterialForMode(params.shaderMode, paragraphCenter, minDiagonal, maxDiagonal);
-
-            if (textMesh) {
-                const oldGeometry = textMesh.geometry;
-                const oldMaterial = textMesh.material;
-                
-                textMesh.geometry = result.geometry;
-                textMesh.material = material;
-                
-                if (oldGeometry) oldGeometry.dispose();
-                if (oldMaterial) oldMaterial.dispose();
-            } else {
-                textMesh = new THREE.Mesh(result.geometry, material);
-                textMesh.rotation.x = 0;
-                textMesh.rotation.y = 0.5;
-                scene.add(textMesh);
-            }
-            
-            const renderTime = Math.round(performance.now() - startTime);
-            updateStatus(`${result.stats.trianglesGenerated.toLocaleString()} triangles in ${renderTime}ms`, "ready");
           } catch (error) {
             console.error("Error rendering text:", error);
             updateStatus(`Error: ${error.message}`, "error");
@@ -1728,8 +1932,8 @@
             customFontBuffer = await file.arrayBuffer();
             currentFontName = file.name;
             
-            // Reset instance when font changes to force reload
             currentTextInstance = null;
+            currentVectorInstance = null;
 
             if (window.fontDisplay && window.fontController) {
               window.fontDisplay.currentFont = currentFontName;

@@ -1,13 +1,16 @@
-import { Vec2 } from '../../utils/vectors';
-import { Path, GlyphContours } from '../types';
+import { Vec2 } from '../utils/vectors';
+import { Path, GlyphContours } from '../core/types';
 import {
   PathOptimizer,
   DEFAULT_OPTIMIZATION_CONFIG,
   OptimizationStats
-} from '../geometry/PathOptimizer';
-import { Polygonizer, COLLINEARITY_EPSILON } from '../geometry/Polygonizer';
-import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
-import { perfLogger } from '../../utils/PerformanceLogger';
+} from './geometry/PathOptimizer';
+import { Polygonizer, COLLINEARITY_EPSILON } from './geometry/Polygonizer';
+import {
+  CurveFidelityConfig,
+  GeometryOptimizationOptions
+} from '../core/types';
+import { perfLogger } from '../utils/PerformanceLogger';
 
 export class GlyphContourCollector {
   private currentGlyphId: number = 0;

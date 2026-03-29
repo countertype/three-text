@@ -1,32 +1,32 @@
-import { Vec3 } from '../../utils/vectors';
-import { perfLogger } from '../../utils/PerformanceLogger';
-import { isLogEnabled } from '../../utils/Logger';
+import { Vec3 } from '../utils/vectors';
+import { perfLogger } from '../utils/PerformanceLogger';
+import { isLogEnabled } from '../utils/Logger';
 import {
   GlyphGeometryInfo,
   GlyphContours,
   LoadedFont,
   GlyphCluster,
   GlyphData
-} from '../types';
+} from '../core/types';
 import {
   globalContourCache,
   globalWordCache,
   globalClusteringCache,
   getGlyphCacheKey
-} from './sharedCaches';
-import { Tessellator } from '../geometry/Tessellator';
-import { Extruder } from '../geometry/Extruder';
-import { BoundaryClusterer } from '../geometry/BoundaryClusterer';
+} from '../core/cache/sharedCaches';
+import { Tessellator } from './geometry/Tessellator';
+import { Extruder } from './geometry/Extruder';
+import { BoundaryClusterer } from './geometry/BoundaryClusterer';
 import { GlyphContourCollector } from './GlyphContourCollector';
 import {
   getSharedDrawCallbackHandler,
   DrawCallbackHandler
-} from '../shaping/DrawCallbacks';
-import { CurveFidelityConfig, GeometryOptimizationOptions } from '../types';
-import { HarfBuzzGlyph } from '../types';
-import { Cache } from '../../utils/Cache';
-import { DEFAULT_CURVE_FIDELITY } from '../geometry/Polygonizer';
-import { DEFAULT_OPTIMIZATION_CONFIG } from '../geometry/PathOptimizer';
+} from '../core/shaping/DrawCallbacks';
+import { CurveFidelityConfig, GeometryOptimizationOptions } from '../core/types';
+import { HarfBuzzGlyph } from '../core/types';
+import { Cache } from '../utils/Cache';
+import { DEFAULT_CURVE_FIDELITY } from './geometry/Polygonizer';
+import { DEFAULT_OPTIMIZATION_CONFIG } from './geometry/PathOptimizer';
 
 export interface InstancedTextGeometry {
   vertices: Float32Array;

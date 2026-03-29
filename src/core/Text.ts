@@ -9,15 +9,11 @@ import {
 } from './layout/constants';
 import type {
   TextOptions,
-  GlyphGeometryInfo,
-  TextGeometryInfo,
-  TextHandle,
+  TextLayoutResult,
+  TextLayoutHandle,
   FontMetrics,
   LoadedFont,
-  HarfBuzzInstance,
-  ColorOptions,
-  ColoredRange,
-  TextQueryOptions
+  HarfBuzzInstance
 } from './types';
 import { perfLogger } from '../utils/PerformanceLogger';
 import { logger } from '../utils/Logger';
@@ -27,11 +23,8 @@ import { setWoff2Decoder } from './font/WoffConverter';
 import { TextMeasurer } from './shaping/TextMeasurer';
 import { loadPattern } from '../hyphenation/HyphenationPatternLoader';
 import type { HyphenationTrieNode } from '../hyphenation';
-import { GlyphGeometryBuilder } from './cache/GlyphGeometryBuilder';
 import { TextShaper } from './shaping/TextShaper';
-import { globalGlyphCache } from './cache/sharedCaches';
 import { HarfBuzzLoader } from './shaping/HarfBuzzLoader';
-import { TextRangeQuery } from './layout/TextRangeQuery';
 import { loadBinary } from '../utils/loadBinary';
 
 declare global {
@@ -49,12 +42,10 @@ export class Text {
   private static maxFontCacheMemoryBytes = Infinity;
   private static fontIdCounter = 0;
 
-  // Enable WOFF2 font support
   public static enableWoff2(decoder: (data: ArrayBuffer | Uint8Array) => Uint8Array | Promise<Uint8Array>): void {
     setWoff2Decoder(decoder);
   }
 
-  // Stringify with sorted keys for cache stability
   private static stableStringify(obj: { [key: string]: any }): string {
     const keys = Object.keys(obj).sort();
     let result = '';
@@ -68,7 +59,6 @@ export class Text {
   private fontLoader: FontLoader;
   private loadedFont?: LoadedFont;
   private currentFontId: string = '';
-  private geometryBuilder?: GlyphGeometryBuilder;
   private textShaper?: TextShaper;
   private textLayout?: TextLayout;
 
@@ -89,7 +79,6 @@ export class Text {
     Text.hbInitPromise = null;
   }
 
-  // Initialize HarfBuzz WASM (optional - create() calls this if needed)
   public static init(): Promise<HarfBuzzInstance> {
     if (!Text.hbInitPromise) {
       Text.hbInitPromise = HarfBuzzLoader.getHarfBuzz();
@@ -97,14 +86,13 @@ export class Text {
     return Text.hbInitPromise;
   }
 
-  public static async create(options: TextOptions): Promise<TextHandle> {
+  public static async create(options: TextOptions): Promise<TextLayoutHandle> {
     if (!options.font) {
       throw new Error(
         'Font is required. Specify options.font as a URL string or ArrayBuffer.'
       );
     }
 
-    // Initialize HarfBuzz if not already done
     if (!Text.hbInitPromise) {
       Text.hbInitPromise = HarfBuzzLoader.getHarfBuzz();
     }
@@ -114,11 +102,9 @@ export class Text {
     const text = new Text();
     text.setLoadedFont(loadedFont);
 
-    const result = await text.createGeometry(options);
+    const result = await text.createLayout(options);
 
-    // Recursive update function
-    const update = async (newOptions: Partial<TextOptions>): Promise<any> => {
-      // Merge options - preserve font from original options if not provided
+    const update = async (newOptions: Partial<TextOptions>): Promise<TextLayoutHandle> => {
       const mergedOptions: TextOptions = { ...options };
       for (const key in newOptions) {
         const value = newOptions[key as keyof TextOptions];
@@ -127,7 +113,6 @@ export class Text {
         }
       }
 
-      // If font definition or configuration changed, reload font and reset helpers
       if (
         newOptions.font !== undefined ||
         newOptions.fontVariations !== undefined ||
@@ -135,35 +120,30 @@ export class Text {
       ) {
         const newLoadedFont = await Text.resolveFont(mergedOptions);
         text.setLoadedFont(newLoadedFont);
-
-        // Reset geometry builder and shaper to use new font
         text.resetHelpers();
       }
 
-      // Update closure options for next time
       options = mergedOptions;
 
-      const newResult = await text.createGeometry(options);
+      const newResult = await text.createLayout(options);
 
       return {
         ...newResult,
         getLoadedFont: () => text.getLoadedFont(),
-        getCacheSize: () => text.getCacheSize(),
-        clearCache: () => text.clearCache(),
         measureTextWidth: (textString: string, letterSpacing?: number) =>
           text.measureTextWidth(textString, letterSpacing),
-        update
+        update,
+        dispose: () => text.destroy()
       };
     };
 
     return {
       ...result,
       getLoadedFont: () => text.getLoadedFont(),
-      getCacheSize: () => text.getCacheSize(),
-      clearCache: () => text.clearCache(),
       measureTextWidth: (textString: string, letterSpacing?: number) =>
         text.measureTextWidth(textString, letterSpacing),
-      update
+      update,
+      dispose: () => text.destroy()
     };
   }
 
@@ -236,7 +216,6 @@ export class Text {
 
   private static generateFontContentHash(buffer?: ArrayBuffer): string {
     if (buffer) {
-      // FNV-1a hash sampling 32 points
       const view = new Uint8Array(buffer);
       let hash = 2166136261;
 
@@ -318,14 +297,13 @@ export class Text {
     }
   }
 
-  private async createGeometry(
+  private async createLayout(
     options: TextOptions
-  ): Promise<TextGeometryInfo> {
-    perfLogger.start('Text.createGeometry', {
+  ): Promise<TextLayoutResult> {
+    perfLogger.start('Text.createLayout', {
       textLength: options.text.length,
       size: options.size || DEFAULT_FONT_SIZE,
-      hasLayout: !!options.layout,
-      mode: 'cached'
+      hasLayout: !!options.layout
     });
 
     try {
@@ -340,43 +318,13 @@ export class Text {
       options = updatedOptions;
       this.updateFontVariations(options);
 
-      if (!this.geometryBuilder) {
-        this.geometryBuilder = new GlyphGeometryBuilder(
-          globalGlyphCache,
-          this.loadedFont!
-        );
-        this.geometryBuilder.setFontId(this.currentFontId);
-      }
-
-      // Curve flattening: either use fixed-step De Casteljau (`curveSteps`) OR
-      // adaptive AGG-style tolerances (`curveFidelity`)
-      const useCurveSteps =
-        options.curveSteps !== undefined &&
-        options.curveSteps !== null &&
-        options.curveSteps > 0;
-      this.geometryBuilder.setCurveSteps(options.curveSteps);
-      this.geometryBuilder.setCurveFidelityConfig(
-        useCurveSteps ? undefined : options.curveFidelity
-      );
-      this.geometryBuilder.setGeometryOptimization(
-        options.geometryOptimization
-      );
-
       this.loadedFont.font.setScale(this.loadedFont.upem, this.loadedFont.upem);
 
       if (!this.textShaper) {
-        this.textShaper = new TextShaper(
-          this.loadedFont,
-          this.geometryBuilder!
-        );
+        this.textShaper = new TextShaper(this.loadedFont);
       }
 
       const layoutData = this.prepareLayout(options);
-
-      // Auto-detect: variable fonts need overlap removal, static fonts can use fast path
-      // Allow manual override via options.removeOverlaps
-      const shouldRemoveOverlaps: boolean =
-        options.removeOverlaps ?? this.loadedFont.isVariable ?? false;
 
       const clustersByLine = this.textShaper!.shapeLines(
         layoutData.lines,
@@ -388,80 +336,15 @@ export class Text {
         options.text
       );
 
-      // Pre-compute which character indices will be colored. This allows geometry building
-      // to selectively use glyph-level caching (separate vertices) only for clusters containing
-      // colored text, while non-colored clusters can still use fast cluster-level merging
-      let coloredTextIndices: Set<number> | undefined;
-      let byTextMatches:
-        | { pattern: string; start: number; end: number }[]
-        | undefined;
-      if (
-        options.color &&
-        typeof options.color === 'object' &&
-        !Array.isArray(options.color)
-      ) {
-        if (options.color.byText || options.color.byCharRange) {
-          // Glyphs don't exist yet, so we scan text directly
-          coloredTextIndices = new Set<number>();
-          if (options.color.byText) {
-            byTextMatches = [];
-            for (const pattern of Object.keys(options.color.byText)) {
-              let index = 0;
-              while ((index = options.text.indexOf(pattern, index)) !== -1) {
-                byTextMatches.push({
-                  pattern,
-                  start: index,
-                  end: index + pattern.length
-                });
-                for (let i = index; i < index + pattern.length; i++) {
-                  coloredTextIndices.add(i);
-                }
-                index += pattern.length;
-              }
-            }
-          }
-          if (options.color.byCharRange) {
-            for (const range of options.color.byCharRange) {
-              for (let i = range.start; i < range.end; i++) {
-                coloredTextIndices.add(i);
-              }
-            }
-          }
-        }
-      }
-
-      const shapedResult = this.geometryBuilder.buildInstancedGeometry(
+      return {
         clustersByLine,
-        layoutData.depth,
-        shouldRemoveOverlaps,
-        this.loadedFont.metrics.isCFF,
-        layoutData.pixelsPerFontUnit,
-        options.perGlyphAttributes ?? false,
-        coloredTextIndices
-      );
-
-      const result = this.finalizeGeometry(
-        shapedResult.vertices,
-        shapedResult.normals,
-        shapedResult.indices,
-        shapedResult.glyphInfos,
-        shapedResult.planeBounds,
+        layoutData,
         options,
-        options.text,
-        byTextMatches
-      );
-
-      if (options.perGlyphAttributes) {
-        const glyphAttrs = this.createGlyphAttributes(
-          result.vertices.length / 3,
-          result.glyphs
-        );
-        result.glyphAttributes = glyphAttrs;
-      }
-
-      return result;
+        loadedFont: this.loadedFont,
+        fontId: this.currentFontId
+      };
     } finally {
-      perfLogger.end('Text.createGeometry');
+      perfLogger.end('Text.createLayout');
     }
   }
 
@@ -471,7 +354,6 @@ export class Text {
 
       if (!options.layout?.hyphenationPatterns?.[language]) {
         try {
-          // Check if pattern is already cached (from registerPattern or previous load)
           if (!Text.patternCache.has(language)) {
             const pattern = await loadPattern(
               language,
@@ -570,8 +452,6 @@ export class Text {
       widthInFontUnits = width * fontUnitsPerPixel;
     }
 
-    // Keep depth behavior consistent with Extruder: extremely small non-zero depths
-    // are clamped to a minimum back offset to prevent Z fighting
     const rawDepthInFontUnits = depth * fontUnitsPerPixel;
     const minExtrudeDepth = this.loadedFont.upem * 0.000025;
     const depthInFontUnits =
@@ -620,285 +500,6 @@ export class Text {
       depth: depthInFontUnits,
       size,
       pixelsPerFontUnit: 1 / fontUnitsPerPixel
-    };
-  }
-
-  private applyColorSystem(
-    vertices: Float32Array,
-    glyphInfoArray: GlyphGeometryInfo[],
-    color: [number, number, number] | ColorOptions,
-    originalText: string,
-    byTextMatches?: { pattern: string; start: number; end: number }[]
-  ): { colors: Float32Array; coloredRanges: ColoredRange[] } {
-    const vertexCount = vertices.length / 3;
-    const colors = new Float32Array(vertexCount * 3);
-    const coloredRanges: ColoredRange[] = [];
-
-    // Simple case: array color for all text
-    if (Array.isArray(color)) {
-      for (let i = 0; i < vertexCount; i++) {
-        const baseIndex = i * 3;
-        colors[baseIndex] = color[0]; // R
-        colors[baseIndex + 1] = color[1]; // G
-        colors[baseIndex + 2] = color[2]; // B
-      }
-
-      // Return single range covering all text
-      coloredRanges.push({
-        start: 0,
-        end: originalText.length,
-        originalText,
-        color,
-        bounds: [], // Would need to calculate if needed
-        glyphs: glyphInfoArray,
-        lineIndices: [...new Set(glyphInfoArray.map((g) => g.lineIndex))]
-      });
-    } else {
-      // More complex case: object with default/byText/byCharRange
-      const defaultColor = color.default || [1, 1, 1];
-
-      for (let i = 0; i < colors.length; i += 3) {
-        colors[i] = defaultColor[0];
-        colors[i + 1] = defaultColor[1];
-        colors[i + 2] = defaultColor[2];
-      }
-
-      // Build glyph index once for both byText and byCharRange
-      let glyphsByTextIndex: Map<number, GlyphGeometryInfo[]> | undefined;
-      if ((color.byText && byTextMatches) || color.byCharRange) {
-        glyphsByTextIndex = new Map();
-        for (const glyph of glyphInfoArray) {
-          const existing = glyphsByTextIndex.get(glyph.textIndex);
-          if (existing) {
-            existing.push(glyph);
-          } else {
-            glyphsByTextIndex.set(glyph.textIndex, [glyph]);
-          }
-        }
-      }
-
-      if (color.byText && byTextMatches && glyphsByTextIndex) {
-        for (const match of byTextMatches) {
-          const targetColor = color.byText[match.pattern];
-          if (!targetColor) continue;
-
-          const matchGlyphs: GlyphGeometryInfo[] = [];
-          const lineGroups = new Map<number, GlyphGeometryInfo[]>();
-
-          for (let i = match.start; i < match.end; i++) {
-            const glyphs = glyphsByTextIndex.get(i);
-            if (glyphs) {
-              for (const glyph of glyphs) {
-                matchGlyphs.push(glyph);
-                const lineGlyphs = lineGroups.get(glyph.lineIndex);
-                if (lineGlyphs) {
-                  lineGlyphs.push(glyph);
-                } else {
-                  lineGroups.set(glyph.lineIndex, [glyph]);
-                }
-                // Color vertices owned by this glyph
-                for (let v = 0; v < glyph.vertexCount; v++) {
-                  const vertexIndex = (glyph.vertexStart + v) * 3;
-                  if (vertexIndex >= 0 && vertexIndex < colors.length) {
-                    colors[vertexIndex] = targetColor[0];
-                    colors[vertexIndex + 1] = targetColor[1];
-                    colors[vertexIndex + 2] = targetColor[2];
-                  }
-                }
-              }
-            }
-          }
-
-          // Calculate bounds per line for collision detection
-          const bounds = Array.from(lineGroups.values()).map((lineGlyphs) =>
-            this.calculateGlyphBounds(lineGlyphs)
-          );
-
-          coloredRanges.push({
-            start: match.start,
-            end: match.end,
-            originalText: match.pattern,
-            color: targetColor,
-            bounds,
-            glyphs: matchGlyphs,
-            lineIndices: Array.from(lineGroups.keys()).sort((a, b) => a - b)
-          });
-        }
-      }
-
-      // Apply range coloring
-      if (color.byCharRange && glyphsByTextIndex) {
-        for (const range of color.byCharRange) {
-          const rangeGlyphs: GlyphGeometryInfo[] = [];
-          const lineGroups = new Map<number, GlyphGeometryInfo[]>();
-
-          for (let i = range.start; i < range.end; i++) {
-            const glyphs = glyphsByTextIndex.get(i);
-            if (glyphs) {
-              for (const glyph of glyphs) {
-                rangeGlyphs.push(glyph);
-                const lineGlyphs = lineGroups.get(glyph.lineIndex);
-                if (lineGlyphs) {
-                  lineGlyphs.push(glyph);
-                } else {
-                  lineGroups.set(glyph.lineIndex, [glyph]);
-                }
-                // Color vertices owned by this glyph
-                for (let v = 0; v < glyph.vertexCount; v++) {
-                  const vertexIndex = (glyph.vertexStart + v) * 3;
-                  if (vertexIndex >= 0 && vertexIndex < colors.length) {
-                    colors[vertexIndex] = range.color[0];
-                    colors[vertexIndex + 1] = range.color[1];
-                    colors[vertexIndex + 2] = range.color[2];
-                  }
-                }
-              }
-            }
-          }
-
-          // Calculate bounds per line for collision detection
-          const bounds = Array.from(lineGroups.values()).map((lineGlyphs) =>
-            this.calculateGlyphBounds(lineGlyphs)
-          );
-
-          coloredRanges.push({
-            start: range.start,
-            end: range.end,
-            originalText: originalText.slice(range.start, range.end),
-            color: range.color,
-            bounds,
-            glyphs: rangeGlyphs,
-            lineIndices: Array.from(lineGroups.keys()).sort((a, b) => a - b)
-          });
-        }
-      }
-    }
-
-    return { colors, coloredRanges };
-  }
-
-  private calculateGlyphBounds(glyphs: GlyphGeometryInfo[]): {
-    min: { x: number; y: number; z: number };
-    max: { x: number; y: number; z: number };
-  } {
-    if (glyphs.length === 0) {
-      return {
-        min: { x: 0, y: 0, z: 0 },
-        max: { x: 0, y: 0, z: 0 }
-      };
-    }
-
-    let minX = Infinity,
-      minY = Infinity,
-      minZ = Infinity;
-    let maxX = -Infinity,
-      maxY = -Infinity,
-      maxZ = -Infinity;
-
-    for (const glyph of glyphs) {
-      if (glyph.bounds.min.x < minX) minX = glyph.bounds.min.x;
-      if (glyph.bounds.min.y < minY) minY = glyph.bounds.min.y;
-      if (glyph.bounds.min.z < minZ) minZ = glyph.bounds.min.z;
-      if (glyph.bounds.max.x > maxX) maxX = glyph.bounds.max.x;
-      if (glyph.bounds.max.y > maxY) maxY = glyph.bounds.max.y;
-      if (glyph.bounds.max.z > maxZ) maxZ = glyph.bounds.max.z;
-    }
-
-    return {
-      min: { x: minX, y: minY, z: minZ },
-      max: { x: maxX, y: maxY, z: maxZ }
-    };
-  }
-
-  private finalizeGeometry(
-    vertices: Float32Array,
-    normals: Float32Array,
-    indices: Uint32Array,
-    glyphInfoArray: GlyphGeometryInfo[],
-    planeBounds: {
-      min: { x: number; y: number; z: number };
-      max: { x: number; y: number; z: number };
-    },
-    options: TextOptions,
-    originalText?: string,
-    byTextMatches?: { pattern: string; start: number; end: number }[]
-  ): TextGeometryInfo {
-    const { layout = {} } = options;
-    const { width, align = layout.direction === 'rtl' ? 'right' : 'left' } =
-      layout;
-
-    if (!this.textLayout) {
-      this.textLayout = new TextLayout(this.loadedFont!);
-    }
-
-    const alignmentResult = this.textLayout.computeAlignmentOffset({
-      width,
-      align,
-      planeBounds
-    });
-
-    const offset = alignmentResult.offset;
-    planeBounds.min.x = alignmentResult.adjustedBounds.min.x;
-    planeBounds.max.x = alignmentResult.adjustedBounds.max.x;
-
-    if (offset !== 0) {
-      for (let i = 0; i < vertices.length; i += 3) {
-        vertices[i] += offset;
-      }
-      for (let i = 0; i < glyphInfoArray.length; i++) {
-        glyphInfoArray[i].bounds.min.x += offset;
-        glyphInfoArray[i].bounds.max.x += offset;
-      }
-    }
-
-    let colors: Float32Array | undefined;
-    let coloredRanges: ColoredRange[] | undefined;
-
-    if (options.color) {
-      const colorResult = this.applyColorSystem(
-        vertices,
-        glyphInfoArray,
-        options.color,
-        options.text,
-        byTextMatches
-      );
-      colors = colorResult.colors;
-      coloredRanges = colorResult.coloredRanges;
-    }
-
-    // Collect optimization stats for return value
-    const optimizationStats = this.geometryBuilder!.getOptimizationStats();
-    const trianglesGenerated = indices.length / 3;
-    const verticesGenerated = vertices.length / 3;
-
-    return {
-      vertices,
-      normals,
-      indices,
-      colors,
-      glyphs: glyphInfoArray,
-      planeBounds,
-      stats: {
-        trianglesGenerated,
-        verticesGenerated,
-        pointsRemovedByVisvalingam:
-          optimizationStats.pointsRemovedByVisvalingam,
-        originalPointCount: optimizationStats.originalPointCount
-      },
-      query: (() => {
-        let cachedQuery: TextRangeQuery | null = null;
-        return (options: TextQueryOptions) => {
-          if (!originalText) {
-            throw new Error('Original text not available for querying');
-          }
-          if (!cachedQuery) {
-            cachedQuery = new TextRangeQuery(originalText, glyphInfoArray);
-          }
-          return cachedQuery.execute(options);
-        };
-      })(),
-      coloredRanges,
-      glyphAttributes: undefined
     };
   }
 
@@ -957,79 +558,7 @@ export class Text {
     return TextMeasurer.measureTextWidth(this.loadedFont, text, letterSpacing);
   }
 
-  public getCacheSize(): number {
-    if (this.geometryBuilder) {
-      return this.geometryBuilder.getCacheStats().size;
-    }
-    return 0;
-  }
-
-  public clearCache() {
-    if (this.geometryBuilder) {
-      this.geometryBuilder.clearCache();
-    }
-  }
-
-  private createGlyphAttributes(
-    vertexCount: number,
-    glyphs: GlyphGeometryInfo[]
-  ): {
-    glyphCenter: Float32Array;
-    glyphIndex: Float32Array;
-    glyphLineIndex: Float32Array;
-    glyphProgress: Float32Array;
-    glyphBaselineY: Float32Array;
-  } {
-    const glyphCenters = new Float32Array(vertexCount * 3);
-    const glyphIndices = new Float32Array(vertexCount);
-    const glyphLineIndices = new Float32Array(vertexCount);
-    const glyphProgress = new Float32Array(vertexCount);
-    const glyphBaselineY = new Float32Array(vertexCount);
-
-    let minX = Infinity;
-    let maxX = -Infinity;
-    for (let i = 0; i < glyphs.length; i++) {
-      const cx = (glyphs[i].bounds.min.x + glyphs[i].bounds.max.x) / 2;
-      if (cx < minX) minX = cx;
-      if (cx > maxX) maxX = cx;
-    }
-    const range = maxX - minX;
-
-    for (let index = 0; index < glyphs.length; index++) {
-      const glyph = glyphs[index];
-      const centerX = (glyph.bounds.min.x + glyph.bounds.max.x) / 2;
-      const centerY = (glyph.bounds.min.y + glyph.bounds.max.y) / 2;
-      const centerZ = (glyph.bounds.min.z + glyph.bounds.max.z) / 2;
-      const baselineY = glyph.bounds.min.y;
-      const progress = range > 0 ? (centerX - minX) / range : 0;
-
-      const start = glyph.vertexStart;
-      const end = Math.min(start + glyph.vertexCount, vertexCount);
-      if (end <= start) continue;
-
-      glyphIndices.fill(index, start, end);
-      glyphLineIndices.fill(glyph.lineIndex, start, end);
-      glyphProgress.fill(progress, start, end);
-      glyphBaselineY.fill(baselineY, start, end);
-
-      for (let v = start * 3; v < end * 3; v += 3) {
-        glyphCenters[v] = centerX;
-        glyphCenters[v + 1] = centerY;
-        glyphCenters[v + 2] = centerZ;
-      }
-    }
-
-    return {
-      glyphCenter: glyphCenters,
-      glyphIndex: glyphIndices,
-      glyphLineIndex: glyphLineIndices,
-      glyphProgress,
-      glyphBaselineY
-    };
-  }
-
   private resetHelpers(): void {
-    this.geometryBuilder = undefined;
     this.textShaper = undefined;
     this.textLayout = undefined;
   }

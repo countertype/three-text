@@ -1,5 +1,5 @@
 import { Vec2 } from '../../utils/vectors';
-import type { Path } from '../types';
+import type { Path } from '../../core/types';
 
 export interface OptimizationConfig {
   enabled: boolean;
