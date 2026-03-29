@@ -67,9 +67,9 @@ three-text has a framework-agnostic core that processes fonts and generates geom
 - **`three-text/three`** - Same as above (explicit alias)
 - **`three-text/three/react`** - React Three Fiber component
 - **`three-text/core`** - Framework-agnostic core (returns raw arrays)
-- **`three-text/vector`** - Vector rendering (Loop-Blinn, resolution-independent)
-- **`three-text/vector/webgl`** - WebGL vector renderer (Loop-Blinn + Kokojima stencil fill)
-- **`three-text/vector/webgpu`** - WebGPU vector renderer (Loop-Blinn + Kokojima stencil fill)
+- **`three-text/vector`** - Vector rendering (Loop-Blinn and Kokojima stencil fill, resolution-independent)
+- **`three-text/vector/webgl`** - WebGL vector renderer
+- **`three-text/vector/webgpu`** - WebGPU vector renderer
 - **`three-text/webgl`** - WebGL mesh buffer utility
 - **`three-text/webgpu`** - WebGPU mesh buffer utility
 - **`three-text/p5`** - p5.js adapter
