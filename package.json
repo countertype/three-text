@@ -23,6 +23,11 @@
       "import": "./dist/three/index.js",
       "require": "./dist/three/index.cjs"
     },
+    "./mesh": {
+      "types": "./dist/three/index.d.ts",
+      "import": "./dist/three/index.js",
+      "require": "./dist/three/index.cjs"
+    },
     "./three/react": {
       "types": "./dist/three/react.d.ts",
       "import": "./dist/three/react.js",

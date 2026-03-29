@@ -80,7 +80,7 @@ Most users will just `import { Text } from 'three-text'` for Three.js projects
 
 The library offers two rendering modes that share the same core (HarfBuzz shaping, Knuth-Plass layout, glyph caching):
 
-- **Mesh** (`three-text` / `three-text/three`): triangulated geometry you can extrude, light, and shade. Use for 3D text, text in a scene graph, or anywhere you need depth
+- **Mesh** (`three-text` (default) / `three-text/mesh`): triangulated geometry you can extrude, light, and shade. Use for 3D text, text in a scene graph, or anywhere you need depth
 - **Vector** (`three-text/vector`): resolution-independent flat rendering on the GPU. Use for HUD text, UI labels, or text that needs to stay sharp at arbitrary zoom without tessellation
 
 Both can be used in the same project from separate entry points
