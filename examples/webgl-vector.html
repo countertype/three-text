@@ -42,7 +42,7 @@
   <canvas id="canvas"></canvas>
 
   <script type="module">
-    import { Text, buildLoopBlinnMeshData } from '../dist/vector/index.js';
+    import { Text } from '../dist/vector/index.js';
     import { createWebGLVectorRenderer } from '../dist/vector/webgl/index.js';
 
     const status = document.getElementById('status');
@@ -80,11 +80,11 @@
         size: 72
       });
 
-      const loopBlinnMeshData = buildLoopBlinnMeshData(vectorText);
+      const vectorData = vectorText.geometryData;
       const renderer = createWebGLVectorRenderer(gl);
-      renderer.setGeometry(loopBlinnMeshData);
+      renderer.setGeometry(vectorData);
 
-      const bounds = loopBlinnMeshData.planeBounds;
+      const bounds = vectorData.planeBounds;
       const centerX = (bounds.min.x + bounds.max.x) * 0.5;
       const centerY = (bounds.min.y + bounds.max.y) * 0.5;
       const width = Math.max(1, bounds.max.x - bounds.min.x);
@@ -152,7 +152,7 @@
         zoom = Math.max(0.5, Math.min(3.0, zoom * (delta > 0 ? 1.08 : 0.92)));
       }, { passive: false });
 
-      status.textContent = `Ready: ${loopBlinnMeshData.stats.interiorTriangleCount + loopBlinnMeshData.stats.curveTriangleCount} triangles`;
+      status.textContent = `Ready: ${vectorData.stats.interiorTriangleCount + vectorData.stats.curveTriangleCount} triangles`;
       status.className = 'status-ready';
 
       const render = () => {

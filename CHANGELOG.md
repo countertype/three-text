@@ -6,7 +6,7 @@
 
 - Resolution-independent vector text rendering via Loop-Blinn curve evaluation with Kokojima et al. stencil filling
 - New entry points: `three-text/vector`, `three-text/vector/webgl`, `three-text/vector/webgpu`
-- `buildLoopBlinnMeshData()` converts vector layout results into renderable triangle data (interior fan + curve triangles + per-glyph fill quads)
+- `Text.create()` returns `geometryData` with renderable triangle data (interior fan + curve triangles + per-glyph fill quads)
 - `createWebGLVectorRenderer()` — standalone WebGL2 adapter (3-pass stencil)
 - `createWebGPUVectorRenderer()` — standalone WebGPU adapter (3-pass stencil)
 - `GlyphOutlineCollector` collects raw glyph outlines from HarfBuzz draw callbacks

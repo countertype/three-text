@@ -53,7 +53,6 @@ export class GlyphContourCollector {
   }
 
   public beginGlyph(glyphId: number, textIndex: number): void {
-    // Finish any previous glyph
     if (this.currentGlyphPaths.length > 0) {
       this.finishGlyph();
     }

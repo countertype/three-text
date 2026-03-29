@@ -1,4 +1,4 @@
-import type { LoopBlinnMeshData } from '../LoopBlinnGeometry';
+import type { VectorGeometryData } from '../LoopBlinnGeometry';
 
 interface ProgramWithMvp {
   program: WebGLProgram;
@@ -24,7 +24,7 @@ interface GeometryResources {
 }
 
 export interface WebGLVectorRenderer {
-  setGeometry(data: LoopBlinnMeshData): void;
+  setGeometry(data: VectorGeometryData): void;
   render(mvp: Float32Array, color: Float32Array): void;
   dispose(): void;
 }
@@ -118,7 +118,7 @@ function createColorProgram(
 
 function createGeometryResources(
   gl: WebGL2RenderingContext,
-  data: LoopBlinnMeshData
+  data: VectorGeometryData
 ): GeometryResources {
   const interiorVAO = assertCreate(gl.createVertexArray(), 'interior VAO');
   const interiorPositionBuffer = assertCreate(
@@ -258,7 +258,7 @@ void main() {
   let geometryResources: GeometryResources | null = null;
 
   return {
-    setGeometry(data: LoopBlinnMeshData): void {
+    setGeometry(data: VectorGeometryData): void {
       if (geometryResources) {
         destroyGeometryResources(gl, geometryResources);
       }
@@ -274,7 +274,7 @@ void main() {
       gl.disable(gl.DEPTH_TEST);
       gl.depthMask(false);
 
-      // No stencil clear needed — the fill pass resets stencil to 0
+      // No stencil clear needed - the fill pass resets stencil to 0
       // via passOp ZERO wherever stencil was non-zero, and per-glyph
       // fill quads cover all stencil writes from interior/curve passes
       gl.enable(gl.STENCIL_TEST);

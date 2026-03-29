@@ -1,6 +1,6 @@
 /// <reference types="@webgpu/types" />
 
-import type { LoopBlinnMeshData } from '../LoopBlinnGeometry';
+import type { VectorGeometryData } from '../LoopBlinnGeometry';
 
 interface GeometryResources {
   interiorPositionBuffer: GPUBuffer;
@@ -15,7 +15,7 @@ interface GeometryResources {
 }
 
 export interface WebGPUVectorRenderer {
-  setGeometry(data: LoopBlinnMeshData): void;
+  setGeometry(data: VectorGeometryData): void;
   render(
     passEncoder: GPURenderPassEncoder,
     mvp: Float32Array,
@@ -52,7 +52,7 @@ function createBufferWithData(
 
 function createGeometryResources(
   device: GPUDevice,
-  data: LoopBlinnMeshData
+  data: VectorGeometryData
 ): GeometryResources {
   const interiorPositionBuffer = createBufferWithData(
     device,
@@ -360,7 +360,7 @@ fn main() -> @location(0) vec4<f32> {
   let geometryResources: GeometryResources | null = null;
 
   return {
-    setGeometry(data: LoopBlinnMeshData): void {
+    setGeometry(data: VectorGeometryData): void {
       if (geometryResources) {
         destroyGeometryResources(geometryResources);
       }

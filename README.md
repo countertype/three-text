@@ -15,7 +15,7 @@ High fidelity 3D mesh font geometry and text layout engine for the web
 > [!CAUTION]
 > three-text is in alpha release and the API may break rapidly. This warning will likely last until summer of 2026. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** is a 3D font and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files and it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for layout, with support for CJK and RTL scripts. Two rendering modes, `mesh` (default - extrudable, lightable, deformable mesh text) and `vector` (infininitely scalable flat text in 3D space) are available. three-text caches the contours it collects and geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported
+**three-text** is a 3D font and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files and it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for layout, with support for CJK and RTL scripts. Two rendering modes, `mesh` (default - extrudable, lightable, deformable mesh text) and `vector` (infinitely scalable flat text in 3D space) are available. three-text caches the contours it collects and geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported
 
 The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
@@ -164,7 +164,7 @@ function draw() {
 **Three.js (via `three-text/vector`):**
 
 ```javascript
-import { Text, buildLoopBlinnMeshData } from 'three-text/vector';
+import { Text } from 'three-text/vector';
 import { woff2Decode } from 'woff-lib/woff2/decode';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
@@ -175,13 +175,13 @@ const result = await Text.create({
   size: 72
 });
 
-const meshData = buildLoopBlinnMeshData(result);
+const vectorData = result.geometryData;
 ```
 
 **Raw WebGL2 (via `three-text/vector/webgl`):**
 
 ```javascript
-import { Text, buildLoopBlinnMeshData } from 'three-text/vector';
+import { Text } from 'three-text/vector';
 import { createWebGLVectorRenderer } from 'three-text/vector/webgl';
 import { woff2Decode } from 'woff-lib/woff2/decode';
 
@@ -192,8 +192,8 @@ const gl = canvas.getContext('webgl2', { antialias: true, stencil: true });
 const renderer = createWebGLVectorRenderer(gl);
 
 const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
-const meshData = buildLoopBlinnMeshData(result);
-renderer.setGeometry(meshData);
+const vectorData = result.geometryData;
+renderer.setGeometry(vectorData);
 
 // In render loop:
 renderer.render(mvpMatrix, new Float32Array([1, 1, 1, 1]));
@@ -202,7 +202,7 @@ renderer.render(mvpMatrix, new Float32Array([1, 1, 1, 1]));
 **Raw WebGPU (via `three-text/vector/webgpu`):**
 
 ```javascript
-import { Text, buildLoopBlinnMeshData } from 'three-text/vector';
+import { Text } from 'three-text/vector';
 import { createWebGPUVectorRenderer } from 'three-text/vector/webgpu';
 import { woff2Decode } from 'woff-lib/woff2/decode';
 
@@ -215,8 +215,8 @@ const renderer = createWebGPUVectorRenderer(device, format, {
 });
 
 const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
-const meshData = buildLoopBlinnMeshData(result);
-renderer.setGeometry(meshData);
+const vectorData = result.geometryData;
+renderer.setGeometry(vectorData);
 
 // In render pass:
 renderer.render(passEncoder, mvpMatrix, new Float32Array([1, 1, 1, 1]));
@@ -346,25 +346,30 @@ three-text generates true 3D geometry from font files via HarfBuzz. It is sharpe
 three-text/
 ├── src/
 │   ├── core/                   # Framework-agnostic text engine
-│   │   ├── Text.ts             # Core API (returns raw arrays)
+│   │   ├── Text.ts             # Core API, font loading, shaping, layout
 │   │   ├── vectors.ts          # Vec2, Vec3, Box3Core
 │   │   ├── types.ts            # TypeScript interfaces
 │   │   ├── cache/              # Glyph caching system
 │   │   ├── font/               # Font loading and metrics
 │   │   ├── shaping/            # HarfBuzz text shaping
-│   │   ├── layout/             # Line breaking and text layout
-│   │   └── geometry/           # Tessellation and geometry processing
+│   │   └── layout/             # Line breaking and text layout
+│   ├── mesh/                   # Mesh geometry pipeline
+│   │   ├── MeshGeometryBuilder.ts      # Orchestrates mesh output from layout
+│   │   ├── GlyphGeometryBuilder.ts     # Instanced geometry from glyph contours
+│   │   ├── GlyphContourCollector.ts    # Collects draw callbacks for mesh path
+│   │   └── geometry/                   # Tessellation, extrusion, optimization
 │   ├── three/                  # Three.js adapter
 │   │   ├── index.ts            # BufferGeometry wrapper
 │   │   ├── react.tsx           # React component export
 │   │   └── ThreeText.tsx       # React Three Fiber component
 │   ├── vector/                 # Vector rendering (Loop-Blinn)
-│   │   ├── index.ts            # Three.js vector adapter
-│   │   ├── LoopBlinnGeometry.ts # Fan triangulation + curve extraction for stencil fill
-│   │   ├── GlyphVectorGeometryBuilder.ts  # Packs glyph outlines into GPU textures
-│   │   ├── GlyphOutlineCollector.ts       # Collects draw callbacks from HarfBuzz
-│   │   ├── webgl/              # WebGL vector renderer (stencil-based)
-│   │   └── webgpu/             # WebGPU vector renderer (stencil-based)
+│   │   ├── index.ts            # Vector entry point and TSL re-exports
+│   │   ├── loopBlinnTSL.ts                # TSL adapter for Three.js WebGPURenderer
+│   │   ├── LoopBlinnGeometry.ts           # Fan triangulation + curve extraction
+│   │   ├── GlyphVectorGeometryBuilder.ts  # Outline collection and geometry packing
+│   │   ├── GlyphOutlineCollector.ts       # Collects draw callbacks for vector path
+│   │   ├── webgl/              # WebGL2 stencil-based renderer
+│   │   └── webgpu/             # WebGPU stencil-based renderer
 │   ├── webgl/                  # WebGL mesh buffer utility
 │   ├── webgpu/                 # WebGPU mesh buffer utility
 │   ├── p5/                     # p5.js adapter
@@ -416,7 +421,7 @@ The multi-stage geometry approach (curve polygonization followed by cleanup, the
 
 The vector pipeline (`three-text/vector`) renders glyphs directly from their mathematical outlines without tessellation or curve flattening. Text stays sharp at any zoom level and the geometry footprint is small -- just the control points of each curve
 
-Curve boundaries use the [Loop-Blinn](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf) technique: each quadratic curve is rendered as a triangle whose fragment shader evaluates `u² - v` to resolve inside/outside, with screen-space derivatives producing a signed distance that feeds alpha-to-coverage for smooth MSAA edges. Glyph interiors use [Kokojima et al.](https://dl.acm.org/doi/10.1145/1179849.1179997) stencil filling: fan-triangulate, stencil XOR, fill where nonzero
+Curves use the [Loop-Blinn](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf) technique: each quadratic curve is rendered as a triangle whose fragment shader evaluates `u² - v` to resolve inside/outside, with screen-space derivatives producing a signed distance that feeds alpha-to-coverage for smooth MSAA edges. Glyph interiors use [Kokojima et al.](https://dl.acm.org/doi/10.1145/1179849.1179997) stencil filling: fan-triangulate, stencil XOR, fill where nonzero
 
 An alternative is [Slug](https://github.com/EricLengyel/Slug) by Eric Lengyel, which casts rays against all curves per fragment to compute winding numbers, avoiding the stencil buffer. Loop-Blinn was chosen because it produces better antialiasing with similar performance characteristics
 
@@ -1039,7 +1044,7 @@ While `three-text` runs on all modern browsers, performance varies significantly
 
 **Safari** for macOS shows reduced performance, which is likely due to the platform's conservative resource management; 120FPS is not acheivable
 
-The library was also tested on a Brightsign 223HD, which took a long time to generate the initial geometry but seemed fine after that
+The library was also tested on a Brightsign 223HD, which took a very long time to generate the initial geometry but ran fine after that. We did not push our luck with further testing
 
 ## Testing
 

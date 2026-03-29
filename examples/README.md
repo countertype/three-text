@@ -173,14 +173,14 @@ See `webgpu-basic.html` for raw WebGPU mesh rendering
 See `webgl-vector.html` for resolution-independent vector text via Loop-Blinn curve evaluation with Kokojima stencil fill on WebGL2
 
 ```javascript
-import { Text, buildLoopBlinnMeshData } from 'three-text/vector';
+import { Text } from 'three-text/vector';
 import { createWebGLVectorRenderer } from 'three-text/vector/webgl';
 
 const gl = canvas.getContext('webgl2', { antialias: true, stencil: true });
 const renderer = createWebGLVectorRenderer(gl);
 
 const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
-renderer.setGeometry(buildLoopBlinnMeshData(result));
+renderer.setGeometry(result.geometryData);
 
 // In render loop:
 renderer.render(mvpMatrix, new Float32Array([1, 1, 1, 1]));
@@ -191,7 +191,7 @@ renderer.render(mvpMatrix, new Float32Array([1, 1, 1, 1]));
 See `webgpu-vector.html` for resolution-independent vector text via Loop-Blinn curve evaluation with Kokojima stencil fill on WebGPU
 
 ```javascript
-import { Text, buildLoopBlinnMeshData } from 'three-text/vector';
+import { Text } from 'three-text/vector';
 import { createWebGPUVectorRenderer } from 'three-text/vector/webgpu';
 
 const renderer = createWebGPUVectorRenderer(device, format, {
@@ -200,7 +200,7 @@ const renderer = createWebGPUVectorRenderer(device, format, {
 });
 
 const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
-renderer.setGeometry(buildLoopBlinnMeshData(result));
+renderer.setGeometry(result.geometryData);
 
 // In render pass:
 renderer.render(passEncoder, mvpMatrix, new Float32Array([1, 1, 1, 1]));

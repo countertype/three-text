@@ -245,7 +245,7 @@
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       import { GUI } from "three/addons/libs/lil-gui.module.min.js";
       import { Text } from "three-text/three";
-      import { Text as VectorText, buildLoopBlinnMeshData } from "three-text/vector";
+      import { Text as VectorText } from "three-text/vector";
       Text.setHarfBuzzPath("/examples/hb/hb.wasm");
 
       (async () => {
@@ -1509,8 +1509,7 @@
 
           updateFontControls(result.getLoadedFont());
 
-          const vector = result;
-          const loopBlinnData = buildLoopBlinnMeshData(vector);
+          const loopBlinnData = result.geometryData;
           const { interiorPositions, interiorIndices, curvePositions } = loopBlinnData;
 
           clearVectorScenes();

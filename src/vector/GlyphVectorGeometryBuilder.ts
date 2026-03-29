@@ -1,4 +1,5 @@
 import { Vec2 } from '../utils/vectors';
+import type { BoundingBox } from '../utils/vectors';
 import type {
   GlyphCluster,
   LoadedFont,
@@ -16,6 +17,11 @@ import {
   getSharedDrawCallbackHandler,
   DrawCallbackHandler
 } from '../core/shaping/DrawCallbacks';
+import type {
+  QuadraticSegment,
+  LoopBlinnGlyphInput,
+  LoopBlinnInput
+} from './LoopBlinnGeometry';
 
 type SegmentRange = { start: number; count: number };
 
@@ -40,7 +46,7 @@ type QuadSeg = {
 };
 
 // All cubic-to-quadratic work uses scalar x/y to avoid per-recursion
-// Vec2 allocations. Only the final emitted QuadSegs create Vec2s.
+// Vec2 allocations. Only the final emitted QuadSegs create Vec2s
 
 function cubicToQuadraticsAdaptive(
   contourId: number,
@@ -193,6 +199,111 @@ export class GlyphVectorGeometryBuilder {
     return this.outlineCache.getStats();
   }
 
+  private collectUniqueGlyphIds(clustersByLine: GlyphCluster[][]): number[] {
+    const ids: number[] = [];
+    const seen = new Set<number>();
+    for (const line of clustersByLine) {
+      for (const cluster of line) {
+        for (const g of cluster.glyphs) {
+          if (!seen.has(g.g)) {
+            seen.add(g.g);
+            ids.push(g.g);
+          }
+        }
+      }
+    }
+    return ids;
+  }
+
+  private computePlaneBounds(glyphInfos: VectorGlyphInfo[]): BoundingBox {
+    if (glyphInfos.length === 0) {
+      return { min: { x: 0, y: 0, z: 0 }, max: { x: 0, y: 0, z: 0 } };
+    }
+    let minX = Infinity, minY = Infinity;
+    let maxX = -Infinity, maxY = -Infinity;
+    for (const g of glyphInfos) {
+      if (g.bounds.min.x < minX) minX = g.bounds.min.x;
+      if (g.bounds.min.y < minY) minY = g.bounds.min.y;
+      if (g.bounds.max.x > maxX) maxX = g.bounds.max.x;
+      if (g.bounds.max.y > maxY) maxY = g.bounds.max.y;
+    }
+    return { min: { x: minX, y: minY, z: 0 }, max: { x: maxX, y: maxY, z: 0 } };
+  }
+
+  public buildForLoopBlinn(
+    clustersByLine: GlyphCluster[][],
+    scale: number
+  ): { loopBlinnInput: LoopBlinnInput; glyphs: VectorGlyphInfo[] } {
+    const uniqueGlyphIds = this.collectUniqueGlyphIds(clustersByLine);
+
+    const scaledSegsByGlyph = new Map<number, QuadraticSegment[]>();
+    const glyphBoundsByGlyph = new Map<number, { minX: number; minY: number; maxX: number; maxY: number }>();
+
+    for (const glyphId of uniqueGlyphIds) {
+      const outline = this.getOutlineForGlyph(glyphId);
+      const quadSegs = toQuadratics(outline.segments);
+
+      const scaledSegs: QuadraticSegment[] = [];
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      for (const seg of quadSegs) {
+        const p0x = seg.p0.x * scale, p0y = seg.p0.y * scale;
+        const p1x = seg.p1.x * scale, p1y = seg.p1.y * scale;
+        const p2x = seg.p2.x * scale, p2y = seg.p2.y * scale;
+        scaledSegs.push({ p0x, p0y, p1x, p1y, p2x, p2y });
+
+        if (p0x < minX) minX = p0x; if (p0y < minY) minY = p0y;
+        if (p0x > maxX) maxX = p0x; if (p0y > maxY) maxY = p0y;
+        if (p1x < minX) minX = p1x; if (p1y < minY) minY = p1y;
+        if (p1x > maxX) maxX = p1x; if (p1y > maxY) maxY = p1y;
+        if (p2x < minX) minX = p2x; if (p2y < minY) minY = p2y;
+        if (p2x > maxX) maxX = p2x; if (p2y > maxY) maxY = p2y;
+      }
+
+      scaledSegsByGlyph.set(glyphId, scaledSegs);
+      glyphBoundsByGlyph.set(glyphId, scaledSegs.length > 0
+        ? { minX, minY, maxX, maxY }
+        : { minX: 0, minY: 0, maxX: 0, maxY: 0 });
+    }
+
+    const loopBlinnGlyphs: LoopBlinnGlyphInput[] = [];
+    const glyphInfos: VectorGlyphInfo[] = [];
+
+    for (const line of clustersByLine) {
+      for (const cluster of line) {
+        for (const g of cluster.glyphs) {
+          const segments = scaledSegsByGlyph.get(g.g);
+          if (!segments || segments.length === 0) continue;
+
+          const bounds = glyphBoundsByGlyph.get(g.g)!;
+          const px = (cluster.position.x + (g.x ?? 0)) * scale;
+          const py = (cluster.position.y + (g.y ?? 0)) * scale;
+
+          loopBlinnGlyphs.push({ offsetX: px, offsetY: py, segments, bounds });
+
+          glyphInfos.push({
+            textIndex: g.absoluteTextIndex,
+            lineIndex: g.lineIndex,
+            vertexStart: 0,
+            vertexCount: 0,
+            segmentStart: 0,
+            segmentCount: segments.length,
+            bounds: {
+              min: { x: px + bounds.minX, y: py + bounds.minY, z: 0 },
+              max: { x: px + bounds.maxX, y: py + bounds.maxY, z: 0 }
+            }
+          });
+        }
+      }
+    }
+
+    const planeBounds = this.computePlaneBounds(glyphInfos);
+    return {
+      loopBlinnInput: { glyphs: loopBlinnGlyphs, planeBounds },
+      glyphs: glyphInfos
+    };
+  }
+
   private getOutlineForGlyph(glyphId: number): GlyphOutline {
     if (this.emptyGlyphs.has(glyphId)) {
       return {
@@ -298,7 +409,6 @@ export class GlyphVectorGeometryBuilder {
     ]);
     const quadIndices = new Uint16Array([0, 1, 2, 0, 2, 3]);
 
-    // Collect unique glyph IDs so we pack segment data once per glyph
     const uniqueGlyphIds: number[] = [];
     const seen = new Set<number>();
     for (const line of clustersByLine) {
@@ -758,7 +868,6 @@ export class GlyphVectorGeometryBuilder {
       }
     }
 
-    // Count instances (glyph occurrences) with non-empty outlines
     let glyphInstanceCount = 0;
     for (const line of clustersByLine) {
       for (const cluster of line) {
@@ -840,7 +949,6 @@ export class GlyphVectorGeometryBuilder {
           };
           glyphInfos.push(glyphInfo);
 
-          // Update plane bounds
           if (glyphInfo.bounds.min.x < planeBounds.min.x)
             planeBounds.min.x = glyphInfo.bounds.min.x;
           if (glyphInfo.bounds.min.y < planeBounds.min.y)

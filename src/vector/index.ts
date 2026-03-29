@@ -1,19 +1,22 @@
 import { Text as TextCore } from '../core/Text';
 import { GlyphVectorGeometryBuilder } from './GlyphVectorGeometryBuilder';
 import { globalOutlineCache } from '../core/cache/sharedCaches';
+import { buildVectorGeometry } from './LoopBlinnGeometry';
 import type {
   TextOptions,
   TextLayoutHandle,
-  VectorTextGeometryInfo,
   VectorGlyphInfo,
   LoadedFont,
   TextQueryOptions,
   TextRange
 } from '../core/types';
+import type { VectorGeometryData } from './LoopBlinnGeometry';
 import { TextRangeQuery } from '../core/layout/TextRangeQuery';
 import type { HyphenationTrieNode } from '../hyphenation';
 
-export interface VectorTextResult extends VectorTextGeometryInfo {
+export interface VectorTextResult {
+  glyphs: VectorGlyphInfo[];
+  geometryData: VectorGeometryData;
   query(options: TextQueryOptions): TextRange[];
   getLoadedFont(): LoadedFont | undefined;
   measureTextWidth(text: string, letterSpacing?: number): number;
@@ -27,10 +30,10 @@ function buildVectorResult(
   options: TextOptions
 ): VectorTextResult {
   const scale = layoutHandle.layoutData.pixelsPerFontUnit;
-  const vectorGeo = vectorBuilder.buildVectorGeometry(
-    layoutHandle.clustersByLine,
-    scale
-  );
+
+  const { loopBlinnInput, glyphs } =
+    vectorBuilder.buildForLoopBlinn(layoutHandle.clustersByLine, scale);
+  const geometryData = buildVectorGeometry(loopBlinnInput);
 
   let cachedQuery: TextRangeQuery | null = null;
 
@@ -66,10 +69,11 @@ function buildVectorResult(
   };
 
   return {
-    ...vectorGeo,
+    glyphs,
+    geometryData,
     query: (queryOptions: TextQueryOptions): TextRange[] => {
       if (!cachedQuery) {
-        cachedQuery = new TextRangeQuery(options.text, vectorGeo.glyphs);
+        cachedQuery = new TextRangeQuery(options.text, glyphs);
       }
       return cachedQuery.execute(queryOptions);
     },
@@ -104,16 +108,20 @@ export class Text {
 export type {
   TextOptions,
   VectorTextResult as TextGeometryInfo,
-  VectorTextGeometryInfo,
   VectorGlyphInfo,
   LoadedFont
 };
 export type { HyphenationTrieNode };
 export {
-  buildLoopBlinnMeshData,
+  buildVectorGeometry,
   extractContours
 } from './LoopBlinnGeometry';
 export type {
-  LoopBlinnMeshData,
-  LoopBlinnContour
+  VectorGeometryData,
+  VectorContour,
+  LoopBlinnInput,
+  LoopBlinnGlyphInput,
+  QuadraticSegment
 } from './LoopBlinnGeometry';
+export { createLoopBlinnTSLMeshes } from './loopBlinnTSL';
+export type { LoopBlinnTSLMeshes } from './loopBlinnTSL';

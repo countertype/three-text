@@ -159,7 +159,6 @@ export class GlyphGeometryBuilder {
     ].join('|');
   }
 
-  // Build instanced geometry from glyph contours
   public buildInstancedGeometry(
     clustersByLine: GlyphCluster[][],
     depth: number,
@@ -296,7 +295,6 @@ export class GlyphGeometryBuilder {
           }
         }
 
-        // Only force separate tessellation when explicitly requested via separateGlyphs
         const forceSeparate = separateGlyphs;
 
         // Split boundary groups so colored and non-colored glyphs don't merge together
@@ -511,7 +509,6 @@ export class GlyphGeometryBuilder {
       }
     }
     tasks.length = taskCount;
-    // Allocate exact-sized buffers and fill once
     const vertexArray = new Float32Array(totalVertexFloats);
     const normalArray = new Float32Array(totalNormalFloats);
     const indexArray = new Uint32Array(totalIndexCount);
@@ -709,7 +706,6 @@ export class GlyphGeometryBuilder {
     );
     perfLogger.end('Extruder.extrude');
 
-    // Compute bounding box from vertices
     const vertices = extrudedResult.vertices;
     let minX = Infinity,
       minY = Infinity,
@@ -744,7 +740,6 @@ export class GlyphGeometryBuilder {
     };
   }
 
-  // Tessellate a glyph for caching
   private tessellateGlyph(
     glyphContours: GlyphContours,
     depth: number,

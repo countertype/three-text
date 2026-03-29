@@ -733,7 +733,7 @@ const vectorConfig = {
       sourcemap: false
     }
   ],
-  external: [/^\.\.\/core\//],
+  external: [/^\.\.\/core\//, 'three', /^three\//],
   plugins: [
     replace({
       preventAssignment: true,
