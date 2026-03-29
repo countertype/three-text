@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.12] - 2026-03-29
+
+### Added
+
+- Resolution-independent vector text rendering via Loop-Blinn curve evaluation with Kokojima et al. stencil filling
+- New entry points: `three-text/vector`, `three-text/vector/webgl`, `three-text/vector/webgpu`
+- `buildLoopBlinnMeshData()` converts vector layout results into renderable triangle data (interior fan + curve triangles + per-glyph fill quads)
+- `createWebGLVectorRenderer()` — standalone WebGL2 adapter (3-pass stencil)
+- `createWebGPUVectorRenderer()` — standalone WebGPU adapter (3-pass stencil)
+- `GlyphOutlineCollector` collects raw glyph outlines from HarfBuzz draw callbacks
+- `GlyphVectorGeometryBuilder` packs outlines into GPU-friendly segment textures with adaptive cubic-to-quadratic subdivision
+- New examples: `webgl-vector.html`, `webgpu-vector.html`
+- Main demo (`examples/index.html`) supports switching between mesh and vector rendering modes
+
+### Changed
+
+- Refactored source layout: mesh geometry code moved from `src/core/` to `src/mesh/`, vector code lives under `src/vector/`
+- Core `Text` module now returns a `TextLayoutHandle` separating layout from geometry, enabling tree-shakeable mesh vs vector paths
+- `DrawCallbacks` generalized via `GlyphDrawCollector` interface to support both mesh and vector outline collection
+
 ## [0.4.11] - 2026-02-12
 
 ### Performance
