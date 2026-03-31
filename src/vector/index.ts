@@ -118,6 +118,8 @@ export {
 } from './LoopBlinnGeometry';
 export type {
   VectorGeometryData,
+  VectorGlyphAttributes,
+  GlyphRange,
   VectorContour,
   LoopBlinnInput,
   LoopBlinnGlyphInput,

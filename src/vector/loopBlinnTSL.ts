@@ -40,6 +40,29 @@ export const loopBlinnFragment = Fn(() => {
   return vec4(1.0, 1.0, 1.0, alpha);
 });
 
+function setGlyphAttrsOnGeometry(
+  geo: THREE.BufferGeometry,
+  attrs: VectorGeometryData['interiorGlyphAttrs'],
+  offsetX = 0,
+  offsetY = 0
+): void {
+  if (!attrs) return;
+
+  const glyphCenter = new Float32Array(attrs.glyphCenter);
+  if (offsetX !== 0 || offsetY !== 0) {
+    for (let i = 0; i < glyphCenter.length; i += 3) {
+      glyphCenter[i] += offsetX;
+      glyphCenter[i + 1] += offsetY;
+    }
+  }
+
+  geo.setAttribute('glyphCenter', new THREE.Float32BufferAttribute(glyphCenter, 3));
+  geo.setAttribute('glyphIndex', new THREE.Float32BufferAttribute(attrs.glyphIndex, 1));
+  geo.setAttribute('glyphProgress', new THREE.Float32BufferAttribute(attrs.glyphProgress, 1));
+  geo.setAttribute('glyphLineIndex', new THREE.Float32BufferAttribute(attrs.glyphLineIndex, 1));
+  geo.setAttribute('glyphBaselineY', new THREE.Float32BufferAttribute(attrs.glyphBaselineY, 1));
+}
+
 function applyStencilXOR(mat: THREE.Material): void {
   mat.depthTest = false;
   mat.depthWrite = false;
@@ -66,6 +89,7 @@ export function createLoopBlinnTSLMeshes(
   const interiorGeo = new THREE.BufferGeometry();
   interiorGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.interiorPositions, 3));
   interiorGeo.setIndex(new THREE.BufferAttribute(data.interiorIndices, 1));
+  setGlyphAttrsOnGeometry(interiorGeo, data.interiorGlyphAttrs);
 
   const curveGeo = new THREE.BufferGeometry();
   curveGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.curvePositions, 3));
@@ -77,10 +101,12 @@ export function createLoopBlinnTSLMeshes(
     curveUVs[i * 2 + 4] = 1;   curveUVs[i * 2 + 5] = 1;     // p2
   }
   curveGeo.setAttribute('uv', new THREE.Float32BufferAttribute(curveUVs, 2));
+  setGlyphAttrsOnGeometry(curveGeo, data.curveGlyphAttrs);
 
   const fillGeo = new THREE.BufferGeometry();
   fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.fillPositions, 3));
   fillGeo.setIndex(new THREE.BufferAttribute(data.fillIndices, 1));
+  setGlyphAttrsOnGeometry(fillGeo, data.fillGlyphAttrs);
 
   // 1) Interior stencil material - no color output
   const stencilInteriorMat = new (THREE as any).MeshBasicNodeMaterial();

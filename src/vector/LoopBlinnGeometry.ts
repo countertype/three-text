@@ -22,12 +22,31 @@ export interface VectorContour {
   segments: QuadraticSegment[];
 }
 
+export interface VectorGlyphAttributes {
+  glyphCenter: Float32Array;
+  glyphIndex: Float32Array;
+  glyphProgress: Float32Array;
+  glyphLineIndex: Float32Array;
+  glyphBaselineY: Float32Array;
+}
+
+export interface GlyphRange {
+  interiorIndexStart: number;
+  interiorIndexCount: number;
+  curveVertexStart: number;
+  curveVertexCount: number;
+}
+
 export interface VectorGeometryData {
   interiorPositions: Float32Array;
   interiorIndices: Uint32Array;
   curvePositions: Float32Array;
   fillPositions: Float32Array;
   fillIndices: Uint32Array;
+  glyphRanges: GlyphRange[];
+  interiorGlyphAttrs?: VectorGlyphAttributes;
+  curveGlyphAttrs?: VectorGlyphAttributes;
+  fillGlyphAttrs?: VectorGlyphAttributes;
   planeBounds: BoundingBox;
   stats: {
     glyphCount: number;
@@ -42,6 +61,8 @@ export interface LoopBlinnGlyphInput {
   offsetY: number;
   segments: QuadraticSegment[];
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  lineIndex: number;
+  baselineY: number;
 }
 
 export interface LoopBlinnInput {
@@ -149,6 +170,36 @@ function shouldSkipCurveSegment(segment: QuadraticSegment): boolean {
   return Math.abs(cross) < CURVE_LINEARITY_EPSILON * lenSq;
 }
 
+function fillGlyphAttrs(
+  center: [number, number, number],
+  idx: number,
+  progress: number,
+  lineIdx: number,
+  baselineY: number,
+  vertCount: number,
+  gc: number[], gi: number[], gp: number[], gl: number[], gb: number[]
+): void {
+  for (let v = 0; v < vertCount; v++) {
+    gc.push(center[0], center[1], center[2]);
+    gi.push(idx);
+    gp.push(progress);
+    gl.push(lineIdx);
+    gb.push(baselineY);
+  }
+}
+
+function packAttrs(
+  gc: number[], gi: number[], gp: number[], gl: number[], gb: number[]
+): VectorGlyphAttributes {
+  return {
+    glyphCenter: new Float32Array(gc),
+    glyphIndex: new Float32Array(gi),
+    glyphProgress: new Float32Array(gp),
+    glyphLineIndex: new Float32Array(gl),
+    glyphBaselineY: new Float32Array(gb)
+  };
+}
+
 export function buildVectorGeometry(
   input: LoopBlinnInput
 ): VectorGeometryData {
@@ -156,26 +207,58 @@ export function buildVectorGeometry(
   const interiorIndices: number[] = [];
   const curvePositions: number[] = [];
 
+  const iGC: number[] = [], iGI: number[] = [], iGP: number[] = [],
+        iGL: number[] = [], iGB: number[] = [];
+  const cGC: number[] = [], cGI: number[] = [], cGP: number[] = [],
+        cGL: number[] = [], cGB: number[] = [];
+  const fGC: number[] = [], fGI: number[] = [], fGP: number[] = [],
+        fGL: number[] = [], fGB: number[] = [];
+
   const glyphCount = input.glyphs.length;
   let contourCount = 0;
   let interiorTriangleCount = 0;
   let curveTriangleCount = 0;
+  const glyphRanges: GlyphRange[] = [];
 
   const fillPositions = new Float32Array(glyphCount * 12);
   const fillIndices = new Uint32Array(glyphCount * 6);
 
   for (let i = 0; i < glyphCount; i++) {
     const glyph = input.glyphs[i];
+    const { minX, minY, maxX, maxY } = glyph.bounds;
+    const cx = glyph.offsetX + (minX + maxX) * 0.5;
+    const cy = glyph.offsetY + (minY + maxY) * 0.5;
+    const center: [number, number, number] = [cx, cy, 0];
+    const progress = glyphCount > 1 ? i / (glyphCount - 1) : 0;
+
+    const intIdxStart = interiorIndices.length;
+    const curveVertStart = curvePositions.length / 3;
+
     const contours = extractContours(glyph.segments);
     contourCount += contours.length;
 
     for (const contour of contours) {
+      const intVertsBefore = interiorPositions.length / 3;
       interiorTriangleCount += triangulateContourFan(
         contour.vertices,
         glyph.offsetX,
         glyph.offsetY,
         interiorPositions,
         interiorIndices
+      );
+      const intVertsAfter = interiorPositions.length / 3;
+      fillGlyphAttrs(
+        center,
+        i,
+        progress,
+        glyph.lineIndex,
+        glyph.baselineY,
+        intVertsAfter - intVertsBefore,
+        iGC,
+        iGI,
+        iGP,
+        iGL,
+        iGB
       );
 
       for (const segment of contour.segments) {
@@ -193,10 +276,29 @@ export function buildVectorGeometry(
           0
         );
         curveTriangleCount++;
+        fillGlyphAttrs(
+          center,
+          i,
+          progress,
+          glyph.lineIndex,
+          glyph.baselineY,
+          3,
+          cGC,
+          cGI,
+          cGP,
+          cGL,
+          cGB
+        );
       }
     }
 
-    const { minX, minY, maxX, maxY } = glyph.bounds;
+    glyphRanges.push({
+      interiorIndexStart: intIdxStart,
+      interiorIndexCount: interiorIndices.length - intIdxStart,
+      curveVertexStart: curveVertStart,
+      curveVertexCount: (curvePositions.length / 3) - curveVertStart
+    });
+
     const fp = i * 12;
     fillPositions[fp]     = glyph.offsetX + minX;
     fillPositions[fp + 1] = glyph.offsetY + minY;
@@ -210,6 +312,20 @@ export function buildVectorGeometry(
     fillPositions[fp + 9]  = glyph.offsetX + minX;
     fillPositions[fp + 10] = glyph.offsetY + maxY;
     fillPositions[fp + 11] = 0;
+
+    fillGlyphAttrs(
+      center,
+      i,
+      progress,
+      glyph.lineIndex,
+      glyph.baselineY,
+      4,
+      fGC,
+      fGI,
+      fGP,
+      fGL,
+      fGB
+    );
 
     const fi = i * 6;
     const fv = i * 4;
@@ -227,6 +343,10 @@ export function buildVectorGeometry(
     curvePositions: new Float32Array(curvePositions),
     fillPositions,
     fillIndices,
+    glyphRanges,
+    interiorGlyphAttrs: packAttrs(iGC, iGI, iGP, iGL, iGB),
+    curveGlyphAttrs: packAttrs(cGC, cGI, cGP, cGL, cGB),
+    fillGlyphAttrs: packAttrs(fGC, fGI, fGP, fGL, fGB),
     planeBounds: input.planeBounds,
     stats: {
       glyphCount,

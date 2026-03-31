@@ -279,7 +279,14 @@ export class GlyphVectorGeometryBuilder {
           const px = (cluster.position.x + (g.x ?? 0)) * scale;
           const py = (cluster.position.y + (g.y ?? 0)) * scale;
 
-          loopBlinnGlyphs.push({ offsetX: px, offsetY: py, segments, bounds });
+          loopBlinnGlyphs.push({
+            offsetX: px,
+            offsetY: py,
+            segments,
+            bounds,
+            lineIndex: g.lineIndex,
+            baselineY: (cluster.position.y + (g.y ?? 0)) * scale
+          });
 
           glyphInfos.push({
             textIndex: g.absoluteTextIndex,

@@ -300,8 +300,24 @@
         let vectorStencilInteriorScene = null;
         let vectorStencilCurveScene = null;
         let vectorColorScene = null;
-        let vectorStencilFirstFrame = true;
-        let vectorUniforms = { u_color: { value: new THREE.Vector4(1, 1, 1, 1) } };
+        let vectorUniforms = {
+          u_color: { value: new THREE.Vector4(1, 1, 1, 1) },
+          time: { value: 0 },
+          waveHeight: { value: 15 },
+          waveFrequency: { value: 0.05 },
+          flipSpeed: { value: 1 },
+          flipPauseDuration: { value: 1.5 },
+          minDiagonal: { value: 0 },
+          maxDiagonal: { value: 1 },
+          explodeSpeed: { value: 0.5 },
+          explodeDistance: { value: 50 },
+          paragraphCenter: { value: new THREE.Vector3(0, 0, 0) },
+          orbitRadius: { value: 20 },
+          orbitSpeed: { value: 1 },
+          twisterSpeed: { value: 0.5 },
+          twisterHeight: { value: 30 },
+          twisterRadius: { value: 50 }
+        };
         let vectorWireframeScene = null;
         let vectorWireInteriorMesh = null;
         let vectorWireCurveMesh = null;
@@ -836,12 +852,6 @@
           for (const f of meshSpecificFolders) {
             if (visible) f.show(); else f.hide();
           }
-          if (animationFolder) {
-            animationFolder.controllersRecursive().forEach(c =>
-              visible ? c.enable() : c.disable()
-            );
-            animationFolder.domElement.style.opacity = visible ? '' : '0.5';
-          }
         }
 
         function initGUI() {
@@ -1117,26 +1127,28 @@
         }
 
         function switchShaderMode(mode) {
-          if (!textMesh) return;
-
           updateShaderFolderVisibility(mode);
+
+          if (params.renderMode === 'vector') {
+            switchVectorShaderMode(mode);
+            return;
+          }
+
+          if (!textMesh) return;
 
           const needsAttributes = ['flip', 'explode', 'orbit', 'twister'].includes(mode);
           const hasAttributes = textMesh.geometry.attributes.glyphCenter !== undefined;
 
-          // If switching to a mode that needs attributes but geometry doesn't have them, re-render
           if (needsAttributes && !hasAttributes) {
             renderText();
             return;
           }
 
-          // If switching from attribute mode to non-attribute mode, re-render for efficiency
           if (!needsAttributes && hasAttributes) {
             renderText();
             return;
           }
 
-          // Calculate diagonal range from geometry attributes (if they exist)
           let minDiagonal = 0;
           let maxDiagonal = 1;
           
@@ -1156,13 +1168,30 @@
 
           const paragraphCenter = new THREE.Vector3(0, 0, 0);
 
-          // Dispose old material
           if (textMesh.material) {
             textMesh.material.dispose();
           }
 
-          // Create and assign new material
           textMesh.material = createMaterialForMode(mode, paragraphCenter, minDiagonal, maxDiagonal);
+        }
+
+        function switchVectorShaderMode(mode) {
+          if (!vectorInteriorMesh || !vectorCurveMesh || !vectorFillMesh) return;
+
+          const diagRange = computeVectorDiagonalRange(
+            vectorInteriorMesh.geometry.attributes.glyphCenter
+          );
+          vectorUniforms.minDiagonal.value = diagRange.min;
+          vectorUniforms.maxDiagonal.value = diagRange.max;
+
+          const { interiorMat, curveMat, colorMat } = createVectorMaterials(mode);
+
+          vectorInteriorMesh.material.dispose();
+          vectorInteriorMesh.material = interiorMat;
+          vectorCurveMesh.material.dispose();
+          vectorCurveMesh.material = curveMat;
+          vectorFillMesh.material.dispose();
+          vectorFillMesh.material = colorMat;
         }
 
         function onWindowResize() {
@@ -1172,9 +1201,10 @@
         }
 
         function createMaterialForMode(mode, paragraphCenter, minDiagonal, maxDiagonal) {
+          const animatedDoubleSided = ['flip', 'explode', 'orbit', 'twister'].includes(mode);
           const baseConfig = {
             vertexColors: true,
-            side: params.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
+            side: (params.depth === 0 || animatedDoubleSided) ? THREE.DoubleSide : THREE.FrontSide,
             transparent: true,
             wireframe: params.wireframe,
             defines: {
@@ -1266,17 +1296,269 @@
           }
         }
 
+        function vectorDisplacementGLSL(mode) {
+          const glyphAttrs = `in vec3 glyphCenter;\nin float glyphIndex;\nin float glyphLineIndex;\n`;
+
+          switch (mode) {
+            case 'wave':
+              return {
+                declarations: `uniform float waveHeight;\nuniform float waveFrequency;\n`,
+                body: `vec3 outPos = position;
+float wave = sin(outPos.x * waveFrequency + time) * sin(outPos.y * waveFrequency + time);
+outPos.x += wave * waveHeight * 0.25;
+outPos.y += wave * waveHeight * 0.25;
+outPos.z += wave * waveHeight;`
+              };
+            case 'flip':
+              return {
+                declarations: glyphAttrs + `uniform float flipSpeed;\nuniform float flipPauseDuration;\nuniform float minDiagonal;\nuniform float maxDiagonal;\n`,
+                body: `float diagonalValue = glyphCenter.x + glyphCenter.y;
+float normalizedDiagonal = (maxDiagonal - minDiagonal) > 0.0 ? (diagonalValue - minDiagonal) / (maxDiagonal - minDiagonal) : 0.0;
+float waveDuration = 0.7;
+float phaseOffset = normalizedDiagonal * waveDuration;
+float cycleTime = time * flipSpeed;
+float flipDuration = 1.5;
+float totalCycle = flipDuration + flipPauseDuration + flipDuration + flipPauseDuration;
+float t = mod(cycleTime, totalCycle);
+float angle = 0.0;
+if (t < flipDuration) {
+  float progress = t - phaseOffset;
+  if (progress >= 0.0 && progress <= flipDuration) {
+    float nt = clamp(progress / (flipDuration - waveDuration), 0.0, 1.0);
+    float eased = nt < 0.5 ? 4.0 * nt * nt * nt : 1.0 - pow(-2.0 * nt + 2.0, 3.0) / 2.0;
+    angle = eased * 3.14159;
+  } else if (progress > flipDuration) { angle = 3.14159; }
+} else if (t < flipDuration + flipPauseDuration) { angle = 3.14159; }
+else if (t < flipDuration * 2.0 + flipPauseDuration) {
+  float backStart = flipDuration + flipPauseDuration;
+  float reversePhase = (1.0 - normalizedDiagonal) * waveDuration;
+  float progress = (t - backStart) - reversePhase;
+  if (progress >= 0.0 && progress <= flipDuration) {
+    float nt = clamp(progress / (flipDuration - waveDuration), 0.0, 1.0);
+    float eased = nt < 0.5 ? 4.0 * nt * nt * nt : 1.0 - pow(-2.0 * nt + 2.0, 3.0) / 2.0;
+    angle = (1.0 - eased) * 3.14159;
+  } else if (progress < 0.0) { angle = 3.14159; }
+}
+float sA = sin(angle); float cA = cos(angle);
+vec3 lp = position - glyphCenter;
+vec3 outPos = vec3(lp.x * cA + lp.z * sA, lp.y, -lp.x * sA + lp.z * cA) + glyphCenter;`
+              };
+            case 'explode':
+              return {
+                declarations: glyphAttrs + `uniform float explodeSpeed;\nuniform float explodeDistance;\nuniform vec3 paragraphCenter;\n` +
+`float hash_v(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
+vec3 hash3_v(vec3 p) { return vec3(hash_v(p), hash_v(p + vec3(1.0)), hash_v(p + vec3(2.0))); }
+mat4 rotMat(vec3 ax, float a) { ax = normalize(ax); float s=sin(a),c=cos(a),oc=1.0-c; return mat4(oc*ax.x*ax.x+c,oc*ax.x*ax.y-ax.z*s,oc*ax.z*ax.x+ax.y*s,0, oc*ax.x*ax.y+ax.z*s,oc*ax.y*ax.y+c,oc*ax.y*ax.z-ax.x*s,0, oc*ax.z*ax.x-ax.y*s,oc*ax.y*ax.z+ax.x*s,oc*ax.z*ax.z+c,0, 0,0,0,1); }\n`,
+                body: `vec3 glyphSeed = glyphCenter * 0.01;
+vec3 chaos = hash3_v(glyphSeed) - 0.5;
+vec3 radialDir = length(glyphCenter - paragraphCenter) > 0.001 ? normalize(glyphCenter - paragraphCenter) : vec3(0,1,0);
+vec3 chaoticDir = normalize(radialDir + chaos * 2.5);
+float distFromCenter = length(glyphCenter - paragraphCenter);
+float cycleTime = time * explodeSpeed;
+float t = mod(cycleTime, 8.0);
+float shockwaveDelay = distFromCenter * 0.0008;
+float phaseT = t - shockwaveDelay;
+float offset = 0.0; float tumbleAngle = 0.0; float scatter = 0.0;
+if (phaseT >= 0.0 && phaseT < 2.4) {
+  float outT = phaseT / 2.4;
+  float curve = outT * outT * (3.0 - 2.0 * outT);
+  offset = explodeDistance * 4.8 * curve;
+  tumbleAngle = 40.0 * (hash_v(glyphSeed) - 0.5) * curve;
+  scatter = 200.0 * curve;
+} else if (phaseT >= 2.4 && phaseT < 3.2) {
+  offset = explodeDistance * 4.8;
+  tumbleAngle = 40.0 * (hash_v(glyphSeed) - 0.5);
+  scatter = 200.0;
+} else if (phaseT >= 3.2 && phaseT < 5.8) {
+  float returnT = (phaseT - 3.2) / 2.6;
+  float curve = returnT * returnT * (3.0 - 2.0 * returnT);
+  offset = explodeDistance * 4.8 * (1.0 - curve);
+  tumbleAngle = 40.0 * (hash_v(glyphSeed) - 0.5) * (1.0 - curve);
+  scatter = 200.0 * (1.0 - curve);
+}
+vec3 outPos = position;
+vec3 tumbleAxis = length(chaos) > 0.001 ? normalize(chaos) : vec3(0,1,0);
+mat4 rotation = rotMat(tumbleAxis, tumbleAngle);
+vec3 localPos = outPos - glyphCenter;
+outPos = (rotation * vec4(localPos, 1.0)).xyz + glyphCenter;
+vec3 vertexSeed = position * 0.01;
+vec3 vertexChaos = (hash3_v(vertexSeed) - 0.5) * scatter;
+outPos += vertexChaos;
+outPos += chaoticDir * offset;`
+              };
+            case 'orbit':
+              return {
+                declarations: glyphAttrs + `uniform float orbitRadius;\nuniform float orbitSpeed;\n`,
+                body: `float phase = glyphIndex * 0.3;
+float angle = time * orbitSpeed + phase;
+vec2 circularOffset = vec2(cos(angle), sin(angle)) * orbitRadius;
+float zOffset = sin(angle * 1.5) * orbitRadius * 1.5;
+vec3 outPos = position + vec3(circularOffset.x, circularOffset.y, zOffset);`
+              };
+            case 'twister':
+              return {
+                declarations: glyphAttrs + `uniform float twisterSpeed;\nuniform float twisterHeight;\nuniform float twisterRadius;\n` +
+`float hash_t(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 45.164))) * 43758.5453); }
+mat4 rotMat_t(vec3 ax, float a) { ax = normalize(ax); float s=sin(a),c=cos(a),oc=1.0-c; return mat4(oc*ax.x*ax.x+c,oc*ax.x*ax.y-ax.z*s,oc*ax.z*ax.x+ax.y*s,0, oc*ax.x*ax.y+ax.z*s,oc*ax.y*ax.y+c,oc*ax.y*ax.z-ax.x*s,0, oc*ax.z*ax.x-ax.y*s,oc*ax.y*ax.z+ax.x*s,oc*ax.z*ax.z+c,0, 0,0,0,1); }\n`,
+                body: `vec3 glyphSeed = glyphCenter * 0.01;
+float distanceFromCenter = length(glyphCenter.xz);
+float verticalPos = glyphCenter.y;
+float vortexPull = exp(-distanceFromCenter * 0.001);
+float glyphPhaseOffset = hash_t(glyphSeed) * 0.5;
+float t = time * twisterSpeed;
+float vortexAngle = t + verticalPos * 0.004 + vortexPull * 6.0 + glyphPhaseOffset;
+float breathe = sin(t * 0.3 + glyphPhaseOffset) * 0.2 + 1.0;
+float spiralRadius = twisterRadius * vortexPull * breathe;
+vec2 spiralOffset = vec2(cos(vortexAngle), sin(vortexAngle)) * spiralRadius;
+float uplift = sin(vortexAngle + glyphPhaseOffset) * twisterHeight * vortexPull;
+vec3 outPos = position;
+vec3 windAxis = normalize(vec3(hash_t(glyphSeed) - 0.5, 0.8, hash_t(glyphSeed + vec3(1.0)) - 0.5));
+float tumble = vortexAngle * 0.2 * vortexPull;
+vec3 localPos = outPos - glyphCenter;
+outPos = (rotMat_t(windAxis, tumble) * vec4(localPos, 1.0)).xyz + glyphCenter;
+outPos += vec3(spiralOffset.x, uplift, spiralOffset.y);`
+              };
+            default:
+              return { declarations: '', body: 'vec3 outPos = position;' };
+          }
+        }
+
+        function createVectorMaterials(mode) {
+          const anim = vectorDisplacementGLSL(mode);
+
+          const interiorVert = `precision highp float;
+in vec3 position;
+${anim.declarations}
+uniform float time;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+void main() {
+  ${anim.body}
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(outPos, 1.0);
+}`;
+
+          const curveVert = `precision highp float;
+in vec3 position;
+${anim.declarations}
+uniform float time;
+out vec2 vUV;
+uniform mat4 projectionMatrix;
+uniform mat4 modelViewMatrix;
+void main() {
+  int local = gl_VertexID % 3;
+  float u = float(local) * 0.5;
+  vUV = vec2(u, floor(u));
+  ${anim.body}
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(outPos, 1.0);
+}`;
+
+          const interiorFrag = `precision highp float;
+out vec4 outColor;
+void main() { outColor = vec4(1.0); }`;
+
+          const curveFrag = `precision highp float;
+in vec2 vUV;
+out vec4 outColor;
+void main() {
+  vec2 px = dFdx(vUV);
+  vec2 py = dFdy(vUV);
+  float fx = 2.0 * vUV.x * px.x - px.y;
+  float fy = 2.0 * vUV.x * py.x - py.y;
+  float denom = sqrt(fx * fx + fy * fy);
+  if (denom < 1e-6) discard;
+  float sd = (vUV.x * vUV.x - vUV.y) / denom;
+  float alpha = clamp(0.5 - sd, 0.0, 1.0);
+  if (alpha <= 0.0) discard;
+  outColor = vec4(1.0, 1.0, 1.0, alpha);
+}`;
+
+          const fillFrag = `precision highp float;
+uniform vec4 u_color;
+out vec4 outColor;
+void main() { outColor = u_color; }`;
+
+          const interiorMat = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: vectorUniforms,
+            vertexShader: interiorVert,
+            fragmentShader: interiorFrag,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+
+          const curveMat = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: vectorUniforms,
+            vertexShader: curveVert,
+            fragmentShader: curveFrag,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+
+          const colorMat = new THREE.RawShaderMaterial({
+            glslVersion: THREE.GLSL3,
+            uniforms: vectorUniforms,
+            vertexShader: interiorVert,
+            fragmentShader: fillFrag,
+            depthTest: false,
+            side: THREE.DoubleSide
+          });
+
+          return { interiorMat, curveMat, colorMat };
+        }
+
+        function setGlyphAttrsOnGeometry(geo, attrs, offsetX, offsetY) {
+          if (!attrs) return;
+          const gc = new Float32Array(attrs.glyphCenter);
+          if (offsetX !== 0 || offsetY !== 0) {
+            for (let i = 0; i < gc.length; i += 3) {
+              gc[i] += offsetX;
+              gc[i + 1] += offsetY;
+            }
+          }
+          geo.setAttribute('glyphCenter', new THREE.Float32BufferAttribute(gc, 3));
+          geo.setAttribute('glyphIndex', new THREE.Float32BufferAttribute(attrs.glyphIndex, 1));
+          geo.setAttribute('glyphProgress', new THREE.Float32BufferAttribute(attrs.glyphProgress, 1));
+          geo.setAttribute('glyphLineIndex', new THREE.Float32BufferAttribute(attrs.glyphLineIndex, 1));
+          geo.setAttribute('glyphBaselineY', new THREE.Float32BufferAttribute(attrs.glyphBaselineY, 1));
+        }
+
+        function computeVectorDiagonalRange(glyphCenterAttr) {
+          if (!glyphCenterAttr) return { min: 0, max: 1 };
+          let min = Infinity;
+          let max = -Infinity;
+          const arr = glyphCenterAttr.array || glyphCenterAttr;
+          for (let i = 0; i < arr.length; i += 3) {
+            const d = arr[i] + arr[i + 1];
+            if (d < min) min = d;
+            if (d > max) max = d;
+          }
+          return { min: isFinite(min) ? min : 0, max: isFinite(max) ? max : 1 };
+        }
+
         function animate() {
           requestAnimationFrame(animate);
           time += 0.01;
           controls.update();
 
           if (params.renderMode === 'vector') {
-            // Stencil-based Loop-Blinn rendering
             if (!vectorInteriorMesh || !vectorCurveMesh || !vectorFillMesh) {
               renderer.render(scene, camera);
               return;
             }
+
+            vectorUniforms.time.value = time;
+            vectorUniforms.waveHeight.value = params.waveHeight;
+            vectorUniforms.waveFrequency.value = params.waveFrequency;
+            vectorUniforms.flipSpeed.value = params.flipSpeed;
+            vectorUniforms.flipPauseDuration.value = params.flipPauseDuration;
+            vectorUniforms.explodeSpeed.value = params.explodeSpeed;
+            vectorUniforms.explodeDistance.value = params.explodeDistance;
+            vectorUniforms.orbitRadius.value = params.orbitRadius;
+            vectorUniforms.orbitSpeed.value = params.orbitSpeed;
+            vectorUniforms.twisterSpeed.value = params.twisterSpeed;
+            vectorUniforms.twisterHeight.value = params.twisterHeight;
+            vectorUniforms.twisterRadius.value = params.twisterRadius;
 
             renderer.autoClear = false;
             renderer.setClearColor(scene.background || 0x111111);
@@ -1284,34 +1566,69 @@
             renderer.clearDepth();
 
             const gl = renderer.getContext();
-            if (vectorStencilFirstFrame) {
-              renderer.clearStencil();
-              vectorStencilFirstFrame = false;
+            renderer.clearStencil();
+
+            const canOverlap = ['flip', 'orbit', 'explode', 'twister'].includes(currentShaderMode);
+            const ranges = currentVectorInstance?.geometryData?.glyphRanges;
+            const interiorGeo = vectorInteriorMesh.geometry;
+            const curveGeo = vectorCurveMesh.geometry;
+            const fillGeo = vectorFillMesh.geometry;
+
+            if (canOverlap && ranges && ranges.length > 0) {
+              gl.depthMask(false);
+              for (let g = 0; g < ranges.length; g++) {
+                const range = ranges[g];
+
+                interiorGeo.setDrawRange(range.interiorIndexStart, range.interiorIndexCount);
+                curveGeo.setDrawRange(range.curveVertexStart, range.curveVertexCount);
+                fillGeo.setDrawRange(g * 6, 6);
+
+                gl.enable(gl.STENCIL_TEST);
+                gl.stencilMask(0xFF);
+                gl.stencilFunc(gl.ALWAYS, 0, 0xFF);
+                gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+                gl.colorMask(false, false, false, false);
+
+                renderer.render(vectorStencilInteriorScene, camera);
+
+                gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+                renderer.render(vectorStencilCurveScene, camera);
+                gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+
+                gl.stencilFunc(gl.NOTEQUAL, 0, 0xFF);
+                gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
+                gl.colorMask(true, true, true, true);
+                renderer.render(vectorColorScene, camera);
+              }
+
+              interiorGeo.setDrawRange(0, Infinity);
+              curveGeo.setDrawRange(0, Infinity);
+              fillGeo.setDrawRange(0, Infinity);
+              gl.disable(gl.STENCIL_TEST);
+              gl.depthMask(true);
+            } else {
+              gl.enable(gl.STENCIL_TEST);
+              gl.stencilMask(0xFF);
+              gl.stencilFunc(gl.ALWAYS, 0, 0xFF);
+              gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+              gl.colorMask(false, false, false, false);
+              gl.depthMask(false);
+
+              renderer.render(vectorStencilInteriorScene, camera);
+
+              gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+              renderer.render(vectorStencilCurveScene, camera);
+              gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+
+              gl.stencilFunc(gl.NOTEQUAL, 0, 0xFF);
+              gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
+              gl.colorMask(true, true, true, true);
+
+              renderer.render(vectorColorScene, camera);
+
+              gl.disable(gl.STENCIL_TEST);
+              gl.depthMask(true);
             }
-
-            // Stencil XOR pass
-            gl.enable(gl.STENCIL_TEST);
-            gl.stencilMask(0xFF);
-            gl.stencilFunc(gl.ALWAYS, 0, 0xFF);
-            gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
-            gl.colorMask(false, false, false, false);
-            gl.depthMask(false);
-
-            renderer.render(vectorStencilInteriorScene, camera);
-
-            gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-            renderer.render(vectorStencilCurveScene, camera);
-            gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-
-            // Color pass
-            gl.stencilFunc(gl.NOTEQUAL, 0, 0xFF);
-            gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
-            gl.colorMask(true, true, true, true);
-
-            renderer.render(vectorColorScene, camera);
-
-            gl.disable(gl.STENCIL_TEST);
-            gl.depthMask(true);
 
             if (params.wireframe && vectorWireframeScene) {
               renderer.render(vectorWireframeScene, camera);
@@ -1508,110 +1825,52 @@
           currentVectorInstance = result;
 
           updateFontControls(result.getLoadedFont());
+          clearVectorScenes();
+          return renderLoopBlinnData(result);
+        }
 
+        function renderLoopBlinnData(result) {
           const loopBlinnData = result.geometryData;
           const { interiorPositions, interiorIndices, curvePositions } = loopBlinnData;
 
-          clearVectorScenes();
-
-          const interiorGeo = new THREE.BufferGeometry();
-          interiorGeo.setAttribute('position', new THREE.Float32BufferAttribute(interiorPositions, 3));
-          interiorGeo.setIndex(new THREE.BufferAttribute(interiorIndices, 1));
-
-          const curveGeo = new THREE.BufferGeometry();
-          curveGeo.setAttribute('position', new THREE.Float32BufferAttribute(curvePositions, 3));
-
-          // Stencil materials
-          const stencilInteriorMat = new THREE.RawShaderMaterial({
-            glslVersion: THREE.GLSL3,
-            uniforms: vectorUniforms,
-            vertexShader: `precision highp float;
-in vec3 position;
-uniform mat4 projectionMatrix;
-uniform mat4 modelViewMatrix;
-void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-            fragmentShader: `precision highp float;
-out vec4 outColor;
-void main() { outColor = vec4(1.0); }`,
-            depthTest: false,
-            side: THREE.DoubleSide
-          });
-
-          const stencilCurveMat = new THREE.RawShaderMaterial({
-            glslVersion: THREE.GLSL3,
-            uniforms: vectorUniforms,
-            vertexShader: `precision highp float;
-in vec3 position;
-out vec2 vUV;
-uniform mat4 projectionMatrix;
-uniform mat4 modelViewMatrix;
-void main() {
-  int local = gl_VertexID % 3;
-  float u = float(local) * 0.5;
-  vUV = vec2(u, floor(u));
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`,
-            fragmentShader: `precision highp float;
-in vec2 vUV;
-out vec4 outColor;
-void main() {
-  vec2 px = dFdx(vUV);
-  vec2 py = dFdy(vUV);
-  float fx = 2.0 * vUV.x * px.x - px.y;
-  float fy = 2.0 * vUV.x * py.x - py.y;
-  float denom = sqrt(fx * fx + fy * fy);
-  if (denom < 1e-6) discard;
-  float sd = (vUV.x * vUV.x - vUV.y) / denom;
-  float alpha = clamp(0.5 - sd, 0.0, 1.0);
-  if (alpha <= 0.0) discard;
-  outColor = vec4(1.0, 1.0, 1.0, alpha);
-}`,
-            depthTest: false,
-            side: THREE.DoubleSide
-          });
-
-          const colorMat = new THREE.RawShaderMaterial({
-            glslVersion: THREE.GLSL3,
-            uniforms: vectorUniforms,
-            vertexShader: `precision highp float;
-in vec3 position;
-uniform mat4 projectionMatrix;
-uniform mat4 modelViewMatrix;
-void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-            fragmentShader: `precision highp float;
-uniform vec4 u_color;
-out vec4 outColor;
-void main() { outColor = u_color; }`,
-            depthTest: false,
-            side: THREE.DoubleSide
-          });
-
-          // Center geometry at origin (like mesh mode does) so rotation works correctly
           const bounds = loopBlinnData.planeBounds;
           const centerX = (bounds.min.x + bounds.max.x) / 2;
           const centerY = (bounds.min.y + bounds.max.y) / 2;
 
+          const interiorGeo = new THREE.BufferGeometry();
+          interiorGeo.setAttribute('position', new THREE.Float32BufferAttribute(interiorPositions, 3));
+          interiorGeo.setIndex(new THREE.BufferAttribute(interiorIndices, 1));
           interiorGeo.translate(-centerX, -centerY, 0);
+          setGlyphAttrsOnGeometry(interiorGeo, loopBlinnData.interiorGlyphAttrs, -centerX, -centerY);
+
+          const curveGeo = new THREE.BufferGeometry();
+          curveGeo.setAttribute('position', new THREE.Float32BufferAttribute(curvePositions, 3));
           curveGeo.translate(-centerX, -centerY, 0);
-
-          vectorInteriorMesh = new THREE.Mesh(interiorGeo, stencilInteriorMat);
-          vectorInteriorMesh.rotation.y = 0.5;
-
-          vectorCurveMesh = new THREE.Mesh(curveGeo, stencilCurveMat);
-          vectorCurveMesh.rotation.y = 0.5;
+          setGlyphAttrsOnGeometry(curveGeo, loopBlinnData.curveGlyphAttrs, -centerX, -centerY);
 
           const fillGeo = new THREE.BufferGeometry();
           fillGeo.setAttribute('position', new THREE.Float32BufferAttribute(loopBlinnData.fillPositions, 3));
           fillGeo.setIndex(new THREE.BufferAttribute(loopBlinnData.fillIndices, 1));
           fillGeo.translate(-centerX, -centerY, 0);
+          setGlyphAttrsOnGeometry(fillGeo, loopBlinnData.fillGlyphAttrs, -centerX, -centerY);
+
+          const diagRange = computeVectorDiagonalRange(interiorGeo.attributes.glyphCenter);
+          vectorUniforms.minDiagonal.value = diagRange.min;
+          vectorUniforms.maxDiagonal.value = diagRange.max;
+          vectorUniforms.paragraphCenter.value.set(0, 0, 0);
+
+          const { interiorMat, curveMat, colorMat } = createVectorMaterials(params.shaderMode);
+
+          vectorInteriorMesh = new THREE.Mesh(interiorGeo, interiorMat);
+          vectorInteriorMesh.rotation.y = 0.5;
+          vectorCurveMesh = new THREE.Mesh(curveGeo, curveMat);
+          vectorCurveMesh.rotation.y = 0.5;
           vectorFillMesh = new THREE.Mesh(fillGeo, colorMat);
           vectorFillMesh.rotation.y = 0.5;
 
-          // Set vector color from text color
           const rgb = hexToRgb(params.textColor);
           vectorUniforms.u_color.value.set(rgb[0], rgb[1], rgb[2], 1.0);
 
-          // Set up three separate scenes for stencil rendering
           vectorStencilInteriorScene = new THREE.Scene();
           vectorStencilInteriorScene.add(vectorInteriorMesh);
           vectorStencilCurveScene = new THREE.Scene();
@@ -1619,7 +1878,6 @@ void main() { outColor = u_color; }`,
           vectorColorScene = new THREE.Scene();
           vectorColorScene.add(vectorFillMesh);
 
-          // Wireframe overlay for interior triangles
           const wireframeMat = new THREE.MeshBasicMaterial({
             color: 0x00ff00,
             wireframe: true,
@@ -1635,11 +1893,9 @@ void main() { outColor = u_color; }`,
           vectorWireframeScene.add(vectorWireInteriorMesh);
           vectorWireframeScene.add(vectorWireCurveMesh);
 
-          vectorStencilFirstFrame = true;
-
+          const { interiorTriangleCount, curveTriangleCount } = loopBlinnData.stats;
           return {
-            totalInteriorTris: loopBlinnData.stats.interiorTriangleCount,
-            totalCurveTris: loopBlinnData.stats.curveTriangleCount
+            label: `Loop-Blinn: ${interiorTriangleCount + curveTriangleCount} tris (${interiorTriangleCount} interior + ${curveTriangleCount} curve)`
           };
         }
 
@@ -1653,9 +1909,9 @@ void main() { outColor = u_color; }`,
             const opts = getSharedTextOptions();
 
             if (params.renderMode === 'vector') {
-              const { totalInteriorTris, totalCurveTris } = await renderTextVector(opts);
+              const { label } = await renderTextVector(opts);
               const renderTime = Math.round(performance.now() - startTime);
-              updateStatus(`Vector: ${totalInteriorTris + totalCurveTris} tris (${totalInteriorTris} interior + ${totalCurveTris} curve) in ${renderTime}ms`, "ready");
+              updateStatus(`${label} in ${renderTime}ms`, "ready");
             } else {
               const result = await renderTextMesh(opts);
               const renderTime = Math.round(performance.now() - startTime);
