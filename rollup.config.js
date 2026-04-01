@@ -386,7 +386,11 @@ const rewriteImports = () => ({
           /from ['"]\.\.\/(?:core|mesh)\/[^'"]*['"]/g,
           "from '../index.js'"
         )
-        .replace(/from ['"]\.\/index['"]/g, "from './index.js'");
+        .replace(/from ['"]\.\/index['"]/g, "from './index.js'")
+        .replace(
+          /from ['"]\.\/loopBlinnTSL['"]/g,
+          "from './loopBlinnTSL.js'"
+        );
       return { code: newCode, map: null };
     } else if (options.format === 'cjs') {
       const newCode = code
@@ -394,7 +398,11 @@ const rewriteImports = () => ({
           /require\(['"]\.\.\/(?:core|mesh)\/[^'"]*['"]\)/g,
           "require('../index.cjs')"
         )
-        .replace(/require\(['"]\.\/index['"]\)/g, "require('./index.cjs')");
+        .replace(/require\(['"]\.\/index['"]\)/g, "require('./index.cjs')")
+        .replace(
+          /require\(['"]\.\/loopBlinnTSL['"]\)/g,
+          "require('./loopBlinnTSL.cjs')"
+        );
       return { code: newCode, map: null };
     }
     return null;
@@ -491,6 +499,66 @@ const reactDtsConfig = {
   output: [{ file: 'dist/three/react.d.ts', format: 'es' }],
   plugins: [dts()],
   external: ['react', 'three', 'react/jsx-runtime', /^\.\/index/]
+};
+
+const vectorReactConfig = {
+  input: 'src/vector/react.tsx',
+  output: [
+    {
+      file: 'dist/vector/react.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/vector/react.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: [
+    'react',
+    'three',
+    'three/tsl',
+    'react/jsx-runtime',
+    /^\.\/index/,
+    /^\.\/loopBlinnTSL/
+  ],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
+const vectorReactDtsConfig = {
+  input: 'dist/types/vector/react.d.ts',
+  output: [{ file: 'dist/vector/react.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: [
+    'react',
+    'three',
+    'three/tsl',
+    'react/jsx-runtime',
+    /^\.\/index/,
+    /^\.\/loopBlinnTSL/
+  ]
 };
 
 const webgpuConfig = {
@@ -784,5 +852,7 @@ export default defineConfig([
   p5Config,
   p5DtsConfig,
   vectorConfig,
-  vectorDtsConfig
+  vectorDtsConfig,
+  vectorReactConfig,
+  vectorReactDtsConfig
 ]);

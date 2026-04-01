@@ -33,6 +33,11 @@
       "import": "./dist/three/react.js",
       "require": "./dist/three/react.cjs"
     },
+    "./mesh/react": {
+      "types": "./dist/three/react.d.ts",
+      "import": "./dist/three/react.js",
+      "require": "./dist/three/react.cjs"
+    },
     "./webgl": {
       "types": "./dist/webgl/index.d.ts",
       "import": "./dist/webgl/index.js",
@@ -58,6 +63,11 @@
       "import": "./dist/vector/index.js",
       "require": "./dist/vector/index.cjs"
     },
+    "./vector/react": {
+      "types": "./dist/vector/react.d.ts",
+      "import": "./dist/vector/react.js",
+      "require": "./dist/vector/react.cjs"
+    },
     "./p5": {
       "types": "./dist/p5/index.d.ts",
       "import": "./dist/p5/index.js",
@@ -79,7 +89,7 @@
     "build:patterns": "node scripts/convertPatterns.js",
     "build:patterns:en-us": "node scripts/convertPatterns.js --languages en-us",
     "copy:harfbuzz": "mkdir -p examples/hb && cp node_modules/harfbuzzjs/hb.wasm examples/hb/",
-    "build": "rollup -c && npm run copy:harfbuzz",
+    "build": "tsc --emitDeclarationOnly && rollup -c && npm run copy:harfbuzz",
     "dev": "rollup -c -w",
     "serve": "npx http-server . -c-1 -p 8080 --cors",
     "clean": "rimraf dist/index.* dist/react dist/three dist/hb dist/types",

@@ -9,7 +9,7 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useControls, button, monitor, folder } from "leva";
 import * as THREE from "three";
-import { Text } from "three-text/three/react";
+import { Text } from "three-text/mesh/react";
 import { woff2Decode } from "woff-lib/woff2/decode";
 import FontDropzone from "./components/FontDropzone";
 import VariableFontControls from "./components/VariableFontControls";

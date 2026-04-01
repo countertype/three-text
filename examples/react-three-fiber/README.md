@@ -48,7 +48,7 @@ This example demonstrates how to use the `<ThreeText>` component with React Thre
 
 ```jsx
 import { Canvas } from '@react-three/fiber';
-import { Text } from 'three-text/three/react';
+import { Text } from 'three-text/mesh/react';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
 
