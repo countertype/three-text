@@ -6,8 +6,8 @@ This directory contains examples demonstrating three-text across different rende
 
 **Three.js:**
 - `hello-world.html` - Minimal Three.js example
-- `index.html` - Full-featured demo with parameter controls (mesh and vector modes)
-- `index-tsl.html` - Same demo using `WebGPURenderer` and TSL node materials (mesh + Loop-Blinn vector)
+- `index.html` - Full-featured demo using `WebGPURenderer` with TSL node materials (mesh + Loop-Blinn vector)
+- `index-webgl.html` - Same demo using `WebGLRenderer` with raw GLSL shaders
 - `index-umd.html` - UMD build for legacy browsers
 
 **Three.js (continued):**
