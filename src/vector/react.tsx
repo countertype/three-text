@@ -4,62 +4,17 @@ import * as THREE from 'three';
 import { Text as VectorTextCore } from './index';
 import type { VectorTextResult } from './index';
 import {
-  createLoopBlinnTSLMeshes,
-  type LoopBlinnTSLMeshes
+  createVectorMeshes,
+  type VectorMeshes
 } from './loopBlinnTSL';
 import type { TextOptions } from '../core/types';
+import { useDeepCompareMemo } from '../react/utils';
 
-function deepEqual(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null || b == null) return false;
-  if (typeof a !== 'object' || typeof b !== 'object') return false;
+const hasNodeMaterials = typeof (THREE as any).MeshBasicNodeMaterial !== 'undefined';
 
-  if (Array.isArray(a) || Array.isArray(b)) {
-    if (!Array.isArray(a) || !Array.isArray(b)) return false;
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!deepEqual(a[i], b[i])) return false;
-    }
-    return true;
-  }
-
-  const keysA = Object.keys(a as object);
-  const keysB = Object.keys(b as object);
-  if (keysA.length !== keysB.length) return false;
-  for (const key of keysA) {
-    if (!Object.prototype.hasOwnProperty.call(b, key)) return false;
-    if (
-      !deepEqual(
-        (a as Record<string, unknown>)[key],
-        (b as Record<string, unknown>)[key]
-      )
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function useDeepCompareMemo<T>(value: T): T {
-  const ref = useRef<T>(value);
-  if (!deepEqual(value, ref.current)) {
-    ref.current = value;
-  }
-  return ref.current;
-}
-
-function colorToRgb(
-  color: THREE.ColorRepresentation | undefined
-): { r: number; g: number; b: number } | undefined {
-  if (color === undefined) return undefined;
-  const c = new THREE.Color(color);
-  return { r: c.r, g: c.g, b: c.b };
-}
-
-export interface VectorTextProps extends Omit<TextOptions, 'text' | 'color'> {
+export interface TextProps extends Omit<TextOptions, 'text' | 'color'> {
   children: string;
   font: string | ArrayBuffer;
-  /** Fill color for Loop-Blinn stencil fill pass (default `#ffffff`) */
   fillColor?: THREE.ColorRepresentation;
   position?: [number, number, number];
   rotation?: [number, number, number];
@@ -68,8 +23,8 @@ export interface VectorTextProps extends Omit<TextOptions, 'text' | 'color'> {
   onError?: (error: Error) => void;
 }
 
-const VectorTextInner = forwardRef<THREE.Group, VectorTextProps>(
-  function VectorTextInner(props, ref) {
+const TextInner = forwardRef<THREE.Group, TextProps>(
+  function TextInner(props, ref) {
     const {
       children,
       font,
@@ -83,18 +38,17 @@ const VectorTextInner = forwardRef<THREE.Group, VectorTextProps>(
     } = props;
 
     const memoizedTextOptions = useDeepCompareMemo(restOptions);
-    const [meshes, setMeshes] = useState<LoopBlinnTSLMeshes | null>(null);
+    const [meshes, setMeshes] = useState<VectorMeshes | null>(null);
     const [error, setError] = useState<Error | null>(null);
     const resultRef = useRef<VectorTextResult | null>(null);
-    const meshesRef = useRef<LoopBlinnTSLMeshes | null>(null);
+    const meshesRef = useRef<VectorMeshes | null>(null);
 
     useEffect(() => {
       let cancelled = false;
 
-      if (typeof (THREE as unknown as { MeshBasicNodeMaterial?: unknown })
-        .MeshBasicNodeMaterial === 'undefined') {
+      if (!hasNodeMaterials) {
         const err = new Error(
-          'VectorText requires THREE.MeshBasicNodeMaterial (Three.js r170+ with node materials / WebGPU build)'
+          'three-text/vector/react requires MeshBasicNodeMaterial (Three.js r170+ with node materials / WebGPU build)'
         );
         setError(err);
         if (onError) onError(err);
@@ -124,8 +78,7 @@ const VectorTextInner = forwardRef<THREE.Group, VectorTextProps>(
           const cx = (bounds.min.x + bounds.max.x) * 0.5;
           const cy = (bounds.min.y + bounds.max.y) * 0.5;
 
-          const rgb = colorToRgb(fillColor);
-          const lb = createLoopBlinnTSLMeshes(result.geometryData, rgb);
+          const lb = createVectorMeshes(result.geometryData, fillColor);
           lb.setOffset(-cx, -cy, 0);
           lb.interiorMesh.renderOrder = 0;
           lb.curveMesh.renderOrder = 1;
@@ -140,7 +93,7 @@ const VectorTextInner = forwardRef<THREE.Group, VectorTextProps>(
           if (!cancelled) {
             setError(e);
             if (onError) onError(e);
-            else console.error('VectorText error:', e);
+            else console.error('three-text/vector/react:', e);
           }
         }
       }
@@ -171,7 +124,7 @@ const VectorTextInner = forwardRef<THREE.Group, VectorTextProps>(
   }
 );
 
-export const VectorText = Object.assign(VectorTextInner, {
+export const Text = Object.assign(TextInner, {
   setHarfBuzzPath: VectorTextCore.setHarfBuzzPath,
   setHarfBuzzBuffer: VectorTextCore.setHarfBuzzBuffer,
   init: VectorTextCore.init,

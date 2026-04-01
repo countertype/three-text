@@ -38,6 +38,16 @@
       "import": "./dist/three/react.js",
       "require": "./dist/three/react.cjs"
     },
+    "./mesh/webgl": {
+      "types": "./dist/webgl/index.d.ts",
+      "import": "./dist/webgl/index.js",
+      "require": "./dist/webgl/index.cjs"
+    },
+    "./mesh/webgpu": {
+      "types": "./dist/webgpu/index.d.ts",
+      "import": "./dist/webgpu/index.js",
+      "require": "./dist/webgpu/index.cjs"
+    },
     "./webgl": {
       "types": "./dist/webgl/index.d.ts",
       "import": "./dist/webgl/index.js",
@@ -67,6 +77,11 @@
       "types": "./dist/vector/react.d.ts",
       "import": "./dist/vector/react.js",
       "require": "./dist/vector/react.cjs"
+    },
+    "./mesh/p5": {
+      "types": "./dist/p5/index.d.ts",
+      "import": "./dist/p5/index.js",
+      "require": "./dist/p5/index.cjs"
     },
     "./p5": {
       "types": "./dist/p5/index.d.ts",

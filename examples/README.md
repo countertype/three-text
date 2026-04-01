@@ -10,10 +10,11 @@ This directory contains examples demonstrating three-text across different rende
 - `index-tsl.html` - Same demo using `WebGPURenderer` and TSL node materials (mesh + Loop-Blinn vector)
 - `index-umd.html` - UMD build for legacy browsers
 
+**Three.js (continued):**
+- `variable-fonts.html` - Variable font demonstration
+
 **React Three Fiber** (`three-text/mesh/react`, `three-text/vector/react`):
 - `react-three-fiber/` - Mesh `Text` demo with Leva controls
-- `variable-fonts.html` - Variable font demonstration
-- `react-three-fiber/` - React Three Fiber with Leva controls
 
 **p5.js**
 - `p5-basic.html` - p5.js integration

@@ -10,11 +10,10 @@ import { Fn, vec4, float, uv, dFdx, dFdy, sqrt, clamp, Discard } from 'three/tsl
 
 import type { VectorGeometryData } from './LoopBlinnGeometry';
 
-export interface LoopBlinnTSLMeshes {
+export interface VectorMeshes {
   interiorMesh: THREE.Mesh;
   curveMesh: THREE.Mesh;
   fillMesh: THREE.Mesh;
-  // Set position offset (e.g. to center the text)
   setOffset(x: number, y: number, z?: number): void;
   dispose(): void;
 }
@@ -77,15 +76,14 @@ function applyStencilXOR(mat: THREE.Material): void {
   (mat as any).stencilZPass = THREE.InvertStencilOp;
 }
 
-// Returns three meshes rendered in order across separate scenes
-// (renderer.autoClear = false):
-//   1. interiorMesh - stencil XOR pass (fan triangulated interiors)
-//   2. curveMesh    - stencil XOR pass (curve evaluation, alpha-to-coverage)
-//   3. fillMesh     - color pass (renders where stencil != 0, zeros stencil)
-export function createLoopBlinnTSLMeshes(
+// Three meshes that must render in order (via renderOrder or sequential draws):
+//   1. interiorMesh - stencil XOR (fan triangulated interiors, no color output)
+//   2. curveMesh    - stencil XOR (Loop-Blinn curve eval, alpha-to-coverage)
+//   3. fillMesh     - color where stencil != 0, then zeros stencil
+export function createVectorMeshes(
   data: VectorGeometryData,
-  color?: { r: number; g: number; b: number }
-): LoopBlinnTSLMeshes {
+  color?: THREE.ColorRepresentation
+): VectorMeshes {
   const interiorGeo = new THREE.BufferGeometry();
   interiorGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.interiorPositions, 3));
   interiorGeo.setIndex(new THREE.BufferAttribute(data.interiorIndices, 1));
@@ -133,8 +131,8 @@ export function createLoopBlinnTSLMeshes(
   colorMat.stencilFail = THREE.KeepStencilOp;
   colorMat.stencilZFail = THREE.KeepStencilOp;
   colorMat.stencilZPass = THREE.ZeroStencilOp;
-  if (color) {
-    colorMat.color = new THREE.Color(color.r, color.g, color.b);
+  if (color !== undefined) {
+    colorMat.color = new THREE.Color(color);
   }
 
   const interiorMesh = new THREE.Mesh(interiorGeo, stencilInteriorMat);

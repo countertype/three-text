@@ -125,5 +125,5 @@ export type {
   LoopBlinnGlyphInput,
   QuadraticSegment
 } from './LoopBlinnGeometry';
-export { createLoopBlinnTSLMeshes } from './loopBlinnTSL';
-export type { LoopBlinnTSLMeshes } from './loopBlinnTSL';
+export { createVectorMeshes } from './loopBlinnTSL';
+export type { VectorMeshes } from './loopBlinnTSL';
