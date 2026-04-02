@@ -292,21 +292,17 @@ export function packSlugData(
     }
 
     // Write curve lists using CalcBandLoc-style wrapping
-    const writeBandLoc = (offset: number): { x: number; y: number } => {
-      let bx = glyphLocX + offset;
-      let by = glyphLocY;
-      by += bx >> LOG_TEX_WIDTH;
-      bx &= (1 << LOG_TEX_WIDTH) - 1;
-      return { x: bx, y: by };
-    };
+    const texWidthMask = (1 << LOG_TEX_WIDTH) - 1;
 
     // Write h-band curve lists
     for (let bi = 0; bi < sd.hBands.length; bi++) {
       const list = sd.hLists[bi];
       const baseOffset = sd.hBands[bi].listOffset;
       for (let ci = 0; ci < list.length; ci += 2) {
-        const loc = writeBandLoc(baseOffset + ci / 2);
-        const idx = (loc.y * TEX_WIDTH + loc.x) * 4;
+        let bx = glyphLocX + baseOffset + (ci >> 1);
+        const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
+        bx &= texWidthMask;
+        const idx = (by * TEX_WIDTH + bx) * 4;
         bandData[idx + 0] = list[ci];     // curveTexX
         bandData[idx + 1] = list[ci + 1]; // curveTexY
         bandData[idx + 2] = 0;
@@ -319,8 +315,10 @@ export function packSlugData(
       const list = sd.vLists[bi];
       const baseOffset = sd.vBands[bi].listOffset;
       for (let ci = 0; ci < list.length; ci += 2) {
-        const loc = writeBandLoc(baseOffset + ci / 2);
-        const idx = (loc.y * TEX_WIDTH + loc.x) * 4;
+        let bx = glyphLocX + baseOffset + (ci >> 1);
+        const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
+        bx &= texWidthMask;
+        const idx = (by * TEX_WIDTH + bx) * 4;
         bandData[idx + 0] = list[ci];
         bandData[idx + 1] = list[ci + 1];
         bandData[idx + 2] = 0;
@@ -329,10 +327,9 @@ export function packSlugData(
     }
 
     // Advance band cursor past this shape's data
-    const totalForShape = listStartOffset;
-    const endLoc = writeBandLoc(totalForShape);
-    bandX = endLoc.x;
-    bandY = endLoc.y;
+    let endBx = glyphLocX + listStartOffset;
+    bandY = glyphLocY + (endBx >> LOG_TEX_WIDTH);
+    bandX = endBx & texWidthMask;
   }
 
   const actualBandTexHeight = bandY + 1;

@@ -19,7 +19,7 @@ import type {
 import type { BoundingBox } from '../../utils/vectors';
 import type { QuadCurve, SlugShape, SlugGPUData } from '../slug/types';
 import { packSlugData } from '../slug/SlugPacker';
-import { cubicToQuadratics, lineToQuadratic } from '../slug/curveUtils';
+import { cubicToQuadratics } from '../slug/curveUtils';
 import { TextRangeQuery } from '../../core/layout/TextRangeQuery';
 import type { HyphenationTrieNode } from '../../hyphenation';
 
@@ -138,15 +138,18 @@ function collectForSlug(
         const curves: QuadCurve[] = [];
         for (const seg of outline.segments) {
           switch (seg.type) {
+            // line to quadratic
             case 0: {
-              const q = lineToQuadratic([seg.p0.x, seg.p0.y], [seg.p1.x, seg.p1.y]);
+              const x0 = seg.p0.x * scale + px, y0 = seg.p0.y * scale + py;
+              const x1 = seg.p1.x * scale + px, y1 = seg.p1.y * scale + py;
               curves.push({
-                p1: [q.p1[0] * scale + px, q.p1[1] * scale + py],
-                p2: [q.p2[0] * scale + px, q.p2[1] * scale + py],
-                p3: [q.p3[0] * scale + px, q.p3[1] * scale + py],
+                p1: [x0, y0],
+                p2: [(x0 + x1) * 0.5, (y0 + y1) * 0.5],
+                p3: [x1, y1],
               });
               break;
             }
+            // quadratic
             case 1:
               curves.push({
                 p1: [seg.p0.x * scale + px, seg.p0.y * scale + py],
@@ -154,6 +157,7 @@ function collectForSlug(
                 p3: [seg.p2!.x * scale + px, seg.p2!.y * scale + py],
               });
               break;
+            // cubic to quadratic
             case 2: {
               const quads = cubicToQuadratics(
                 [seg.p0.x, seg.p0.y],
