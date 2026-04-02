@@ -14,7 +14,7 @@ This directory contains examples demonstrating three-text across different rende
 - `variable-fonts.html` - Variable font demonstration
 
 **React Three Fiber** (`three-text/mesh/react`, `three-text/vector/react`):
-- `react-three-fiber/` - Mesh `Text` demo with Leva controls
+- `react-three-fiber/` - Mesh and vector `Text` demo with Leva controls and TSL animations
 
 **p5.js**
 - `p5-basic.html` - p5.js integration

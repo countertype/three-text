@@ -9,52 +9,45 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useControls, button, monitor, folder } from "leva";
 import * as THREE from "three";
-import { Text } from "three-text/mesh/react";
+import { WebGPURenderer, MeshStandardNodeMaterial } from "three/webgpu";
+import { Text as MeshText } from "three-text/mesh/react";
+import { Text as VectorText } from "three-text/vector/react";
 import { woff2Decode } from "woff-lib/woff2/decode";
+import { createTSLUniforms, createPositionNode, computeDiagonalRange as computeDiagRange } from "./tslAnimations";
 import FontDropzone from "./components/FontDropzone";
 import VariableFontControls from "./components/VariableFontControls";
-import flipVertexShader from "./shaders/flip.vert?raw";
-import explodeVertexShader from "./shaders/explode.vert?raw";
-import orbitVertexShader from "./shaders/orbit.vert?raw";
-import twisterVertexShader from "./shaders/twister.vert?raw";
-import standardFragmentShader from "./shaders/standard.frag?raw";
-import waveVertexShader from "./shaders/wave.vert?raw";
-import waveFragmentShader from "./shaders/wave.frag?raw";
-import offVertexShader from "./shaders/off.vert?raw";
 
-Text.setHarfBuzzPath("/hb/hb.wasm");
-Text.enableWoff2(woff2Decode);
+MeshText.setHarfBuzzPath("/hb/hb.wasm");
+MeshText.enableWoff2(woff2Decode);
 
 const DEFAULT_TEXT = `three-text is a 3D font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGPU, and WebGL`;
 
-function AnimationUpdater({ meshRef, animationMode, waveControls, flipControls, explodeControls, orbitControls, twisterControls }) {
+function UniformUpdater({ uniforms, animationMode, waveControls, flipControls, explodeControls, orbitControls, twisterControls }) {
   useFrame((state) => {
-    if (!meshRef.current?.material?.uniforms?.time) return;
-
-    const uniforms = meshRef.current.material.uniforms;
+    if (!uniforms) return;
     uniforms.time.value = state.clock.elapsedTime;
 
     switch (animationMode) {
       case 'wave':
-        if (uniforms.waveHeight) uniforms.waveHeight.value = waveControls.waveHeight;
-        if (uniforms.waveFrequency) uniforms.waveFrequency.value = waveControls.waveFrequency;
+        uniforms.waveHeight.value = waveControls.waveHeight;
+        uniforms.waveFrequency.value = waveControls.waveFrequency;
         break;
       case 'flip':
-        if (uniforms.flipSpeed) uniforms.flipSpeed.value = flipControls.flipSpeed;
-        if (uniforms.flipPauseDuration) uniforms.flipPauseDuration.value = flipControls.flipPauseDuration;
+        uniforms.flipSpeed.value = flipControls.flipSpeed;
+        uniforms.flipPauseDuration.value = flipControls.flipPauseDuration;
         break;
       case 'explode':
-        if (uniforms.explodeSpeed) uniforms.explodeSpeed.value = explodeControls.explodeSpeed;
-        if (uniforms.explodeDistance) uniforms.explodeDistance.value = explodeControls.explodeDistance;
+        uniforms.explodeSpeed.value = explodeControls.explodeSpeed;
+        uniforms.explodeDistance.value = explodeControls.explodeDistance;
         break;
       case 'orbit':
-        if (uniforms.orbitRadius) uniforms.orbitRadius.value = orbitControls.orbitRadius;
-        if (uniforms.orbitSpeed) uniforms.orbitSpeed.value = orbitControls.orbitSpeed;
+        uniforms.orbitRadius.value = orbitControls.orbitRadius;
+        uniforms.orbitSpeed.value = orbitControls.orbitSpeed;
         break;
       case 'twister':
-        if (uniforms.twisterSpeed) uniforms.twisterSpeed.value = twisterControls.twisterSpeed;
-        if (uniforms.twisterHeight) uniforms.twisterHeight.value = twisterControls.twisterHeight;
-        if (uniforms.twisterRadius) uniforms.twisterRadius.value = twisterControls.twisterRadius;
+        uniforms.twisterSpeed.value = twisterControls.twisterSpeed;
+        uniforms.twisterHeight.value = twisterControls.twisterHeight;
+        uniforms.twisterRadius.value = twisterControls.twisterRadius;
         break;
     }
   });
@@ -70,17 +63,21 @@ function App() {
   const [featureNames, setFeatureNames] = useState({});
   const [fontFeatures, setFontFeatures] = useState({});
   const textMeshRef = useRef();
-  const renderStartTimeRef = useRef(null);
   const lastColorRef = useRef(null);
+  const tslUniformsRef = useRef(null);
+  if (!tslUniformsRef.current) {
+    tslUniformsRef.current = createTSLUniforms();
+  }
 
-  const handleFontLoad = (fontBuffer, fontName) => {
+  const handleFontLoad = useCallback((fontBuffer, fontName) => {
     setCustomFont({ buffer: fontBuffer, name: fontName });
     setCurrentFontName(fontName);
     setVariationAxes(null);
     setFontVariations({});
     setAvailableFeatures(null);
+    setFeatureNames({});
     setFontFeatures({});
-  };
+  }, []);
 
   const handleUploadClick = useCallback(() => {
     const input = document.createElement("input");
@@ -181,6 +178,12 @@ function App() {
                 ? fontFeatures[tag]
                 : defaultEnabled.has(tag),
             onChange: (value) => {
+              if (
+                fontFeatures[tag] === undefined &&
+                value === defaultEnabled.has(tag)
+              ) {
+                return;
+              }
               setFontFeatures((prev) => ({ ...prev, [tag]: value }));
             },
           };
@@ -248,9 +251,15 @@ function App() {
     [variationAxes]
   );
 
+  const renderingControls = useControls("Rendering", {
+    mode: { value: 'mesh', options: ['mesh', 'vector'] },
+  });
+
   const animationControls = useControls("Animation", {
     shaderMode: { value: 'wave', options: ['off', 'wave', 'flip', 'explode', 'orbit', 'twister'] },
   });
+
+  const isMeshMode = renderingControls.mode === 'mesh';
 
   const waveControls = useControls("Wave controls", {
     waveHeight: { value: 10, min: 0, max: 50, step: 1 },
@@ -278,130 +287,36 @@ function App() {
     twisterRadius: { value: 300, min: 50, max: 500, step: 10 },
   }, { render: (get) => get('Animation.shaderMode') === 'twister' });
 
-  const [geometryKey, setGeometryKey] = useState(0);
   const [minDiagonal, setMinDiagonal] = useState(0);
   const [maxDiagonal, setMaxDiagonal] = useState(1);
 
-  useEffect(() => {
-    setGeometryKey(prev => prev + 1);
+  const meshPositionNode = useMemo(() => {
+    return createPositionNode(animationControls.shaderMode, tslUniformsRef.current);
+  }, [animationControls.shaderMode]);
+
+  const vectorPositionNode = useMemo(() => {
+    return createPositionNode(animationControls.shaderMode, tslUniformsRef.current);
   }, [animationControls.shaderMode]);
 
   const material = useMemo(() => {
-    const mode = animationControls.shaderMode;
-    const baseConfig = {
+    if (animationControls.shaderMode === "off" || !meshPositionNode) {
+      return new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        side: textControls.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
+        transparent: true,
+        wireframe: textControls.wireframe,
+      });
+    }
+
+    const mat = new MeshStandardNodeMaterial({
       vertexColors: true,
       side: textControls.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
       transparent: true,
       wireframe: textControls.wireframe,
-      defines: { USE_COLOR: "" },
-    };
-
-    if (mode === 'off') {
-      return new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          opacity: { value: 1.0 },
-        },
-        vertexShader: offVertexShader,
-        fragmentShader: standardFragmentShader,
-        ...baseConfig,
-      });
-    }
-
-    if (mode === 'flip') {
-      return new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          flipSpeed: { value: flipControls.flipSpeed },
-          flipPauseDuration: { value: flipControls.flipPauseDuration },
-          minDiagonal: { value: minDiagonal },
-          maxDiagonal: { value: maxDiagonal },
-          opacity: { value: 1.0 },
-        },
-        vertexShader: flipVertexShader,
-        fragmentShader: standardFragmentShader,
-        ...baseConfig,
-      });
-    }
-
-    if (mode === 'explode') {
-      return new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          explodeSpeed: { value: explodeControls.explodeSpeed },
-          explodeDistance: { value: explodeControls.explodeDistance },
-          paragraphCenter: { value: new THREE.Vector3(0, 0, 0) },
-          opacity: { value: 1.0 },
-        },
-        vertexShader: explodeVertexShader,
-        fragmentShader: standardFragmentShader,
-        ...baseConfig,
-      });
-    }
-
-    if (mode === 'orbit') {
-      return new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          orbitRadius: { value: orbitControls.orbitRadius },
-          orbitSpeed: { value: orbitControls.orbitSpeed },
-          opacity: { value: 1.0 },
-        },
-        vertexShader: orbitVertexShader,
-        fragmentShader: standardFragmentShader,
-        ...baseConfig,
-      });
-    }
-
-    if (mode === 'twister') {
-      return new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          twisterSpeed: { value: twisterControls.twisterSpeed },
-          twisterHeight: { value: twisterControls.twisterHeight },
-          twisterRadius: { value: twisterControls.twisterRadius },
-          opacity: { value: 1.0 },
-        },
-        vertexShader: twisterVertexShader,
-        fragmentShader: standardFragmentShader,
-        ...baseConfig,
-      });
-    }
-
-    return new THREE.ShaderMaterial({
-      uniforms: {
-        time: { value: 0 },
-        waveHeight: { value: waveControls.waveHeight },
-        waveFrequency: { value: waveControls.waveFrequency },
-        opacity: { value: 1.0 },
-      },
-      vertexShader: waveVertexShader,
-      fragmentShader: waveFragmentShader,
-      vertexColors: true,
-      side: textControls.depth === 0 ? THREE.DoubleSide : THREE.FrontSide,
-      transparent: true,
-      defines: {
-        USE_COLOR: "",
-      },
     });
-  }, [
-    animationControls.shaderMode,
-    textControls.wireframe,
-    textControls.depth,
-    waveControls.waveHeight,
-    waveControls.waveFrequency,
-    flipControls.flipSpeed,
-    flipControls.flipPauseDuration,
-    explodeControls.explodeSpeed,
-    explodeControls.explodeDistance,
-    orbitControls.orbitRadius,
-    orbitControls.orbitSpeed,
-    twisterControls.twisterSpeed,
-    twisterControls.twisterHeight,
-    twisterControls.twisterRadius,
-    minDiagonal,
-    maxDiagonal,
-  ]);
+    mat.positionNode = meshPositionNode;
+    return mat;
+  }, [animationControls.shaderMode, meshPositionNode, textControls.wireframe, textControls.depth]);
 
   const updateStatus = (message, type = "loading") => {
     const statusEl = document.querySelector(".status");
@@ -410,6 +325,40 @@ function App() {
       statusEl.className = `status status-${type}`;
     }
   };
+
+  const centerMeshGeometry = useCallback((geometry) => {
+    geometry.computeBoundingBox();
+    const center = new THREE.Vector3();
+    geometry.boundingBox.getCenter(center);
+    geometry.translate(-center.x, -center.y, -center.z);
+
+    const glyphCenterAttr = geometry.attributes.glyphCenter;
+    if (glyphCenterAttr) {
+      for (let i = 0; i < glyphCenterAttr.count; i++) {
+        glyphCenterAttr.setX(i, glyphCenterAttr.getX(i) - center.x);
+        glyphCenterAttr.setY(i, glyphCenterAttr.getY(i) - center.y);
+        glyphCenterAttr.setZ(i, glyphCenterAttr.getZ(i) - center.z);
+      }
+      glyphCenterAttr.needsUpdate = true;
+    }
+  }, []);
+
+  const syncFontMetadata = useCallback((loadedFont) => {
+    if (!loadedFont) return;
+
+    const axes = loadedFont.variationAxes || null;
+    const features = loadedFont.availableFeatures || null;
+    const names = loadedFont.featureNames || {};
+
+    if (axes && !variationAxes) {
+      setVariationAxes(axes);
+    }
+
+    if (features && features.length > 0 && !availableFeatures) {
+      setAvailableFeatures(features);
+      setFeatureNames(names);
+    }
+  }, [availableFeatures, variationAxes]);
 
   const handleLoad = (geometry, info) => {
     if (geometry.attributes.glyphCenter) {
@@ -430,34 +379,7 @@ function App() {
     }
 
     const loadedFont = info.getLoadedFont();
-    if (loadedFont) {
-      const axes = loadedFont.variationAxes || null;
-      const features = loadedFont.availableFeatures || null;
-      const names = loadedFont.featureNames || {};
-      
-      if (axes && !variationAxes) {
-        setVariationAxes(axes);
-        const defaultVariations = {};
-        for (const [tag, axisInfo] of Object.entries(axes)) {
-          defaultVariations[tag] = axisInfo.default;
-        }
-        setFontVariations(defaultVariations);
-      }
-      
-      if (features && features.length > 0 && !availableFeatures) {
-        setAvailableFeatures(features);
-        setFeatureNames(names);
-        
-        const defaultEnabled = ['abvm', 'blwm', 'ccmp', 'locl', 'mark', 'mkmk', 'rlig', 'calt', 'clig', 'curs', 'dist', 'kern', 'liga', 'rclt'];
-        const defaults = {};
-        features.forEach(tag => {
-          if (defaultEnabled.includes(tag)) {
-            defaults[tag] = true;
-          }
-        });
-        setFontFeatures(defaults);
-      }
-    }
+    syncFontMetadata(loadedFont);
 
     const triangles = info?.stats?.trianglesGenerated;
     const message = triangles 
@@ -506,6 +428,37 @@ function App() {
     colors.needsUpdate = true;
   }, [resolvedColor]);
 
+  const fontSource = customFont?.buffer || "./fonts/NimbusSanL-Reg.woff";
+
+  const layout = useMemo(() => ({
+    width: lineBreakingControls.lineWidth,
+    align: lineBreakingControls.alignment,
+    direction: textControls.direction,
+    hyphenate: hyphenationControls.hyphenate,
+    language: hyphenationControls.language,
+    respectExistingBreaks: lineBreakingControls.respectExistingBreaks,
+    tolerance: lineBreakingControls.tolerance,
+    pretolerance: lineBreakingControls.pretolerance,
+    emergencyStretch: lineBreakingControls.emergencyStretch,
+    lefthyphenmin: hyphenationControls.lefthyphenmin,
+    righthyphenmin: hyphenationControls.righthyphenmin,
+    linepenalty: lineBreakingControls.linepenalty,
+    adjdemerits: lineBreakingControls.adjdemerits,
+    hyphenpenalty: hyphenationControls.hyphenpenalty,
+    exhyphenpenalty: hyphenationControls.exhyphenpenalty,
+    doublehyphendemerits: hyphenationControls.doublehyphendemerits,
+  }), [lineBreakingControls, hyphenationControls, textControls.direction]);
+
+  const curveFidelity = useMemo(() => ({
+    distanceTolerance: tessellationControls.distanceTolerance,
+    angleTolerance: tessellationControls.angleTolerance,
+  }), [tessellationControls.distanceTolerance, tessellationControls.angleTolerance]);
+
+  const geometryOptimization = useMemo(() => ({
+    enabled: optimizationControls.optimizationEnabled,
+    areaThreshold: optimizationControls.areaThreshold,
+  }), [optimizationControls.optimizationEnabled, optimizationControls.areaThreshold]);
+
   return (
     <>
       <div className="status status-loading">Initializing...</div>
@@ -537,18 +490,23 @@ function App() {
           near: 100,
           far: 50000,
         }}
-        gl={{
-          antialias: true,
-          precision: "highp",
-          powerPreference: "high-performance",
+        gl={async (props) => {
+          const renderer = new WebGPURenderer({
+            ...props,
+            antialias: true,
+            stencil: true,
+            powerPreference: "high-performance",
+          });
+          await renderer.init();
+          return renderer;
         }}
       >
         <color attach="background" args={[textControls.backgroundColor]} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[1, 1, 1]} intensity={0.8} />
 
-        <AnimationUpdater
-          meshRef={textMeshRef}
+        <UniformUpdater
+          uniforms={tslUniformsRef.current}
           animationMode={animationControls.shaderMode}
           waveControls={waveControls}
           flipControls={flipControls}
@@ -557,70 +515,59 @@ function App() {
           twisterControls={twisterControls}
         />
 
-        <Text
-          key={geometryKey}
-          ref={textMeshRef}
-          font={customFont?.buffer || "./fonts/NimbusSanL-Reg.woff"}
-          size={textControls.fontSize}
-          depth={textControls.depth}
-          lineHeight={lineBreakingControls.lineHeight}
-          letterSpacing={textControls.letterSpacing}
-          color={resolvedColor}
-          removeOverlaps={textControls.removeOverlaps}
-          perGlyphAttributes={['flip', 'explode', 'orbit', 'twister'].includes(animationControls.shaderMode)}
-          curveSteps={tessellationControls.curveMode === 'steps' ? tessellationControls.curveSteps : 0}
-          curveFidelity={{
-            distanceTolerance: tessellationControls.distanceTolerance,
-            angleTolerance: tessellationControls.angleTolerance,
-          }}
-          geometryOptimization={{
-            enabled: optimizationControls.optimizationEnabled,
-            areaThreshold: optimizationControls.areaThreshold,
-          }}
-          layout={{
-            width: lineBreakingControls.lineWidth,
-            align: lineBreakingControls.alignment,
-            direction: textControls.direction,
-            hyphenate: hyphenationControls.hyphenate,
-            language: hyphenationControls.language,
-            respectExistingBreaks: lineBreakingControls.respectExistingBreaks,
-            tolerance: lineBreakingControls.tolerance,
-            pretolerance: lineBreakingControls.pretolerance,
-            emergencyStretch: lineBreakingControls.emergencyStretch,
-            lefthyphenmin: hyphenationControls.lefthyphenmin,
-            righthyphenmin: hyphenationControls.righthyphenmin,
-            linepenalty: lineBreakingControls.linepenalty,
-            adjdemerits: lineBreakingControls.adjdemerits,
-            hyphenpenalty: hyphenationControls.hyphenpenalty,
-            exhyphenpenalty: hyphenationControls.exhyphenpenalty,
-            doublehyphendemerits: hyphenationControls.doublehyphendemerits,
-          }}
-          fontVariations={fontVariations}
-          fontFeatures={fontFeatures}
-          material={material}
-          rotation={[0, 0.5, 0]}
-          onLoad={(geometry, info) => {
-            geometry.computeBoundingBox();
-            const center = new THREE.Vector3();
-            geometry.boundingBox.getCenter(center);
-            geometry.translate(-center.x, -center.y, -center.z);
+        {isMeshMode ? (
+          <MeshText
+            ref={textMeshRef}
+            font={fontSource}
+            size={textControls.fontSize}
+            depth={textControls.depth}
+            lineHeight={lineBreakingControls.lineHeight}
+            letterSpacing={textControls.letterSpacing}
+            color={resolvedColor}
+            removeOverlaps={textControls.removeOverlaps}
+            perGlyphAttributes={true}
+            curveSteps={tessellationControls.curveMode === 'steps' ? tessellationControls.curveSteps : 0}
+            curveFidelity={curveFidelity}
+            geometryOptimization={geometryOptimization}
+            layout={layout}
+            fontVariations={fontVariations}
+            fontFeatures={fontFeatures}
+            material={material}
+            rotation={[0, 0.5, 0]}
+            onLoad={(geometry, info) => {
+              centerMeshGeometry(geometry);
+              handleLoad(geometry, info);
+            }}
+            onError={handleError}
+          >
+            {textControls.text || DEFAULT_TEXT}
+          </MeshText>
+        ) : (
+          <VectorText
+            font={fontSource}
+            fillColor={textControls.color}
+            size={textControls.fontSize}
+            lineHeight={lineBreakingControls.lineHeight}
+            letterSpacing={textControls.letterSpacing}
+            positionNode={vectorPositionNode}
+            perGlyphAttributes={true}
+            layout={layout}
+            fontVariations={fontVariations}
+            fontFeatures={fontFeatures}
+            rotation={[0, 0.5, 0]}
+            onLoad={(result) => {
+              const diagRange = computeDiagRange(result.interiorGeometry?.attributes?.glyphCenter);
+              tslUniformsRef.current.minDiagonal.value = diagRange.min;
+              tslUniformsRef.current.maxDiagonal.value = diagRange.max;
 
-            if (geometry.attributes.glyphCenter) {
-              const glyphCenterAttr = geometry.attributes.glyphCenter;
-              for (let i = 0; i < glyphCenterAttr.count; i++) {
-                glyphCenterAttr.setX(i, glyphCenterAttr.getX(i) - center.x);
-                glyphCenterAttr.setY(i, glyphCenterAttr.getY(i) - center.y);
-                glyphCenterAttr.setZ(i, glyphCenterAttr.getZ(i) - center.z);
-              }
-              glyphCenterAttr.needsUpdate = true;
-            }
-            
-            handleLoad(geometry, info);
-          }}
-          onError={handleError}
-        >
-          {textControls.text || DEFAULT_TEXT}
-        </Text>
+              syncFontMetadata(result.getLoadedFont());
+              if (!isMeshMode) updateStatus("Ready (vector)", "ready");
+            }}
+            onError={handleError}
+          >
+            {textControls.text || DEFAULT_TEXT}
+          </VectorText>
+        )}
 
         <OrbitControls
           enableDamping

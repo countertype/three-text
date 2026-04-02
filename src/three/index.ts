@@ -24,6 +24,7 @@ export interface ThreeTextGeometryInfo
   clearCache(): void;
   measureTextWidth(text: string, letterSpacing?: number): number;
   update(options: Partial<TextOptions>): Promise<ThreeTextGeometryInfo>;
+  dispose(): void;
 }
 
 function buildThreeResult(
@@ -116,7 +117,8 @@ function buildThreeResult(
     clearCache: () => meshPipeline.clearCache(),
     measureTextWidth: (text: string, letterSpacing?: number) =>
       layoutHandle.measureTextWidth(text, letterSpacing),
-    update
+    update,
+    dispose: () => layoutHandle.dispose()
   };
 }
 

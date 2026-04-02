@@ -1,11 +1,23 @@
 # Changelog
 
-## [0.5.1] - 2026-03-31
+## [0.5.2] - 2026-04-02
 
 ### Fixed
 
-- Vector stencil fill now uses nonzero winding rule (`INCR_WRAP`/`DECR_WRAP`) instead of even-odd (`INVERT`), fixing holes in overlapping contours (e.g. variable fonts)
-- `three-text/vector` entry point no longer re-exports `loopBlinnTSL`, so `dist/vector/index.js` does not pull in `three` or `three/tsl`
+- Vector stencil fill now uses nonzero winding rule, fixing holes in overlapping contours (e.g. variable fonts)
+- Font cache no longer destroyed when one text instance unmounts while another is still using it
+- React adapters use incremental `update()` instead of full rebuilds on prop changes — layout tweaks like width are now as fast as the imperative API
+
+### Added
+
+- `Text.create()` from `three-text/vector` returns `result.group` — a `THREE.Group` with stencil, render ordering, and centering handled internally. Accepts `color`, `positionNode`, `colorNode`, and `center` options
+- `result.updateMaterials()` — swap animation/color nodes without rebuilding geometry
+- Vector text works alongside standard Three.js materials without requiring a bundler alias for `three`
+
+### Changed
+
+- `three-text/vector` is now the main Three.js-aware entry point; Three.js-free core available at `three-text/vector/core`
+- `three-text/vector/react` simplified — uses `Text.create()` internally
 
 ## [0.5.0] - 2026-04-01
 

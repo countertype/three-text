@@ -380,6 +380,7 @@ const rewriteImports = () => ({
           "from '../index.js'"
         )
         .replace(/from ['"]\.\/index['"]/g, "from './index.js'")
+        .replace(/from ['"]\.\/core['"]/g, "from './core.js'")
         .replace(
           /from ['"]\.\/loopBlinnTSL['"]/g,
           "from './loopBlinnTSL.js'"
@@ -392,6 +393,7 @@ const rewriteImports = () => ({
           "require('../index.cjs')"
         )
         .replace(/require\(['"]\.\/index['"]\)/g, "require('./index.cjs')")
+        .replace(/require\(['"]\.\/core['"]\)/g, "require('./core.cjs')")
         .replace(
           /require\(['"]\.\/loopBlinnTSL['"]\)/g,
           "require('./loopBlinnTSL.cjs')"
@@ -780,16 +782,16 @@ const p5DtsConfig = {
   external: [/^\.\.\/core\//]
 };
 
-const vectorConfig = {
-  input: 'src/vector/index.ts',
+const vectorCoreConfig = {
+  input: 'src/vector/core.ts',
   output: [
     {
-      file: 'dist/vector/index.js',
+      file: 'dist/vector/core.js',
       format: 'esm',
       sourcemap: false
     },
     {
-      file: 'dist/vector/index.cjs',
+      file: 'dist/vector/core.cjs',
       format: 'cjs',
       sourcemap: false
     }
@@ -819,11 +821,103 @@ const vectorConfig = {
   ]
 };
 
+const vectorCoreDtsConfig = {
+  input: 'dist/types/vector/core.d.ts',
+  output: [{ file: 'dist/vector/core.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: [/^\.\.\/core\//]
+};
+
+const vectorConfig = {
+  input: 'src/vector/index.ts',
+  output: [
+    {
+      file: 'dist/vector/index.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/vector/index.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: [/^\.\.\/core\//, 'three', /^three\//, /^\.\/core/, /^\.\/loopBlinnTSL/],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
 const vectorDtsConfig = {
   input: 'dist/types/vector/index.d.ts',
   output: [{ file: 'dist/vector/index.d.ts', format: 'es' }],
   plugins: [dts()],
-  external: [/^\.\.\/core\//]
+  external: [/^\.\.\/core\//, 'three', /^three\//]
+};
+
+const loopBlinnTSLConfig = {
+  input: 'src/vector/loopBlinnTSL.ts',
+  output: [
+    {
+      file: 'dist/vector/loopBlinnTSL.js',
+      format: 'esm',
+      sourcemap: false
+    },
+    {
+      file: 'dist/vector/loopBlinnTSL.cjs',
+      format: 'cjs',
+      sourcemap: false
+    }
+  ],
+  external: ['three', /^three\//, /^\.\/index/],
+  plugins: [
+    replace({
+      preventAssignment: true,
+      values: {
+        'process.env.NODE_ENV': JSON.stringify('production'),
+        'process.env.DEBUG': JSON.stringify(''),
+        'process.env': JSON.stringify({}),
+        'process.browser': 'true'
+      }
+    }),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
+    commonjs(),
+    typescript({
+      tsconfig: './tsconfig.json',
+      sourceMap: false,
+      declaration: false
+    }),
+    rewriteImports()
+  ]
+};
+
+const loopBlinnTSLDtsConfig = {
+  input: 'dist/types/vector/loopBlinnTSL.d.ts',
+  output: [{ file: 'dist/vector/loopBlinnTSL.d.ts', format: 'es' }],
+  plugins: [dts()],
+  external: ['three', /^three\//]
 };
 
 export default defineConfig([
@@ -844,8 +938,12 @@ export default defineConfig([
   webgpuVectorDtsConfig,
   p5Config,
   p5DtsConfig,
+  vectorCoreConfig,
+  vectorCoreDtsConfig,
   vectorConfig,
   vectorDtsConfig,
+  loopBlinnTSLConfig,
+  loopBlinnTSLDtsConfig,
   vectorReactConfig,
   vectorReactDtsConfig
 ]);
