@@ -2,7 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/three-text.svg)](https://www.npmjs.com/package/three-text)
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-007acc.svg)](https://www.typescriptlang.org/)
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3_or_later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 High fidelity 3D text rendering and layout for the web
 
@@ -354,7 +354,7 @@ cp node_modules/harfbuzzjs/hb.wasm public/hb/
 Then, before any `Text.create()` calls, configure the path:
 
 ```javascript
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 Text.setHarfBuzzPath('/hb/hb.wasm');
 ```
 
@@ -366,7 +366,7 @@ This method is essential for applications that use Web Workers, as it is the onl
 
 
 ```javascript
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 
 // Main thread
 const wasmResponse = await fetch('/hb/hb.wasm');
@@ -385,7 +385,7 @@ The library will prioritize the buffer if both a path and a buffer have been set
 
 **NW.js with CommonJS:** If using `require()` to load the CJS build in NW.js, use Option 2 (buffer-based loading). NW.js's [dual-context architecture](https://docs.nwjs.io/For%20Users/Advanced/JavaScript%20Contexts%20in%20NW.js/#separate-context-mode) causes path resolution issues in this specific scenario. ESM imports and bundled code work normally
 
-**Electron with `file://` protocol:** If loading HTML directly from the filesystem (not via a dev server), use Option 2 (buffer-based loading) or enable `nodeIntegration` in your BrowserWindow
+**Electron with `file://` protocol:** If loading HTML directly from the filesystem (not via a dev server), use Option 2 (buffer-based loading) or enable `nodeIntegration` in your `BrowserWindow`
 
 ### Hyphenation patterns
 
@@ -393,7 +393,7 @@ The library will prioritize the buffer if both a path and a buffer have been set
 
 ```javascript
 import enUs from 'three-text/patterns/en-us';
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 
 Text.registerPattern('en-us', enUs);
 ```
@@ -512,6 +512,8 @@ The algorithm models text using three fundamental elements:
 Line badness is calculated based on how much glue must stretch or shrink from its natural width to achieve the target line length. The algorithm finds the sequence of breaks that minimizes total badness across the paragraph
 
 This uses a three-pass approach: first without hyphenation (pretolerance), then with hyphenation (tolerance), and finally with emergency stretch for difficult paragraphs that cannot be broken acceptably
+
+For book typesetting, TeX uses delta nodes to efficiently handle long paragraphs that may span multiple pages with many possible break points. Since three-text isn't a page layout engine, we take a simpler approach and store cumulative widths directly on each break candidate
 
 #### Hyphenation
 
@@ -1255,6 +1257,6 @@ The build generates multiple module formats for core and all adapters:
 
 ## License
 
-`three-text` was written by Jeremy Tribby ([@jpt](https://github.com/jpt)) and is licensed under the GNU Affero General Public License v3.0 or later (AGPL-3.0-or-later). See the [LICENSE](LICENSE) file for details
+`three-text` was written by Jeremy Tribby ([@jpt](https://github.com/jpt)) and is licensed under the MIT License. See the [LICENSE](LICENSE) file for details
 
 This software includes code from third-party libraries under compatible permissive licenses. For full license details, see the [LICENSE_THIRD_PARTY](LICENSE_THIRD_PARTY) file

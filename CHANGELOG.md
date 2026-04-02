@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.0] - 2026-02-02
+
+### Changed
+
+- License changed from AGPL-3.0 to MIT
+
+### Breaking changes
+
+- Removed hyphenation patterns for Czech, Indonesian, Macedonian, and Serbian due to incompatible licensing
+
 ## [0.4.12] - 2026-03-31
 
 ### Added

@@ -25,7 +25,7 @@ import offVertexShader from "./shaders/off.vert?raw";
 Text.setHarfBuzzPath("/hb/hb.wasm");
 Text.enableWoff2(woff2Decode);
 
-const DEFAULT_TEXT = `three-text is a 3D font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGL and WebGPU. Under the hood, three-text relies on HarfBuzz for text shaping, Knuth-Plass line breaking, Liang hyphenation, libtess by Eric Veach for tessellation, curve polygonization from Maxim Shemanarev's Anti-Grain Geometry, and Visvalingam-Whyatt line simplification`;
+const DEFAULT_TEXT = `three-text is a 3D font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses Tex-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates. The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for Three.js, React Three Fiber, p5.js, WebGPU, and WebGL`;
 
 function AnimationUpdater({ meshRef, animationMode, waveControls, flipControls, explodeControls, orbitControls, twisterControls }) {
   useFrame((state) => {
@@ -197,7 +197,7 @@ function App() {
   );
 
   const lineBreakingControls = useControls("Line breaking", {
-    lineWidth: { value: 1400, min: 500, max: 3000, step: 10 },
+    lineWidth: { value: 1320, min: 500, max: 3000, step: 10 },
     lineHeight: { value: 1.33, min: 0.8, max: 2.0, step: 0.05 },
     alignment: {
       value: "justify",
@@ -217,13 +217,12 @@ function App() {
       value: "en-us",
       options: [
         "en-us", "en-gb", "de-1996", "fr", "es", "it", "pt", "nl", "da", "sv",
-        "nb", "nn", "fi", "is", "pl", "cs", "sk", "sl", "hr", "sr-cyrl",
-        "sh-cyrl", "sh-latn", "ru", "uk", "be", "bg", "mk", "el-monoton",
-        "el-polyton", "hy", "ka", "tr", "tk", "sq", "et", "lv", "lt", "ro",
-        "hu", "ca", "oc", "gl", "eu", "cy", "ga", "eo", "ia", "la", "af",
-        "id", "hi", "bn", "as", "gu", "pa", "or", "ml", "kn", "ta", "te",
-        "mr", "sa", "th", "kmr", "hsb", "fur", "rm", "pms", "zh-latn-pinyin",
-        "mn-cyrl", "mul-ethi"
+        "nb", "nn", "fi", "is", "pl", "sk", "sl", "hr", "sh-cyrl", "sh-latn",
+        "ru", "uk", "be", "bg", "el-monoton", "el-polyton", "hy", "ka", "tr",
+        "tk", "sq", "et", "lv", "lt", "ro", "hu", "ca", "oc", "gl", "eu", "cy",
+        "ga", "eo", "ia", "la", "af", "hi", "bn", "as", "gu", "pa", "or", "ml",
+        "kn", "ta", "te", "mr", "sa", "th", "kmr", "hsb", "fur", "rm", "pms",
+        "zh-latn-pinyin", "mn-cyrl", "mul-ethi"
       ],
     },
     lefthyphenmin: { value: 2, min: 1, max: 5, step: 1 },

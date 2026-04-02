@@ -8,18 +8,11 @@ import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
 
 // License banner for all builds
-const licenseBanner = `/*!
+const licenseBanner = `/**
+ * @license
  * three-text v${JSON.parse(readFileSync('./package.json', 'utf8')).version}
- * Copyright (C) 2025 Countertype LLC
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * See LICENSE file for full terms: <https://www.gnu.org/licenses/>
- * 
- * This software includes third-party code - see LICENSE_THIRD_PARTY for details.
+ * Copyright © 2025-2026 Jeremy Tribby, Countertype LLC
+ * SPDX-License-Identifier: MIT
  */`;
 
 // Public API properties (protected from mangling)
@@ -163,7 +156,7 @@ const terserOptions = {
     }
   },
   format: {
-    comments: /^!/,
+    comments: /@license/i,
     ascii_only: false,
     ecma: 2020,
     semicolons: false,

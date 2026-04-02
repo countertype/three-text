@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.4.12",
+  "version": "0.5.0",
   "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
@@ -125,7 +125,7 @@
     "harfbuzz"
   ],
   "author": "Jeremy Tribby, Countertype LLC",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/countertype/three-text.git"
