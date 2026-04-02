@@ -107,6 +107,21 @@ complete source and licensing details: https://github.com/hyphenation/tex-hyphen
 
 ---
 
+4. Slug Library
+
+This software includes a port of the Slug library
+(https://github.com/EricLengyel/Slug), a GPU-based vector graphics
+rendering algorithm for text and shapes by Eric Lengyel. The original
+GLSL shaders were ported to Three.js TSL (Three.js Shading Language)
+with added adaptive supersampling
+
+Copyright (c) 2017 Eric Lengyel
+
+Slug is distributed under the MIT License.
+(See Appendix A for MIT License text)
+
+---
+
 Appendix A: MIT License text
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

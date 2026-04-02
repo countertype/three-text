@@ -1,335 +1,213 @@
-import type { VectorGeometryData } from '../LoopBlinnGeometry';
+// Raw WebGL2 Slug vector text renderer
+// Standalone, no dependency on Three.js
 
-interface ProgramWithMvp {
-  program: WebGLProgram;
-  mvp: WebGLUniformLocation;
-}
-
-interface ColorProgram extends ProgramWithMvp {
-  color: WebGLUniformLocation;
-}
-
-interface GeometryResources {
-  interiorVAO: WebGLVertexArrayObject;
-  interiorPositionBuffer: WebGLBuffer;
-  interiorIndexBuffer: WebGLBuffer;
-  interiorIndexCount: number;
-  curveVAO: WebGLVertexArrayObject;
-  curvePositionBuffer: WebGLBuffer;
-  curveVertexCount: number;
-  fillVAO: WebGLVertexArrayObject;
-  fillPositionBuffer: WebGLBuffer;
-  fillIndexBuffer: WebGLBuffer;
-  fillIndexCount: number;
-}
+import type { SlugGPUData } from '../slug/types';
+import { vertexShaderGLSL300, fragmentShaderGLSL300 } from '../slug/shaderStrings';
 
 export interface WebGLVectorRenderer {
-  setGeometry(data: VectorGeometryData): void;
+  setGeometry(data: SlugGPUData): void;
   render(mvp: Float32Array, color: Float32Array): void;
   dispose(): void;
 }
 
-function assertCreate<T>(value: T | null, label: string): T {
-  if (!value) {
-    throw new Error(`Failed to create ${label}`);
-  }
-  return value;
-}
-
-function compileShader(
-  gl: WebGL2RenderingContext,
-  type: GLenum,
-  source: string
-): WebGLShader {
-  const shader = assertCreate(gl.createShader(type), 'shader');
+function compileShader(gl: WebGL2RenderingContext, type: number, source: string): WebGLShader {
+  const shader = gl.createShader(type);
+  if (!shader) throw new Error('Failed to create shader');
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const info = gl.getShaderInfoLog(shader) || 'unknown shader compile error';
+    const info = gl.getShaderInfoLog(shader);
     gl.deleteShader(shader);
-    throw new Error(info);
+    throw new Error(`Shader compile failed: ${info}`);
   }
-
   return shader;
 }
 
-function linkProgram(
-  gl: WebGL2RenderingContext,
-  vertexSource: string,
-  fragmentSource: string
-): WebGLProgram {
-  const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
-  const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
-  const program = assertCreate(gl.createProgram(), 'program');
-
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
-  gl.linkProgram(program);
-
-  gl.deleteShader(vertexShader);
-  gl.deleteShader(fragmentShader);
-
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    const info = gl.getProgramInfoLog(program) || 'unknown program link error';
-    gl.deleteProgram(program);
-    throw new Error(info);
+function createProgram(gl: WebGL2RenderingContext, vsSrc: string, fsSrc: string): WebGLProgram {
+  const vs = compileShader(gl, gl.VERTEX_SHADER, vsSrc);
+  const fs = compileShader(gl, gl.FRAGMENT_SHADER, fsSrc);
+  const prog = gl.createProgram();
+  if (!prog) throw new Error('Failed to create program');
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    const info = gl.getProgramInfoLog(prog);
+    gl.deleteProgram(prog);
+    throw new Error(`Program link failed: ${info}`);
   }
-
-  return program;
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+  return prog;
 }
 
-function getUniform(
+function createRGBA32FTexture(
   gl: WebGL2RenderingContext,
-  program: WebGLProgram,
-  name: string
-): WebGLUniformLocation {
-  const location = gl.getUniformLocation(program, name);
-  if (!location) {
-    throw new Error(`Missing uniform "${name}"`);
-  }
-  return location;
+  data: Float32Array,
+  width: number,
+  height: number
+): WebGLTexture {
+  const tex = gl.createTexture();
+  if (!tex) throw new Error('Failed to create texture');
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, data);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return tex;
 }
 
-function createProgramWithMvp(
+function createRGBA32UITexture(
   gl: WebGL2RenderingContext,
-  vertexSource: string,
-  fragmentSource: string
-): ProgramWithMvp {
-  const program = linkProgram(gl, vertexSource, fragmentSource);
-  return {
-    program,
-    mvp: getUniform(gl, program, 'u_mvp')
+  data: Uint32Array,
+  width: number,
+  height: number
+): WebGLTexture {
+  const tex = gl.createTexture();
+  if (!tex) throw new Error('Failed to create texture');
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32UI, width, height, 0, gl.RGBA_INTEGER, gl.UNSIGNED_INT, data);
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return tex;
+}
+
+interface WebGL2Resources {
+  program: WebGLProgram;
+  vao: WebGLVertexArrayObject;
+  vbo: WebGLBuffer;
+  ibo: WebGLBuffer;
+  curveTexture: WebGLTexture;
+  bandTexture: WebGLTexture;
+  uniforms: {
+    slug_matrix: WebGLUniformLocation;
+    slug_viewport: WebGLUniformLocation;
+    curveTexture: WebGLUniformLocation;
+    bandTexture: WebGLUniformLocation;
   };
+  indexCount: number;
 }
 
-function createColorProgram(
-  gl: WebGL2RenderingContext,
-  vertexSource: string,
-  fragmentSource: string
-): ColorProgram {
-  const program = linkProgram(gl, vertexSource, fragmentSource);
-  return {
-    program,
-    mvp: getUniform(gl, program, 'u_mvp'),
-    color: getUniform(gl, program, 'u_color')
+function createResources(gl: WebGL2RenderingContext, gpuData: SlugGPUData, fragSrc: string): WebGL2Resources {
+  gl.getExtension('EXT_color_buffer_float');
+
+  const program = createProgram(gl, vertexShaderGLSL300, fragSrc);
+
+  const uniforms = {
+    slug_matrix: gl.getUniformLocation(program, 'slug_matrix')!,
+    slug_viewport: gl.getUniformLocation(program, 'slug_viewport')!,
+    curveTexture: gl.getUniformLocation(program, 'curveTexture')!,
+    bandTexture: gl.getUniformLocation(program, 'bandTexture')!,
   };
-}
 
-function createGeometryResources(
-  gl: WebGL2RenderingContext,
-  data: VectorGeometryData
-): GeometryResources {
-  const interiorVAO = assertCreate(gl.createVertexArray(), 'interior VAO');
-  const interiorPositionBuffer = assertCreate(
-    gl.createBuffer(),
-    'interior position buffer'
-  );
-  const interiorIndexBuffer = assertCreate(gl.createBuffer(), 'interior index buffer');
+  const vao = gl.createVertexArray();
+  if (!vao) throw new Error('Failed to create VAO');
+  gl.bindVertexArray(vao);
 
-  gl.bindVertexArray(interiorVAO);
-  gl.bindBuffer(gl.ARRAY_BUFFER, interiorPositionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, data.interiorPositions, gl.STATIC_DRAW);
+  const vbo = gl.createBuffer();
+  if (!vbo) throw new Error('Failed to create VBO');
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.bufferData(gl.ARRAY_BUFFER, gpuData.vertices, gl.STATIC_DRAW);
+
+  const stride = 20 * 4;
   gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, interiorIndexBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.interiorIndices, gl.STATIC_DRAW);
+  gl.vertexAttribPointer(0, 4, gl.FLOAT, false, stride, 0);
+  gl.enableVertexAttribArray(1);
+  gl.vertexAttribPointer(1, 4, gl.FLOAT, false, stride, 4 * 4);
+  gl.enableVertexAttribArray(2);
+  gl.vertexAttribPointer(2, 4, gl.FLOAT, false, stride, 8 * 4);
+  gl.enableVertexAttribArray(3);
+  gl.vertexAttribPointer(3, 4, gl.FLOAT, false, stride, 12 * 4);
+  gl.enableVertexAttribArray(4);
+  gl.vertexAttribPointer(4, 4, gl.FLOAT, false, stride, 16 * 4);
 
-  const curveVAO = assertCreate(gl.createVertexArray(), 'curve VAO');
-  const curvePositionBuffer = assertCreate(gl.createBuffer(), 'curve position buffer');
-
-  gl.bindVertexArray(curveVAO);
-  gl.bindBuffer(gl.ARRAY_BUFFER, curvePositionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, data.curvePositions, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-
-  const fillVAO = assertCreate(gl.createVertexArray(), 'fill VAO');
-  const fillPositionBuffer = assertCreate(gl.createBuffer(), 'fill position buffer');
-  const fillIndexBuffer = assertCreate(gl.createBuffer(), 'fill index buffer');
-
-  gl.bindVertexArray(fillVAO);
-  gl.bindBuffer(gl.ARRAY_BUFFER, fillPositionBuffer);
-  gl.bufferData(gl.ARRAY_BUFFER, data.fillPositions, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, fillIndexBuffer);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.fillIndices, gl.STATIC_DRAW);
+  const ibo = gl.createBuffer();
+  if (!ibo) throw new Error('Failed to create IBO');
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
+  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, gpuData.indices, gl.STATIC_DRAW);
 
   gl.bindVertexArray(null);
-  gl.bindBuffer(gl.ARRAY_BUFFER, null);
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null);
 
-  return {
-    interiorVAO,
-    interiorPositionBuffer,
-    interiorIndexBuffer,
-    interiorIndexCount: data.interiorIndices.length,
-    curveVAO,
-    curvePositionBuffer,
-    curveVertexCount: data.curvePositions.length / 3,
-    fillVAO,
-    fillPositionBuffer,
-    fillIndexBuffer,
-    fillIndexCount: data.fillIndices.length
-  };
+  const curveTexture = createRGBA32FTexture(
+    gl, gpuData.curveTexture.data, gpuData.curveTexture.width, gpuData.curveTexture.height
+  );
+  const bandTexture = createRGBA32UITexture(
+    gl, gpuData.bandTexture.data, gpuData.bandTexture.width, gpuData.bandTexture.height
+  );
+
+  return { program, vao, vbo, ibo, curveTexture, bandTexture, uniforms, indexCount: gpuData.indices.length };
 }
 
-function destroyGeometryResources(
+function draw(
   gl: WebGL2RenderingContext,
-  resources: GeometryResources
+  res: WebGL2Resources,
+  mvpMatrix: Float32Array,
+  viewportWidth: number,
+  viewportHeight: number
 ): void {
-  gl.deleteVertexArray(resources.interiorVAO);
-  gl.deleteBuffer(resources.interiorPositionBuffer);
-  gl.deleteBuffer(resources.interiorIndexBuffer);
-  gl.deleteVertexArray(resources.curveVAO);
-  gl.deleteBuffer(resources.curvePositionBuffer);
-  gl.deleteVertexArray(resources.fillVAO);
-  gl.deleteBuffer(resources.fillPositionBuffer);
-  gl.deleteBuffer(resources.fillIndexBuffer);
+  gl.useProgram(res.program);
+  gl.uniformMatrix4fv(res.uniforms.slug_matrix, false, mvpMatrix);
+  gl.uniform2f(res.uniforms.slug_viewport, viewportWidth, viewportHeight);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, res.curveTexture);
+  gl.uniform1i(res.uniforms.curveTexture, 0);
+
+  gl.activeTexture(gl.TEXTURE1);
+  gl.bindTexture(gl.TEXTURE_2D, res.bandTexture);
+  gl.uniform1i(res.uniforms.bandTexture, 1);
+
+  gl.bindVertexArray(res.vao);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.drawElements(gl.TRIANGLES, res.indexCount, gl.UNSIGNED_SHORT, 0);
+  gl.bindVertexArray(null);
+}
+
+export interface WebGLVectorRendererOptions {
+  // Enable rotated RGSS-4 adaptive supersampling (4 samples per pixel)
+  adaptiveSupersampling?: boolean;
 }
 
 export function createWebGLVectorRenderer(
-  gl: WebGL2RenderingContext
+  gl: WebGL2RenderingContext,
+  options?: WebGLVectorRendererOptions
 ): WebGLVectorRenderer {
-  const interiorVertexShader = `#version 300 es
-layout(location = 0) in vec3 a_position;
-uniform mat4 u_mvp;
-void main() {
-  gl_Position = u_mvp * vec4(a_position, 1.0);
-}`;
-
-  const interiorFragmentShader = `#version 300 es
-precision highp float;
-out vec4 outColor;
-void main() {
-  outColor = vec4(1.0);
-}`;
-
-  const curveVertexShader = `#version 300 es
-layout(location = 0) in vec3 a_position;
-uniform mat4 u_mvp;
-out vec2 v_uv;
-void main() {
-  int localVertex = gl_VertexID % 3;
-  float u = float(localVertex) * 0.5;
-  v_uv = vec2(u, floor(u));
-  gl_Position = u_mvp * vec4(a_position, 1.0);
-}`;
-
-  const curveFragmentShader = `#version 300 es
-precision highp float;
-in vec2 v_uv;
-out vec4 outColor;
-void main() {
-  vec2 px = dFdx(v_uv);
-  vec2 py = dFdy(v_uv);
-  float fx = 2.0 * v_uv.x * px.x - px.y;
-  float fy = 2.0 * v_uv.x * py.x - py.y;
-  float denom = sqrt(fx * fx + fy * fy);
-  if (denom < 1e-6) {
-    discard;
-  }
-  float sd = (v_uv.x * v_uv.x - v_uv.y) / denom;
-  float alpha = clamp(0.5 - sd, 0.0, 1.0);
-  if (alpha <= 0.0) {
-    discard;
-  }
-  outColor = vec4(1.0, 1.0, 1.0, alpha);
-}`;
-
-  const colorVertexShader = interiorVertexShader;
-  const colorFragmentShader = `#version 300 es
-precision highp float;
-uniform vec4 u_color;
-out vec4 outColor;
-void main() {
-  outColor = u_color;
-}`;
-
-  const interiorProgram = createProgramWithMvp(
-    gl,
-    interiorVertexShader,
-    interiorFragmentShader
-  );
-  const curveProgram = createProgramWithMvp(gl, curveVertexShader, curveFragmentShader);
-  const colorProgram = createColorProgram(gl, colorVertexShader, colorFragmentShader);
-
-  let geometryResources: GeometryResources | null = null;
+  let resources: WebGL2Resources | null = null;
+  const fragSrc = options?.adaptiveSupersampling
+    ? '#define SLUG_ADAPTIVE_SUPERSAMPLE\n' + fragmentShaderGLSL300
+    : fragmentShaderGLSL300;
 
   return {
-    setGeometry(data: VectorGeometryData): void {
-      if (geometryResources) {
-        destroyGeometryResources(gl, geometryResources);
-      }
-      geometryResources = createGeometryResources(gl, data);
+    setGeometry(data: SlugGPUData): void {
+      if (resources) this.dispose();
+      resources = createResources(gl, data, fragSrc);
     },
 
-    render(mvp: Float32Array, color: Float32Array): void {
-      if (!geometryResources) {
-        return;
-      }
-
-      gl.disable(gl.CULL_FACE);
-      gl.disable(gl.DEPTH_TEST);
-      gl.depthMask(false);
-
-      // No stencil clear needed - the fill pass resets stencil to 0
-      // via passOp ZERO wherever stencil was non-zero, and per-glyph
-      // fill quads cover all stencil writes from interior/curve passes
-      gl.enable(gl.STENCIL_TEST);
-      gl.stencilMask(0xff);
-      gl.stencilFunc(gl.ALWAYS, 0, 0xff);
-      // Nonzero winding: front faces increment, back faces decrement
-      gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
-      gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
-      gl.colorMask(false, false, false, false);
-
-      if (geometryResources.interiorIndexCount > 0) {
-        gl.useProgram(interiorProgram.program);
-        gl.uniformMatrix4fv(interiorProgram.mvp, false, mvp);
-        gl.bindVertexArray(geometryResources.interiorVAO);
-        gl.drawElements(
-          gl.TRIANGLES,
-          geometryResources.interiorIndexCount,
-          gl.UNSIGNED_INT,
-          0
-        );
-      }
-
-      if (geometryResources.curveVertexCount > 0) {
-        gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-        gl.useProgram(curveProgram.program);
-        gl.uniformMatrix4fv(curveProgram.mvp, false, mvp);
-        gl.bindVertexArray(geometryResources.curveVAO);
-        gl.drawArrays(gl.TRIANGLES, 0, geometryResources.curveVertexCount);
-        gl.disable(gl.SAMPLE_ALPHA_TO_COVERAGE);
-      }
-
-      gl.stencilFunc(gl.NOTEQUAL, 0, 0xff);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.ZERO);
-      gl.colorMask(true, true, true, true);
-
-      gl.useProgram(colorProgram.program);
-      gl.uniformMatrix4fv(colorProgram.mvp, false, mvp);
-      gl.uniform4fv(colorProgram.color, color);
-      gl.bindVertexArray(geometryResources.fillVAO);
-      gl.drawElements(gl.TRIANGLES, geometryResources.fillIndexCount, gl.UNSIGNED_INT, 0);
-
-      gl.bindVertexArray(null);
-      gl.useProgram(null);
-      gl.disable(gl.STENCIL_TEST);
-      gl.depthMask(true);
+    render(mvp: Float32Array, _color: Float32Array): void {
+      if (!resources) return;
+      draw(gl, resources, mvp, gl.drawingBufferWidth, gl.drawingBufferHeight);
     },
 
     dispose(): void {
-      if (geometryResources) {
-        destroyGeometryResources(gl, geometryResources);
-        geometryResources = null;
-      }
-      gl.deleteProgram(interiorProgram.program);
-      gl.deleteProgram(curveProgram.program);
-      gl.deleteProgram(colorProgram.program);
+      if (!resources) return;
+      const gl2 = gl;
+      gl2.deleteTexture(resources.curveTexture);
+      gl2.deleteTexture(resources.bandTexture);
+      gl2.deleteBuffer(resources.vbo);
+      gl2.deleteBuffer(resources.ibo);
+      gl2.deleteVertexArray(resources.vao);
+      gl2.deleteProgram(resources.program);
+      resources = null;
     }
   };
 }
+
+export type { SlugGPUData };

@@ -276,41 +276,6 @@ export interface VectorGlyphInfo extends GlyphGeometryInfo {
   segmentCount: number;
 }
 
-export interface PackedFloatTexture {
-  width: number;
-  height: number;
-  data: Float32Array;
-}
-
-export interface VectorTextGeometryInfo {
-  quadVertices: Float32Array;
-  quadIndices: Uint16Array;
-  instances: {
-    position: Float32Array;
-    bounds: Float32Array;
-    segmentRange: Uint32Array;
-    glyphDataIndex: Uint32Array;
-    glyphIndex: Uint32Array;
-    textIndex: Uint32Array;
-    lineIndex: Uint32Array;
-  };
-  segmentTexelsPerSegment: number;
-  segments: PackedFloatTexture;
-  segmentBounds?: PackedFloatTexture;
-  bandCount?: number;
-  bandRanges?: PackedFloatTexture;
-  bandIndices?: PackedFloatTexture;
-  xBandCount?: number;
-  xBandRanges?: PackedFloatTexture;
-  xBandIndices?: PackedFloatTexture;
-  tileCountX?: number;
-  tileCountY?: number;
-  tileRanges?: PackedFloatTexture;
-  tileIndices?: PackedFloatTexture;
-  glyphs: VectorGlyphInfo[];
-  planeBounds: BoundingBox;
-}
-
 export interface TextLayoutData {
   lines: LineInfo[];
   scaledLineHeight: number;
@@ -379,6 +344,8 @@ export interface TextOptions {
   geometryOptimization?: GeometryOptimizationOptions;
   layout?: LayoutOptions;
   color?: [number, number, number] | ColorOptions;
+  /** Enable rotated RGSS-4 adaptive supersampling (4 samples per pixel). Takes effect when the GLSL rendering path is active. */
+  adaptiveSupersampling?: boolean;
 }
 
 export interface HyphenationPatternsMap {
