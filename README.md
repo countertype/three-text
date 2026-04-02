@@ -435,20 +435,24 @@ Then navigate to `http://localhost:3000`
 
 ## Why three-text?
 
-three-text generates high-fidelity 3D mesh geometry from font files. Unlike texture-based approaches, it produces true geometry that can be lit, shaded, and manipulated like any 3D model
+three-text renders text from real font files (TTF, OTF, WOFF, WOFF2) with two pipelines:
+
+- **Mesh** — tessellated 3D geometry that can be extruded, lit, and shaded like any model
+- **Vector** — resolution-independent outlines rendered directly from curve data on the GPU, sharp at any zoom or angle
+
+Both share the same layout engine (HarfBuzz shaping, Knuth-Plass line breaking) and glyph cache, so a paragraph of 1000 words might only require 50 unique glyphs to be processed
 
 Existing solutions take different approaches:
 
-- **Three.js native TextGeometry** uses fonts converted by facetype.js to JSON format. It creates 3D text by extruding flat 2D character outlines. While this produces true 3D geometry with depth, there is no support for real fonts or OpenType features needed for many of the world's scripts
-- **three-bmfont-text** renders from pre-generated SDF atlas textures. Atlases are built offline at fixed sizes
-- **troika-three-text** generates SDF glyphs at runtime from font files via HarfBuzz. More flexible than bmfont, but still a 2D image-space technique with artifacts up close
+- **Three.js native TextGeometry** extrudes 2D outlines from facetype.js JSON. True 3D geometry with depth, but no support for real fonts or OpenType features needed for many of the world's scripts
+- **three-bmfont-text** renders from pre-generated SDF atlas textures built offline at fixed sizes
+- **troika-three-text** generates SDF glyphs at runtime via HarfBuzz. More flexible than bmfont, but still an image-space technique with artifacts up close
 
-three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches, and produces mesh data that can be used with any rendering system. The library caches glyph geometry, so a paragraph of 1000 words might only require 50 unique glyphs to be processed. This makes it well-suited to longer texts. three-text also provides control over typesetting and paragraph justification via TeX-based parameters
-
+three-text produces actual geometry from font files, sharper at close distances than bitmap approaches, with control over typesetting and paragraph justification via TeX-based parameters
 
 ### Why Loop-Blinn
 
-For text that needs to stay sharp in 3D at any zoom or angle without tessellation, the vector pipeline renders glyphs directly from their curve data using Loop-Blinn with Kokojima et al. stencil filling (see [Vector rendering](#vector-rendering)). Loop-Blinn's coverage is per-triangle, so it integrates with hardware MSAA directly. The alternative approach, [Slug](https://github.com/EricLengyel/Slug) (Eric Lengyel), evaluates all curves per fragment via ray casting and requires adaptive supersampling in the shader to achieve comparable antialiasing. In testing, Loop-Blinn was preferable
+The vector path uses Loop-Blinn curve rendering, where each quadratic Bezier segment becomes a triangle whose fragment shader evaluates the implicit equation `u² - v = 0` to resolve inside/outside analytically, while interior regions are filled separately. We also evaluated Eric Lengyel's [Slug](https://github.com/EricLengyel/Slug) algorithm, which renders glyphs by casting rays against banded curve data over a dilated bounding polygon, and tested several antialiasing configurations including adaptive supersampling and alpha-to-coverage. Loop-Blinn produced cleaner results under strong perspective and oblique viewing angles, so that is what we use
 
 ## Library structure
 
