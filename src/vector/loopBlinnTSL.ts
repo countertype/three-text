@@ -11,8 +11,8 @@ import { Fn, vec4, float, uv, dFdx, dFdy, sqrt, clamp, Discard } from 'three/tsl
 import type { VectorGeometryData } from './LoopBlinnGeometry';
 
 export interface VectorMeshes {
-  interiorMesh: THREE.Mesh;
-  curveMesh: THREE.Mesh;
+  interiorMesh: THREE.Object3D;
+  curveMesh: THREE.Object3D;
   fillMesh: THREE.Mesh;
   setOffset(x: number, y: number, z?: number): void;
   dispose(): void;
@@ -62,10 +62,15 @@ function setGlyphAttrsOnGeometry(
   geo.setAttribute('glyphBaselineY', new THREE.Float32BufferAttribute(attrs.glyphBaselineY, 1));
 }
 
-function applyStencilXOR(mat: THREE.Material): void {
+// Nonzero winding via two-sided stencil: front faces increment,
+// back faces decrement. Three.js materials only expose one set of
+// stencil ops (no front/back split), so we use two single-sided
+// meshes per pass. A Three.js PR to add stencilBack* properties
+// would let us collapse these back to one DoubleSide mesh each.
+function applyStencilNonzero(mat: THREE.Material, side: THREE.Side): void {
   mat.depthTest = false;
   mat.depthWrite = false;
-  mat.side = THREE.DoubleSide;
+  mat.side = side;
   (mat as any).stencilWrite = true;
   (mat as any).stencilFunc = THREE.AlwaysStencilFunc;
   (mat as any).stencilRef = 0;
@@ -73,12 +78,14 @@ function applyStencilXOR(mat: THREE.Material): void {
   (mat as any).stencilWriteMask = 0xFF;
   (mat as any).stencilFail = THREE.KeepStencilOp;
   (mat as any).stencilZFail = THREE.KeepStencilOp;
-  (mat as any).stencilZPass = THREE.InvertStencilOp;
+  (mat as any).stencilZPass = side === THREE.FrontSide
+    ? THREE.IncrementWrapStencilOp
+    : THREE.DecrementWrapStencilOp;
 }
 
-// Three meshes that must render in order (via renderOrder or sequential draws):
-//   1. interiorMesh - stencil XOR (fan triangulated interiors, no color output)
-//   2. curveMesh    - stencil XOR (Loop-Blinn curve eval, alpha-to-coverage)
+// Three meshes rendered in order (via renderOrder or sequential draws):
+//   1. interiorMesh - nonzero stencil winding (fan interiors, no color output)
+//   2. curveMesh    - nonzero stencil winding (Loop-Blinn curve eval, alpha-to-coverage)
 //   3. fillMesh     - color where stencil != 0, then zeros stencil
 export function createVectorMeshes(
   data: VectorGeometryData,
@@ -106,19 +113,26 @@ export function createVectorMeshes(
   fillGeo.setIndex(new THREE.BufferAttribute(data.fillIndices, 1));
   setGlyphAttrsOnGeometry(fillGeo, data.fillGlyphAttrs);
 
-  // 1) Interior stencil material - no color output
-  const stencilInteriorMat = new (THREE as any).MeshBasicNodeMaterial();
-  applyStencilXOR(stencilInteriorMat);
-  stencilInteriorMat.colorWrite = false;
+  function makeStencilPair(geo: THREE.BufferGeometry, extra?: (mat: any) => void) {
+    const frontMat = new (THREE as any).MeshBasicNodeMaterial();
+    applyStencilNonzero(frontMat, THREE.FrontSide);
+    frontMat.colorWrite = false;
+    const backMat = new (THREE as any).MeshBasicNodeMaterial();
+    applyStencilNonzero(backMat, THREE.BackSide);
+    backMat.colorWrite = false;
+    if (extra) { extra(frontMat); extra(backMat); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(geo, frontMat), new THREE.Mesh(geo, backMat));
+    return { group, materials: [frontMat, backMat] };
+  }
 
-  // 2) Curve stencil material - Loop-Blinn fragment evaluation
-  const stencilCurveMat = new (THREE as any).MeshBasicNodeMaterial();
-  applyStencilXOR(stencilCurveMat);
-  stencilCurveMat.colorWrite = false;
-  stencilCurveMat.alphaToCoverage = true;
-  stencilCurveMat.fragmentNode = loopBlinnFragment();
+  const interior = makeStencilPair(interiorGeo);
+  const curve = makeStencilPair(curveGeo, (mat) => {
+    mat.alphaToCoverage = true;
+    mat.fragmentNode = loopBlinnFragment();
+  });
 
-  // 3) Color fill material - renders where stencil != 0
+  // Color fill material - renders where stencil != 0
   const colorMat = new (THREE as any).MeshBasicNodeMaterial();
   colorMat.depthTest = false;
   colorMat.depthWrite = false;
@@ -135,8 +149,8 @@ export function createVectorMeshes(
     colorMat.color = new THREE.Color(color);
   }
 
-  const interiorMesh = new THREE.Mesh(interiorGeo, stencilInteriorMat);
-  const curveMesh = new THREE.Mesh(curveGeo, stencilCurveMat);
+  const interiorMesh = interior.group;
+  const curveMesh = curve.group;
   const fillMesh = new THREE.Mesh(fillGeo, colorMat);
 
   return {
@@ -152,8 +166,8 @@ export function createVectorMeshes(
       interiorGeo.dispose();
       curveGeo.dispose();
       fillGeo.dispose();
-      stencilInteriorMat.dispose();
-      stencilCurveMat.dispose();
+      interior.materials.forEach(m => m.dispose());
+      curve.materials.forEach(m => m.dispose());
       colorMat.dispose();
     }
   };

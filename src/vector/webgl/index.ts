@@ -280,7 +280,9 @@ void main() {
       gl.enable(gl.STENCIL_TEST);
       gl.stencilMask(0xff);
       gl.stencilFunc(gl.ALWAYS, 0, 0xff);
-      gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
+      // Nonzero winding: front faces increment, back faces decrement
+      gl.stencilOpSeparate(gl.FRONT, gl.KEEP, gl.KEEP, gl.INCR_WRAP);
+      gl.stencilOpSeparate(gl.BACK, gl.KEEP, gl.KEEP, gl.DECR_WRAP);
       gl.colorMask(false, false, false, false);
 
       if (geometryResources.interiorIndexCount > 0) {

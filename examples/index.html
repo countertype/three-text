@@ -215,6 +215,8 @@ let shaderFolders = {};
 let vectorInteriorMesh = null;
 let vectorCurveMesh = null;
 let vectorFillMesh = null;
+let vectorInteriorGeo = null;
+let vectorCurveGeo = null;
 let vectorScene = null;
 let vectorWireframeScene = null;
 let vectorWireInteriorMesh = null;
@@ -688,10 +690,10 @@ function createMeshMaterial(mode) {
   return material;
 }
 
-function applyStencilXOR(mat) {
+function applyStencilNonzero(mat, side) {
   mat.depthTest = false;
   mat.depthWrite = false;
-  mat.side = THREE.DoubleSide;
+  mat.side = side;
   mat.stencilWrite = true;
   mat.stencilFunc = THREE.AlwaysStencilFunc;
   mat.stencilRef = 0;
@@ -699,23 +701,37 @@ function applyStencilXOR(mat) {
   mat.stencilWriteMask = 0xff;
   mat.stencilFail = THREE.KeepStencilOp;
   mat.stencilZFail = THREE.KeepStencilOp;
-  mat.stencilZPass = THREE.InvertStencilOp;
+  mat.stencilZPass = side === THREE.FrontSide
+    ? THREE.IncrementWrapStencilOp
+    : THREE.DecrementWrapStencilOp;
+}
+
+function makeStencilPair(side, extra) {
+  const mat = new THREE.MeshBasicNodeMaterial();
+  applyStencilNonzero(mat, side);
+  mat.colorWrite = false;
+  if (extra) extra(mat);
+  return mat;
 }
 
 function createVectorMaterials(mode) {
   const displacementNode = createVectorPositionNode(mode);
 
-  const interiorMat = new THREE.MeshBasicNodeMaterial();
-  applyStencilXOR(interiorMat);
-  interiorMat.colorWrite = false;
-  if (displacementNode) interiorMat.positionNode = displacementNode;
+  const applyDisplacement = (mat) => {
+    if (displacementNode) mat.positionNode = displacementNode;
+  };
 
-  const curveMat = new THREE.MeshBasicNodeMaterial();
-  applyStencilXOR(curveMat);
-  curveMat.colorWrite = false;
-  curveMat.alphaToCoverage = true;
-  curveMat.fragmentNode = loopBlinnFragment();
-  if (displacementNode) curveMat.positionNode = displacementNode;
+  const interiorMats = [THREE.FrontSide, THREE.BackSide].map(side =>
+    makeStencilPair(side, applyDisplacement)
+  );
+
+  const curveMats = [THREE.FrontSide, THREE.BackSide].map(side =>
+    makeStencilPair(side, (mat) => {
+      mat.alphaToCoverage = true;
+      mat.fragmentNode = loopBlinnFragment();
+      applyDisplacement(mat);
+    })
+  );
 
   const colorMat = new THREE.MeshBasicNodeMaterial();
   colorMat.depthTest = false;
@@ -732,7 +748,7 @@ function createVectorMaterials(mode) {
   colorMat.colorNode = textColorU;
   if (displacementNode) colorMat.positionNode = displacementNode;
 
-  return { interiorMat, curveMat, colorMat };
+  return { interiorMats, curveMats, colorMat };
 }
 
 function setMeshControlsVisible(visible) {
@@ -753,16 +769,14 @@ function updateShaderFolderVisibility(mode) {
 function switchVectorShaderMode(mode) {
   if (!vectorInteriorMesh || !vectorCurveMesh || !vectorFillMesh) return;
 
-  const diagRange = computeDiagonalRange(vectorInteriorMesh.geometry.attributes.glyphCenter);
+  const diagRange = computeDiagonalRange(vectorInteriorGeo.attributes.glyphCenter);
   minDiagonalU.value = diagRange.min;
   maxDiagonalU.value = diagRange.max;
 
-  const { interiorMat, curveMat, colorMat } = createVectorMaterials(mode);
+  const { interiorMats, curveMats, colorMat } = createVectorMaterials(mode);
 
-  vectorInteriorMesh.material.dispose();
-  vectorInteriorMesh.material = interiorMat;
-  vectorCurveMesh.material.dispose();
-  vectorCurveMesh.material = curveMat;
+  vectorInteriorMesh.children.forEach((c, i) => { c.material.dispose(); c.material = interiorMats[i]; });
+  vectorCurveMesh.children.forEach((c, i) => { c.material.dispose(); c.material = curveMats[i]; });
   vectorFillMesh.material.dispose();
   vectorFillMesh.material = colorMat;
 }
@@ -987,12 +1001,12 @@ function clearVectorScenes() {
   if (vectorWireframeScene) vectorWireframeScene.clear();
 
   if (vectorInteriorMesh) {
-    vectorInteriorMesh.geometry.dispose();
-    vectorInteriorMesh.material.dispose();
+    vectorInteriorMesh.children.forEach(c => c.material.dispose());
+    if (vectorInteriorGeo) vectorInteriorGeo.dispose();
   }
   if (vectorCurveMesh) {
-    vectorCurveMesh.geometry.dispose();
-    vectorCurveMesh.material.dispose();
+    vectorCurveMesh.children.forEach(c => c.material.dispose());
+    if (vectorCurveGeo) vectorCurveGeo.dispose();
   }
   if (vectorFillMesh) {
     vectorFillMesh.geometry.dispose();
@@ -1008,6 +1022,8 @@ function clearVectorScenes() {
   vectorInteriorMesh = null;
   vectorCurveMesh = null;
   vectorFillMesh = null;
+  vectorInteriorGeo = null;
+  vectorCurveGeo = null;
   vectorScene = null;
   vectorWireframeScene = null;
   vectorWireInteriorMesh = null;
@@ -1141,12 +1157,19 @@ function renderLoopBlinnData(result) {
   maxDiagonalU.value = diagRange.max;
   paragraphCenterU.value.set(0, 0, 0);
 
-  const { interiorMat, curveMat, colorMat } = createVectorMaterials(params.shaderMode);
-  vectorInteriorMesh = new THREE.Mesh(interiorGeo, interiorMat);
-  vectorCurveMesh = new THREE.Mesh(curveGeo, curveMat);
+  vectorInteriorGeo = interiorGeo;
+  vectorCurveGeo = curveGeo;
+
+  const { interiorMats, curveMats, colorMat } = createVectorMaterials(params.shaderMode);
+
+  vectorInteriorMesh = new THREE.Group();
+  interiorMats.forEach(mat => vectorInteriorMesh.add(new THREE.Mesh(interiorGeo, mat)));
+  vectorCurveMesh = new THREE.Group();
+  curveMats.forEach(mat => vectorCurveMesh.add(new THREE.Mesh(curveGeo, mat)));
   vectorFillMesh = new THREE.Mesh(fillGeo, colorMat);
-  vectorInteriorMesh.renderOrder = 0;
-  vectorCurveMesh.renderOrder = 1;
+
+  vectorInteriorMesh.children.forEach(c => c.renderOrder = 0);
+  vectorCurveMesh.children.forEach(c => c.renderOrder = 1);
   vectorFillMesh.renderOrder = 2;
   vectorInteriorMesh.rotation.y = 0.5;
   vectorCurveMesh.rotation.y = 0.5;
@@ -1465,8 +1488,8 @@ function animate(timeMs) {
 
     const canOverlap = ["flip", "orbit", "explode", "twister"].includes(currentShaderMode);
     const ranges = currentVectorInstance?.geometryData?.glyphRanges;
-    const interiorGeo = vectorInteriorMesh.geometry;
-    const curveGeo = vectorCurveMesh.geometry;
+    const interiorGeo = vectorInteriorGeo;
+    const curveGeo = vectorCurveGeo;
     const fillGeo = vectorFillMesh.geometry;
 
     if (canOverlap && ranges && ranges.length > 0) {

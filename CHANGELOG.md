@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.5.0] - 2026-02-02
+## [0.5.1] - 2026-03-31
+
+### Fixed
+
+- Vector stencil fill now uses nonzero winding rule (`INCR_WRAP`/`DECR_WRAP`) instead of even-odd (`INVERT`), fixing holes in overlapping contours (e.g. variable fonts)
+- `three-text/vector` entry point no longer re-exports `loopBlinnTSL`, so `dist/vector/index.js` does not pull in `three` or `three/tsl`
+
+## [0.5.0] - 2026-04-01
 
 ### Changed
 

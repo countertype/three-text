@@ -41,6 +41,15 @@
   <div id="status" class="status-loading">Initializing WebGL vector renderer...</div>
   <canvas id="canvas"></canvas>
 
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "../node_modules/three/build/three.webgpu.js",
+        "three/tsl": "../node_modules/three/build/three.tsl.js"
+      }
+    }
+  </script>
+
   <script type="module">
     import { Text } from '../dist/vector/index.js';
     import { createWebGLVectorRenderer } from '../dist/vector/webgl/index.js';
