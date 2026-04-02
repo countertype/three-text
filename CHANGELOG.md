@@ -1,23 +1,37 @@
 # Changelog
 
-## [0.5.2] - 2026-04-02
+## [0.6.0] - 2026-04-02
 
-### Fixed
+### Breaking changes
 
-- Vector stencil fill now uses nonzero winding rule, fixing holes in overlapping contours (e.g. variable fonts)
-- Font cache no longer destroyed when one text instance unmounts while another is still using it
-- React adapters use incremental `update()` instead of full rebuilds on prop changes — layout tweaks like width are now as fast as the imperative API
+- Vector rendering switched from Loop-Blinn stencil fill to the Slug algorithm — `Text.create()` from `three-text/vector` now returns `result.group` (a `THREE.Group`) ready for `scene.add()`, no separate mesh creation needed
+- `three-text/vector/webgl` and `three-text/vector/webgpu` now use Slug (were Loop-Blinn stencil renderers)
+- Removed `vectorMode` option from `TextOptions`
+- Vector mode requires `WebGPURenderer` or a renderer supporting `MeshBasicNodeMaterial` (Three.js r170+)
 
 ### Added
 
-- `Text.create()` from `three-text/vector` returns `result.group` — a `THREE.Group` with stencil, render ordering, and centering handled internally. Accepts `color`, `positionNode`, `colorNode`, and `center` options
-- `result.updateMaterials()` — swap animation/color nodes without rebuilding geometry
-- Vector text works alongside standard Three.js materials without requiring a bundler alias for `three`
+- Slug per-fragment curve evaluation for vector text — handles variable font self-intersections correctly via winding number computation
+- `result.mesh` exposed on `VectorTextResult` for direct material access (e.g. setting `positionNode` for TSL animations)
+- `result.gpuData` exposed on `VectorTextResult` for raw WebGL/WebGPU renderer consumption
+- `glyphCenter` and `glyphIndex` vertex attributes on vector meshes for TSL animation compatibility
+- `positionNode` prop on `three-text/vector/react` component
+- Geometry auto-centered in `Text.create()` — no manual bounding box centering needed
 
 ### Changed
 
-- `three-text/vector` is now the main Three.js-aware entry point; Three.js-free core available at `three-text/vector/core`
-- `three-text/vector/react` simplified — uses `Text.create()` internally
+- `three-text/vector/react` simplified — uses `Text.create()` internally, no longer imports `createSlugTSLMesh`
+- `examples/index-webgl.html` is now mesh-only (vector mode was Loop-Blinn specific)
+
+### Removed
+- `loopBlinnTSL.ts`, `core.ts`, and associated rollup configs
+
+## [0.5.2] - 2026-04-01
+
+### Fixed
+
+- Font cache no longer destroyed when one text instance unmounts while another is still using it
+- React adapters use incremental `update()` instead of full rebuilds on prop changes — layout tweaks like width are now as fast as the imperative API
 
 ## [0.5.0] - 2026-04-01
 

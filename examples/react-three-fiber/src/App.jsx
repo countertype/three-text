@@ -253,6 +253,7 @@ function App() {
 
   const renderingControls = useControls("Rendering", {
     mode: { value: 'mesh', options: ['mesh', 'vector'] },
+    adaptiveSupersampling: { value: false, label: 'Adaptive supersampling', render: (get) => get('Rendering.mode') === 'vector' },
   });
 
   const animationControls = useControls("Animation", {
@@ -291,10 +292,6 @@ function App() {
   const [maxDiagonal, setMaxDiagonal] = useState(1);
 
   const meshPositionNode = useMemo(() => {
-    return createPositionNode(animationControls.shaderMode, tslUniformsRef.current);
-  }, [animationControls.shaderMode]);
-
-  const vectorPositionNode = useMemo(() => {
     return createPositionNode(animationControls.shaderMode, tslUniformsRef.current);
   }, [animationControls.shaderMode]);
 
@@ -549,19 +546,15 @@ function App() {
             size={textControls.fontSize}
             lineHeight={lineBreakingControls.lineHeight}
             letterSpacing={textControls.letterSpacing}
-            positionNode={vectorPositionNode}
-            perGlyphAttributes={true}
             layout={layout}
             fontVariations={fontVariations}
             fontFeatures={fontFeatures}
+            adaptiveSupersampling={renderingControls.adaptiveSupersampling}
+            positionNode={meshPositionNode}
             rotation={[0, 0.5, 0]}
             onLoad={(result) => {
-              const diagRange = computeDiagRange(result.interiorGeometry?.attributes?.glyphCenter);
-              tslUniformsRef.current.minDiagonal.value = diagRange.min;
-              tslUniformsRef.current.maxDiagonal.value = diagRange.max;
-
               syncFontMetadata(result.getLoadedFont());
-              if (!isMeshMode) updateStatus("Ready (vector)", "ready");
+              if (!isMeshMode) updateStatus(`Ready (vector, ${result.glyphs.length} glyphs)`, "ready");
             }}
             onError={handleError}
           >

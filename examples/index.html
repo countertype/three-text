@@ -157,7 +157,7 @@
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
       import { GUI } from "three/addons/libs/lil-gui.module.min.js";
       import { Text } from "three-text/three";
-      import { Text as VectorText, createVectorMeshes } from "three-text/vector";
+      import { Text as VectorText } from "three-text/vector";
 
       Text.setHarfBuzzPath("/examples/hb/hb.wasm");
 
@@ -207,11 +207,8 @@
           let meshSpecificFolders = [];
           let shaderFolders = {};
 
-          let currentVectorMeshes = null;
+          let currentVectorResult = null;
           let vectorScene = null;
-          let vectorWireframeScene = null;
-          let vectorWireInteriorMesh = null;
-          let vectorWireCurveMesh = null;
 
           const params = {
             renderMode: "mesh",
@@ -229,6 +226,7 @@
             optimizationEnabled: false,
             areaThreshold: 1.0,
             removeOverlaps: null,
+            adaptiveSupersampling: false,
 
             waveSpeed: 1.0,
             waveHeight: 10,
@@ -651,16 +649,11 @@ function updateShaderFolderVisibility(mode) {
 }
 
 function switchVectorShaderMode(mode) {
-  if (!currentVectorMeshes) return;
-
-  const diagRange = computeDiagonalRange(currentVectorMeshes.interiorGeometry.attributes.glyphCenter);
-  minDiagonalU.value = diagRange.min;
-  maxDiagonalU.value = diagRange.max;
-
-  currentVectorMeshes.updateMaterials({
-    positionNode: createVectorPositionNode(mode),
-    colorNode: textColorU,
-  });
+  if (!currentVectorResult?.mesh) return;
+  const mat = currentVectorResult.mesh.material;
+  const node = createVectorPositionNode(mode);
+  mat.positionNode = node ?? null;
+  mat.needsUpdate = true;
 }
 
 function switchShaderMode(mode) {
@@ -704,10 +697,22 @@ function onWindowResize() {
     .onChange((mode) => {
       const isMesh = mode === "mesh";
       setMeshControlsVisible(isMesh);
+      if (isMesh) ssControl.hide(); else ssControl.show();
       currentTextInstance = null;
       currentVectorInstance = null;
       renderText();
     });
+
+  const ssControl = gui
+    .add(params, "adaptiveSupersampling")
+    .name("Adaptive supersampling")
+    .onChange(() => {
+      if (params.renderMode === "vector") {
+        currentVectorInstance = null;
+        renderText();
+      }
+    });
+  ssControl.hide();
 
           addFontUploadGUI();
 
@@ -880,17 +885,11 @@ function getSharedTextOptions() {
 
 function clearVectorScenes() {
   if (vectorScene) vectorScene.clear();
-  if (vectorWireframeScene) vectorWireframeScene.clear();
 
-  if (currentVectorMeshes) currentVectorMeshes.dispose();
-  if (vectorWireInteriorMesh) vectorWireInteriorMesh.material.dispose();
-  if (vectorWireCurveMesh) vectorWireCurveMesh.material.dispose();
+  if (currentVectorResult) currentVectorResult.dispose();
 
-  currentVectorMeshes = null;
+  currentVectorResult = null;
   vectorScene = null;
-  vectorWireframeScene = null;
-  vectorWireInteriorMesh = null;
-  vectorWireCurveMesh = null;
 }
 
 function updateFontControls(loadedFont) {
@@ -984,46 +983,33 @@ async function renderTextMesh(opts) {
 async function renderTextVector(opts) {
   if (textMesh) textMesh.visible = false;
 
+  const color = new THREE.Color(params.textColor);
+  opts.color = [color.r, color.g, color.b];
+  opts.adaptiveSupersampling = params.adaptiveSupersampling;
+
   const result = currentVectorInstance ? await currentVectorInstance.update(opts) : await VectorText.create(opts);
   currentVectorInstance = result;
   updateFontControls(result.getLoadedFont());
   clearVectorScenes();
-  return renderLoopBlinnData(result);
-}
+  currentVectorResult = result;
 
-function renderLoopBlinnData(result) {
-  currentVectorMeshes = createVectorMeshes(result.geometryData, {
-    positionNode: createVectorPositionNode(params.shaderMode),
-    colorNode: textColorU,
-  });
+  const group = result.group;
+  group.rotation.y = 0.5;
 
-  const diagRange = computeDiagonalRange(currentVectorMeshes.interiorGeometry.attributes.glyphCenter);
-  minDiagonalU.value = diagRange.min;
-  maxDiagonalU.value = diagRange.max;
-  paragraphCenterU.value.set(0, 0, 0);
+  const gcAttr = result.mesh?.geometry?.attributes?.glyphCenter;
+  if (gcAttr) {
+    const diagRange = computeDiagonalRange(gcAttr);
+    minDiagonalU.value = diagRange.min;
+    maxDiagonalU.value = diagRange.max;
+  }
 
-  currentVectorMeshes.group.rotation.y = 0.5;
+  switchVectorShaderMode(params.shaderMode);
 
   vectorScene = new THREE.Scene();
-  vectorScene.add(currentVectorMeshes.group);
+  vectorScene.add(group);
 
-  const wireframeMat = new THREE.MeshBasicMaterial({
-    color: 0x00ff00,
-    wireframe: true,
-    transparent: true,
-    opacity: 0.4,
-    depthTest: false,
-  });
-  vectorWireInteriorMesh = new THREE.Mesh(currentVectorMeshes.interiorGeometry, wireframeMat);
-  vectorWireCurveMesh = new THREE.Mesh(currentVectorMeshes.curveGeometry, wireframeMat);
-  vectorWireInteriorMesh.rotation.y = 0.5;
-  vectorWireCurveMesh.rotation.y = 0.5;
-  vectorWireframeScene = new THREE.Scene();
-  vectorWireframeScene.add(vectorWireInteriorMesh, vectorWireCurveMesh);
-
-  const { interiorTriangleCount, curveTriangleCount } = result.geometryData.stats;
   return {
-    label: `Loop-Blinn TSL: ${interiorTriangleCount + curveTriangleCount} tris (${interiorTriangleCount} interior + ${curveTriangleCount} curve)`,
+    label: `Slug: ${result.glyphs.length} glyphs`,
   };
 }
 
@@ -1309,50 +1295,14 @@ function animate(timeMs) {
   controls.update();
 
   if (params.renderMode === "vector") {
-    if (!currentVectorMeshes || !vectorScene) {
+    if (!currentVectorResult || !vectorScene) {
       renderer.render(scene, camera);
       return;
     }
 
-    const canOverlap = ["flip", "orbit", "explode", "twister"].includes(currentShaderMode);
-    const ranges = currentVectorInstance?.geometryData?.glyphRanges;
-    const interiorGeo = currentVectorMeshes.interiorGeometry;
-    const curveGeo = currentVectorMeshes.curveGeometry;
-    const fillGeo = currentVectorMeshes.fillGeometry;
-
-    if (canOverlap && ranges && ranges.length > 0) {
-      // Per-glyph rendering: manual clear, no scene background so stencil persists
-      // between render calls. Each glyph's fill pass zeros its stencil area.
-      vectorScene.background = null;
-      renderer.autoClear = false;
-      renderer.setClearColor(scene.background || 0x111111, 1);
-      renderer.clear(true, true, true);
-
-      for (let g = 0; g < ranges.length; g++) {
-        const range = ranges[g];
-        interiorGeo.setDrawRange(range.interiorIndexStart, range.interiorIndexCount);
-        curveGeo.setDrawRange(range.curveVertexStart, range.curveVertexCount);
-        fillGeo.setDrawRange(g * 6, 6);
-        renderer.render(vectorScene, camera);
-      }
-
-      interiorGeo.setDrawRange(0, Infinity);
-      curveGeo.setDrawRange(0, Infinity);
-      fillGeo.setDrawRange(0, Infinity);
-    } else {
-      // Single-pass: scene background triggers clear, all 3 meshes rendered
-      // in one pass via renderOrder so stencil is shared within the pass.
-      vectorScene.background = scene.background;
-      renderer.autoClear = true;
-      renderer.render(vectorScene, camera);
-    }
-
-    if (params.wireframe && vectorWireframeScene) {
-      renderer.autoClear = false;
-      renderer.render(vectorWireframeScene, camera);
-    }
-
+    vectorScene.background = scene.background;
     renderer.autoClear = true;
+    renderer.render(vectorScene, camera);
   } else {
     renderer.autoClear = true;
     renderer.render(scene, camera);

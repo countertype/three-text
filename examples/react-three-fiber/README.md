@@ -37,17 +37,19 @@ node scripts/setup-harfbuzz.js
 
 ## Usage
 
-This example demonstrates how to use the `<ThreeText>` component with React Three Fiber. The example includes:
+This example demonstrates how to use the `<Text>` component with React Three Fiber in both mesh and vector modes. The example includes:
 
+- Toggle between mesh and vector rendering modes
+- TSL animations (wave, flip, explode, orbit, twister) for both modes
 - Real-time parameter adjustment with Leva controls
 - Text layout options (alignment, line breaking, hyphenation)
 - Geometry optimization settings (V-W simplification, overlap removal)
 - Loading custom fonts (WOFF2, WOFF, TTF, OTF) via drag-and-drop
+- Variable font axis sliders
 
-### Using the Text Component
+### Mesh mode
 
 ```jsx
-import { Canvas } from '@react-three/fiber';
 import { Text } from 'three-text/mesh/react';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
@@ -55,16 +57,32 @@ Text.setHarfBuzzPath('/hb/hb.wasm');
 function App() {
   return (
     <Canvas>
-      <Text
-        font="/fonts/Font.woff"
-        size={72}
-        layout={{ width: 800, align: 'justify' }}
-      >
-        Your text here
+      <Text font="/fonts/Font.woff" size={72} depth={10}>
+        Hello React
       </Text>
     </Canvas>
   );
 }
 ```
+
+### Vector mode
+
+```jsx
+import { Text } from 'three-text/vector/react';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+
+function App() {
+  return (
+    <Canvas gl={async (props) => new WebGPURenderer({ ...props, antialias: true })}>
+      <Text font="/fonts/Font.woff" size={72} fillColor="#ffffff">
+        Hello Vector
+      </Text>
+    </Canvas>
+  );
+}
+```
+
+Vector mode requires `WebGPURenderer` (Three.js r170+) for TSL node material support
 
 The component handles font loading, geometry creation, and cleanup automatically

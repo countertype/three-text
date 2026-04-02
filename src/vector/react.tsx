@@ -1,17 +1,18 @@
 /// <reference types="@react-three/fiber" />
 import { forwardRef, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Text as VectorText, type VectorResult, type VectorTextOptions } from './index';
+import { Text as VectorText, type VectorTextResult, type TextOptions } from './index';
 import { useDeepCompareMemo } from '../react/utils';
 
-export interface TextProps extends Omit<VectorTextOptions, 'text' | 'color'> {
+export interface TextProps extends Omit<TextOptions, 'text' | 'color'> {
   children: string;
   font: string | ArrayBuffer;
   fillColor?: THREE.ColorRepresentation;
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: [number, number, number];
-  onLoad?: (result: VectorResult) => void;
+  positionNode?: any;
+  onLoad?: (result: VectorTextResult) => void;
   onError?: (error: Error) => void;
 }
 
@@ -21,11 +22,10 @@ const TextInner = forwardRef<THREE.Group, TextProps>(
       children,
       font,
       fillColor = '#ffffff',
-      positionNode,
-      colorNode,
       position = [0, 0, 0],
       rotation = [0, 0, 0],
       scale = [1, 1, 1],
+      positionNode,
       onLoad,
       onError,
       ...restOptions
@@ -34,8 +34,8 @@ const TextInner = forwardRef<THREE.Group, TextProps>(
     const memoizedTextOptions = useDeepCompareMemo(restOptions);
     const [group, setGroup] = useState<THREE.Group | null>(null);
     const [error, setError] = useState<Error | null>(null);
-    const resultRef = useRef<VectorResult | null>(null);
-    const opRef = useRef<Promise<VectorResult | null>>(Promise.resolve(null));
+    const resultRef = useRef<VectorTextResult | null>(null);
+    const opRef = useRef<Promise<VectorTextResult | null>>(Promise.resolve(null));
     const onLoadRef = useRef(onLoad);
     const onErrorRef = useRef(onError);
     onLoadRef.current = onLoad;
@@ -48,24 +48,24 @@ const TextInner = forwardRef<THREE.Group, TextProps>(
         try {
           setError(null);
 
+          const color = new THREE.Color(fillColor);
+
           const resultPromise = opRef.current.catch(() => null).then(() => {
             if (cancelled) return null;
+
+            const colorArr: [number, number, number] = [color.r, color.g, color.b];
 
             return resultRef.current
               ? resultRef.current.update({
                   text: children,
                   font,
-                  color: fillColor,
-                  positionNode,
-                  colorNode,
+                  color: colorArr,
                   ...memoizedTextOptions
                 })
               : VectorText.create({
                   text: children,
                   font,
-                  color: fillColor,
-                  positionNode,
-                  colorNode,
+                  color: colorArr,
                   ...memoizedTextOptions
                 });
           });
@@ -81,10 +81,17 @@ const TextInner = forwardRef<THREE.Group, TextProps>(
             return;
           }
 
+          if (positionNode && result.mesh?.material) {
+            (result.mesh.material as any).positionNode = positionNode;
+            (result.mesh.material as any).needsUpdate = true;
+          }
+
           const prev = resultRef.current;
           resultRef.current = result;
           setGroup(result.group);
+
           if (onLoadRef.current) onLoadRef.current(result);
+
           requestAnimationFrame(() => prev?.dispose());
         } catch (err) {
           const e = err as Error;
@@ -101,7 +108,15 @@ const TextInner = forwardRef<THREE.Group, TextProps>(
       return () => {
         cancelled = true;
       };
-    }, [children, font, memoizedTextOptions, fillColor, positionNode, colorNode]);
+    }, [children, font, memoizedTextOptions, fillColor]);
+
+    useEffect(() => {
+      const result = resultRef.current;
+      if (result?.mesh?.material) {
+        (result.mesh.material as any).positionNode = positionNode ?? null;
+        (result.mesh.material as any).needsUpdate = true;
+      }
+    }, [positionNode]);
 
     useEffect(() => {
       return () => {

@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
@@ -57,6 +57,11 @@
       "types": "./dist/webgpu/index.d.ts",
       "import": "./dist/webgpu/index.js",
       "require": "./dist/webgpu/index.cjs"
+    },
+    "./vector/core": {
+      "types": "./dist/vector/core/index.d.ts",
+      "import": "./dist/vector/core/index.js",
+      "require": "./dist/vector/core/index.cjs"
     },
     "./vector/webgl": {
       "types": "./dist/vector/webgl/index.d.ts",
