@@ -2,7 +2,7 @@ import { describe, bench } from 'vitest';
 import {
   Polygonizer,
   DEFAULT_CURVE_FIDELITY
-} from '../src/core/geometry/Polygonizer';
+} from '../src/mesh/geometry/Polygonizer';
 import { Vec2 } from '../src/core/vectors';
 
 describe('Polygonizer performance', () => {

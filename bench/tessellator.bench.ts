@@ -1,5 +1,5 @@
 import { describe, bench } from 'vitest';
-import { Tessellator } from '../src/core/geometry/Tessellator';
+import { Tessellator } from '../src/mesh/geometry/Tessellator';
 import { Vec2 } from '../src/core/vectors';
 import type { Path } from '../src/core/types';
 

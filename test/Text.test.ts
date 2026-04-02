@@ -1,8 +1,62 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { Text } from '../src/core/Text';
-import { PathOptimizer } from '../src/core/geometry/PathOptimizer';
+import { MeshGeometryBuilder } from '../src/mesh/MeshGeometryBuilder';
+import { PathOptimizer } from '../src/mesh/geometry/PathOptimizer';
 import { Vec2, Vec3 } from '../src/utils/vectors';
 import enUs from '../src/hyphenation/en-us';
+
+const createLayoutHandle = Text.create.bind(Text);
+
+async function createLegacyTextHandle(options: any): Promise<any> {
+  let currentOptions = { ...options };
+  let layoutHandle = await createLayoutHandle(currentOptions);
+  let meshBuilder = new MeshGeometryBuilder(
+    layoutHandle.loadedFont,
+    layoutHandle.fontId
+  );
+
+  const buildResult = (): any => {
+    const meshResult = meshBuilder.build(layoutHandle, currentOptions);
+
+    const update = async (newOptions: any) => {
+      const mergedOptions = { ...currentOptions };
+      for (const key in newOptions) {
+        const value = newOptions[key];
+        if (value !== undefined) {
+          mergedOptions[key] = value;
+        }
+      }
+
+      const nextLayout = await layoutHandle.update(mergedOptions);
+      if (
+        newOptions.font !== undefined ||
+        newOptions.fontVariations !== undefined ||
+        newOptions.fontFeatures !== undefined
+      ) {
+        meshBuilder = new MeshGeometryBuilder(
+          nextLayout.loadedFont,
+          nextLayout.fontId
+        );
+      }
+
+      layoutHandle = nextLayout;
+      currentOptions = mergedOptions;
+      return buildResult();
+    };
+
+    return {
+      ...meshResult,
+      getLoadedFont: () => layoutHandle.getLoadedFont(),
+      getCacheSize: () => meshBuilder.getCacheSize(),
+      clearCache: () => meshBuilder.clearCache(),
+      measureTextWidth: (text: string, letterSpacing?: number) =>
+        layoutHandle.measureTextWidth(text, letterSpacing),
+      update
+    };
+  };
+
+  return buildResult();
+}
 
 // Minimal mocks for isolated testing
 vi.mock('tess2-ts', () => ({
@@ -15,7 +69,7 @@ vi.mock('tess2-ts', () => ({
   ELEMENT: { POLYGONS: 0, CONNECTED_POLYGONS: 1, BOUNDARY_CONTOURS: 2 }
 }));
 
-vi.mock('../src/core/cache/GlyphContourCollector', () => {
+vi.mock('../src/mesh/GlyphContourCollector', () => {
   // Create a simple square for each glyph
   const createMockContours = (glyphId: number) => ({
     glyphId,
@@ -162,7 +216,7 @@ vi.mock('../src/core/shaping/DrawCallbacks', () => ({
   }))
 }));
 
-vi.mock('../src/core/cache/GlyphGeometryBuilder', () => {
+vi.mock('../src/mesh/GlyphGeometryBuilder', () => {
   const mockVertices = new Float32Array(300).fill(0);
   const mockNormals = new Float32Array(300).fill(0);
   const mockIndices = new Uint32Array(300).fill(0);
@@ -278,6 +332,7 @@ describe('Text Library', () => {
   const testFontPath = './examples/fonts/NimbusSanL-Reg.woff';
 
   beforeAll(() => {
+    (Text as any).create = createLegacyTextHandle;
     Text.setHarfBuzzPath('dummy.wasm');
     Text.registerPattern('en-us', enUs);
   });

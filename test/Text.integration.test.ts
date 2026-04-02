@@ -2,6 +2,8 @@ import { describe, it, beforeAll, expect } from 'vitest';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { Text } from '../src/core/Text';
+import { MeshGeometryBuilder } from '../src/mesh/MeshGeometryBuilder';
+import type { TextOptions } from '../src/core/types';
 import enUs from '../src/hyphenation/en-us';
 
 const require = createRequire(import.meta.url);
@@ -30,7 +32,7 @@ beforeAll(async () => {
 
 describe('Text integration with real HarfBuzz and font', () => {
   it('creates geometry and glyph metadata end-to-end', async () => {
-    const result = await Text.create({
+    const options: TextOptions = {
       text: 'Integration test for three-text with hyphenation.',
       font: fontBuffer,
       size: 48,
@@ -43,7 +45,13 @@ describe('Text integration with real HarfBuzz and font', () => {
         hyphenate: true,
         language: 'en-us'
       }
-    });
+    };
+    const layoutResult = await Text.create(options);
+    const meshBuilder = new MeshGeometryBuilder(
+      layoutResult.loadedFont,
+      layoutResult.fontId
+    );
+    const result = meshBuilder.build(layoutResult, options);
 
     expect(result).toBeDefined();
     expect(result.vertices.length).toBeGreaterThan(0);
@@ -53,7 +61,7 @@ describe('Text integration with real HarfBuzz and font', () => {
     expect(result.planeBounds.max.x).toBeGreaterThan(result.planeBounds.min.x);
     expect(result.planeBounds.max.y).toBeGreaterThan(result.planeBounds.min.y);
 
-    const loadedFont = result.getLoadedFont();
+    const loadedFont = layoutResult.getLoadedFont();
     expect(loadedFont).toBeDefined();
     expect(loadedFont?.upem).toBeGreaterThan(0);
   });

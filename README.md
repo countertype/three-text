@@ -4,7 +4,7 @@
 [![TypeScript](https://img.shields.io/badge/built%20with-TypeScript-007acc.svg)](https://www.typescriptlang.org/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3_or_later-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-High fidelity 3D mesh font geometry and text layout engine for the web
+High fidelity 3D text rendering and layout for the web
 
 ![Screenshot of three-text example file](https://countertype.com/assets/three-text/3D.png)
 
@@ -13,22 +13,21 @@ High fidelity 3D mesh font geometry and text layout engine for the web
 ## Overview
 
 > [!CAUTION]
-> three-text is an alpha release and the API may break rapidly. This warning will likely last until the end of March 2026. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
+> three-text is in alpha release and the API may break rapidly. This warning will likely last until summer of 2026. If API stability is important to you, consider pinning your version. Community feedback is encouraged; please open an issue if you have any suggestions or feedback, thank you
 
-**three-text** is a 3D mesh font geometry and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files. For layout, it uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for breaking text into paragraphs across multiple lines and supports CJK and RTL scripts. three-text caches the geometries it generates for low CPU overhead in languages with lots of repeating glyphs. Variable fonts are supported as static instances at a given axis coordinate, and can be animated by re-drawing each frame with new coordinates
+**three-text** is a 3D font rendering and text layout library for the web. It supports TTF, OTF, WOFF, and WOFF2 font files and uses [TeX](https://en.wikipedia.org/wiki/TeX)-based parameters for layout, with support for CJK and RTL scripts. Two rendering pipelines share the same core: **mesh** (extruded, lit, deformable geometry) and **vector** (resolution-independent Loop-Blinn outlines). Contours and geometries are cached per glyph for low CPU overhead in text-heavy scenes. Variable fonts are supported
 
-The library has a framework-agnostic core that returns raw vertex data, with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
+The library has a framework-agnostic core with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
-Under the hood, three-text relies on [harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs) (based on [HarfBuzz](https://github.com/harfbuzz/harfbuzz) by Behdad Esfahbod et al) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking (with [SILE](https://github.com/sile-typesetter/sile/blob/master/core/break.lua) being the cleanest modern reference), [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation and the [TeX hyphenation patterns](https://github.com/hyphenation/tex-hyphen), [libtess-ts](https://github.com/countertype/libtess-ts) (a port of the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, adaptive curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/), as well as [woff-lib](https://github.com/countertype/woff-lib) for optional WOFF2 support
+Under the hood, three-text relies on a core of [harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs) (based on [HarfBuzz](https://github.com/harfbuzz/harfbuzz) by Behdad Esfahbod et al) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking (with [SILE](https://github.com/sile-typesetter/sile/blob/master/core/break.lua) and LuaTex being the closest modern references), [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation and the [TeX hyphenation patterns](https://github.com/hyphenation/tex-hyphen), and [woff-lib](https://github.com/countertype/woff-lib) for optional WOFF2 support. The mesh text pipeline uses [libtess-ts](https://github.com/countertype/libtess-ts) (a port of the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, adaptive curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), and [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/). The vector pipeline uses [Loop-Blinn](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf) resolution-independent curve rendering with [Kokojima et al.](https://dl.acm.org/doi/10.1145/1179849.1179997) stencil filling
 
 ## Table of contents
 
 - [Overview](#overview)
 - [Getting started](#getting-started)
 - [Architecture](#architecture)
-  - [Three.js](#threejs)
-  - [React Three Fiber](#react-three-fiber)
-  - [p5.js](#p5js)
+  - [Mesh vs vector](#mesh-vs-vector)
+  - [Basic Usage](#basic-usage)
   - [Coordinate systems](#coordinate-systems)
 - [Development and examples](#development-and-examples)
 - [Why three-text?](#why-three-text)
@@ -63,22 +62,44 @@ npm install three
 
 three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats:
 
-- **`three-text`** - Three.js adapter (default export, returns BufferGeometry)
-- **`three-text/three`** - Same as above (explicit alias)
-- **`three-text/three/react`** - React Three Fiber component
+- **`three-text`** - Three.js adapter (default export, returns `BufferGeometry`)
+- **`three-text/mesh`** - Same as above (explicit alias)
+- **`three-text/mesh/react`** - React Three Fiber component for extruded mesh text
+- **`three-text/three`** - Deprecated, use `three-text/mesh`
+- **`three-text/three/react`** - Deprecated, use `three-text/mesh/react`
+- **`three-text/mesh/webgl`** - WebGL mesh buffer utility
+- **`three-text/mesh/webgpu`** - WebGPU mesh buffer utility
+- **`three-text/mesh/p5`** - p5.js adapter
 - **`three-text/core`** - Framework-agnostic core (returns raw arrays)
-- **`three-text/webgl`** - WebGL buffer utility
-- **`three-text/webgpu`** - WebGPU buffer utility
-- **`three-text/p5`** - p5.js adapter
+- **`three-text/vector`** - Vector rendering (Loop-Blinn and Kokojima stencil fill, resolution-independent)
+- **`three-text/vector/react`** - React Three Fiber component for vector text
+- **`three-text/vector/webgl`** - WebGL vector renderer
+- **`three-text/vector/webgpu`** - WebGPU vector renderer
+- **`three-text/webgl`** - Deprecated, use `three-text/mesh/webgl`
+- **`three-text/webgpu`** - Deprecated, use `three-text/mesh/webgpu`
+- **`three-text/p5`** - Deprecated, use `three-text/mesh/p5`
 
-Most users will just `import { Text } from 'three-text'` for Three.js projects
+Most users will just `import { Text } from 'three-text'` for Three.js projects with mesh, or `import { Text } from 'three-text/vector'` for vector text
+
+### Mesh vs vector
+
+The library offers two rendering modes that share the same core (HarfBuzz shaping, Knuth-Plass justification, glyph caching):
+
+- **Mesh** (`three-text` (default) / `three-text/mesh`): triangulated geometry you can extrude, light, and shade. Use for 3D text, text in a scene graph, or anywhere you need depth
+- **Vector** (`three-text/vector`): resolution-independent rendering on the GPU without tessellation. Use for text that needs to stay sharp at arbitrary zoom
+
+Both can be used in the same project from separate entry points
+
+**React Three Fiber:** both `three-text/mesh/react` and `three-text/vector/react` export `Text`
 
 ### Basic Usage
 
-#### Three.js
+#### Mesh (Three.js)
+
+Extruded `BufferGeometry` — light, shade, and deform as a normal mesh:
 
 ```javascript
-import { Text } from 'three-text/three';
+import { Text } from 'three-text';
 import { woff2Decode } from 'woff-lib/woff2/decode';
 import * as THREE from 'three';
 
@@ -94,11 +115,58 @@ const mesh = new THREE.Mesh(result.geometry, material);
 scene.add(mesh);
 ```
 
-#### React Three Fiber
+#### Vector (Three.js)
+
+Resolution-independent outlines via Loop-Blinn stencil passes (see [Vector rendering](#vector-rendering)):
+
+```javascript
+import { Text } from 'three-text/vector';
+import { woff2Decode } from 'woff-lib/woff2/decode';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+Text.enableWoff2(woff2Decode);
+const result = await Text.create({
+  text: 'Hello Vector',
+  font: '/fonts/Font.woff2',
+  size: 72
+});
+
+const vectorData = result.geometryData;
+```
+
+Use `createVectorMeshes(vectorData)` from `three-text/vector` for TSL / `WebGPURenderer`, or build your own stencil materials (see [Vector rendering](#vector-rendering))
+
+#### Mesh + vector in one scene
+
+Alias one import to avoid the name collision between `Text` components. The entry points share a core (shaping, layout, font cache) so you can mix them freely — fonts load once regardless of which entry point requests them:
+
+```javascript
+import { Text as MeshText } from 'three-text';
+import { Text as VectorText, createVectorMeshes } from 'three-text/vector';
+
+MeshText.setHarfBuzzPath('/hb/hb.wasm');
+
+const heading = await MeshText.create({
+  text: 'Heading',
+  font: '/fonts/Font.woff2',
+  size: 72, depth: 10
+});
+scene.add(new THREE.Mesh(heading.geometry, material));
+
+const caption = await VectorText.create({
+  text: 'Caption text',
+  font: '/fonts/Font.woff2',
+  size: 24
+});
+const { interiorMesh, curveMesh, fillMesh } = createVectorMeshes(caption.geometryData);
+scene.add(interiorMesh, curveMesh, fillMesh);
+```
+
+#### React Three Fiber — mesh
 
 ```jsx
 import { Canvas } from '@react-three/fiber';
-import { Text } from 'three-text/three/react';
+import { Text } from 'three-text/mesh/react';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
 
@@ -109,6 +177,72 @@ function App() {
       <Text font="/fonts/Font.woff" size={72} depth={10}>
         Hello React
       </Text>
+    </Canvas>
+  );
+}
+```
+
+#### React Three Fiber — vector
+
+The vector `Text` builds three internal meshes (interior / curve / fill) with TSL stencil materials. Requires a renderer that supports `MeshBasicNodeMaterial` (Three.js r170+). With WebGPU, pass a `WebGPURenderer` with `stencil: true` and await `init()` (see the [three.js WebGPU examples](https://threejs.org/examples/?q=webgpu)):
+
+```jsx
+import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three/webgpu';
+import { Text } from 'three-text/vector/react';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+
+function App() {
+  return (
+    <Canvas
+      gl={async (props) => {
+        const renderer = new THREE.WebGPURenderer({
+          canvas: props.canvas,
+          stencil: true
+        });
+        await renderer.init();
+        return renderer;
+      }}
+    >
+      <Text font="/fonts/Font.woff" size={72} fillColor="#ffffff">
+        Sharp vector text
+      </Text>
+    </Canvas>
+  );
+}
+```
+
+#### React Three Fiber — both in one app
+
+Since both adapters export `Text`, alias one at the import site:
+
+```jsx
+import { Canvas } from '@react-three/fiber';
+import * as THREE from 'three/webgpu';
+import { Text as MeshText } from 'three-text/mesh/react';
+import { Text as VectorText } from 'three-text/vector/react';
+
+MeshText.setHarfBuzzPath('/hb/hb.wasm');
+
+function App() {
+  return (
+    <Canvas
+      gl={async (props) => {
+        const renderer = new THREE.WebGPURenderer({
+          canvas: props.canvas,
+          stencil: true
+        });
+        await renderer.init();
+        return renderer;
+      }}
+    >
+      <MeshText font="/fonts/Font.woff" size={72} depth={10}>
+        Extruded heading
+      </MeshText>
+      <VectorText font="/fonts/Font.woff" size={24} fillColor="#cccccc">
+        Sharp caption
+      </VectorText>
     </Canvas>
   );
 }
@@ -146,6 +280,54 @@ function draw() {
 ```
 
 `createThreeTextGeometry()` accepts all the same options as Three.js (`layout`, `fontVariations`, `depth`, etc.) and returns `{ geometry, planeBounds, glyphs }`. Use `planeBounds` to center the text
+
+#### Vector rendering
+
+**Raw WebGL2 (via `three-text/vector/webgl`):**
+
+```javascript
+import { Text } from 'three-text/vector';
+import { createWebGLVectorRenderer } from 'three-text/vector/webgl';
+import { woff2Decode } from 'woff-lib/woff2/decode';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+Text.enableWoff2(woff2Decode);
+
+const gl = canvas.getContext('webgl2', { antialias: true, stencil: true });
+const renderer = createWebGLVectorRenderer(gl);
+
+const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
+const vectorData = result.geometryData;
+renderer.setGeometry(vectorData);
+
+// In render loop:
+renderer.render(mvpMatrix, new Float32Array([1, 1, 1, 1]));
+```
+
+**Raw WebGPU (via `three-text/vector/webgpu`):**
+
+```javascript
+import { Text } from 'three-text/vector';
+import { createWebGPUVectorRenderer } from 'three-text/vector/webgpu';
+import { woff2Decode } from 'woff-lib/woff2/decode';
+
+Text.setHarfBuzzPath('/hb/hb.wasm');
+Text.enableWoff2(woff2Decode);
+
+const renderer = createWebGPUVectorRenderer(device, format, {
+  depthStencilFormat: 'depth24plus-stencil8',
+  sampleCount: 4
+});
+
+const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
+const vectorData = result.geometryData;
+renderer.setGeometry(vectorData);
+
+// In render pass:
+renderer.render(passEncoder, mvpMatrix, new Float32Array([1, 1, 1, 1]));
+```
+
+See `examples/webgl-vector.html` and `examples/webgpu-vector.html` for raw WebGL/WebGPU demos. The main interactive demo (`examples/index.html`) uses `WebGPURenderer` with TSL node materials for both mesh and Loop-Blinn vector paths. A `WebGLRenderer` variant is available at `examples/index-webgl.html`
 
 ### Coordinate systems
 
@@ -253,15 +435,24 @@ Then navigate to `http://localhost:3000`
 
 ## Why three-text?
 
-three-text generates high-fidelity 3D mesh geometry from font files. Unlike texture-based approaches, it produces true geometry that can be lit, shaded, and manipulated like any 3D model
+three-text renders text from real font files (TTF, OTF, WOFF, WOFF2) with two pipelines:
+
+- **Mesh** — tessellated 3D geometry that can be extruded, lit, and shaded like any model
+- **Vector** — resolution-independent outlines rendered directly from curve data on the GPU, sharp at any zoom or angle
+
+Both share the same layout engine (HarfBuzz shaping, Knuth-Plass line breaking) and glyph cache, so a paragraph of 1000 words might only require 50 unique glyphs to be processed
 
 Existing solutions take different approaches:
 
-- **Three.js native TextGeometry** uses fonts converted by facetype.js to JSON format. It creates 3D text by extruding flat 2D character outlines. While this produces true 3D geometry with depth, there is no support for real fonts or OpenType features needed for many of the world's scripts
-- **three-bmfont-text** renders from pre-generated SDF atlas textures. Atlases are built offline at fixed sizes
-- **troika-three-text** generates SDF glyphs at runtime from font files via HarfBuzz. More flexible than bmfont, but still a 2D image-space technique with artifacts up close
+- **Three.js native TextGeometry** extrudes 2D outlines from facetype.js JSON. True 3D geometry with depth, but no support for real fonts or OpenType features needed for many of the world's scripts
+- **three-bmfont-text** renders from pre-generated SDF atlas textures built offline at fixed sizes
+- **troika-three-text** generates SDF glyphs at runtime via HarfBuzz. More flexible than bmfont, but still an image-space technique with artifacts up close
 
-three-text generates true 3D geometry from font files via HarfBuzz. It is sharper at close distances than bitmap approaches, and produces mesh data that can be used with any rendering system. The library caches glyph geometry, so a paragraph of 1000 words might only require 50 unique glyphs to be processed. This makes it well-suited to longer texts. three-text also provides control over typesetting and paragraph justification via TeX-based parameters
+three-text produces actual geometry from font files, sharper at close distances than bitmap approaches, with control over typesetting and paragraph justification via TeX-based parameters
+
+### Why Loop-Blinn
+
+The vector path uses Loop-Blinn curve rendering, where each quadratic Bezier segment becomes a triangle whose fragment shader evaluates the implicit equation `u² - v = 0` to resolve inside/outside analytically, while interior regions are filled separately. We also evaluated Eric Lengyel's [Slug](https://github.com/EricLengyel/Slug) algorithm, which renders glyphs by casting rays against banded curve data over a dilated bounding polygon, and tested several antialiasing configurations including adaptive supersampling and alpha-to-coverage. Loop-Blinn produced cleaner results under strong perspective and oblique viewing angles, so that is what we use
 
 ## Library structure
 
@@ -269,20 +460,32 @@ three-text generates true 3D geometry from font files via HarfBuzz. It is sharpe
 three-text/
 ├── src/
 │   ├── core/                   # Framework-agnostic text engine
-│   │   ├── Text.ts             # Core API (returns raw arrays)
+│   │   ├── Text.ts             # Core API, font loading, shaping, layout
 │   │   ├── vectors.ts          # Vec2, Vec3, Box3Core
 │   │   ├── types.ts            # TypeScript interfaces
 │   │   ├── cache/              # Glyph caching system
 │   │   ├── font/               # Font loading and metrics
 │   │   ├── shaping/            # HarfBuzz text shaping
-│   │   ├── layout/             # Line breaking and text layout
-│   │   └── geometry/           # Tessellation and geometry processing
+│   │   └── layout/             # Line breaking and text layout
+│   ├── mesh/                   # Mesh geometry pipeline
+│   │   ├── MeshGeometryBuilder.ts      # Orchestrates mesh output from layout
+│   │   ├── GlyphGeometryBuilder.ts     # Instanced geometry from glyph contours
+│   │   ├── GlyphContourCollector.ts    # Collects draw callbacks for mesh path
+│   │   └── geometry/                   # Tessellation, extrusion, optimization
 │   ├── three/                  # Three.js adapter
 │   │   ├── index.ts            # BufferGeometry wrapper
 │   │   ├── react.tsx           # React component export
 │   │   └── ThreeText.tsx       # React Three Fiber component
-│   ├── webgl/                  # WebGL buffer utility
-│   ├── webgpu/                 # WebGPU buffer utility
+│   ├── vector/                 # Vector rendering (Loop-Blinn)
+│   │   ├── index.ts            # Vector entry point and TSL re-exports
+│   │   ├── loopBlinnTSL.ts                # TSL adapter for Three.js WebGPURenderer
+│   │   ├── LoopBlinnGeometry.ts           # Fan triangulation + curve extraction
+│   │   ├── GlyphVectorGeometryBuilder.ts  # Outline collection and geometry packing
+│   │   ├── GlyphOutlineCollector.ts       # Collects draw callbacks for vector path
+│   │   ├── webgl/              # WebGL2 stencil-based renderer
+│   │   └── webgpu/             # WebGPU stencil-based renderer
+│   ├── webgl/                  # WebGL mesh buffer utility
+│   ├── webgpu/                 # WebGPU mesh buffer utility
 │   ├── p5/                     # p5.js adapter
 │   ├── hyphenation/            # Language-specific hyphenation patterns
 │   └── utils/                  # Performance logging, data structures
@@ -316,7 +519,7 @@ Hyphenation uses patterns derived from the Tex hyphenation project, converted in
 
 ### Geometry generation and optimization
 
-The geometry pipeline runs once per unique glyph (or glyph cluster), with intermediate results cached to avoid redundant work:
+By default, three-text runs in mesh mode, generating triangulated geometry from glyph outlines that you can extrude, light, or deform. The mesh pipeline runs once per unique glyph (or glyph cluster), with intermediate results cached to avoid redundant work:
 
 1. **Path collection**: HarfBuzz callbacks provide low level drawing operations
 2. **Curve polygonization**: Flattens bezier curves into line segments, placing more points where curves are tight
@@ -327,6 +530,14 @@ The geometry pipeline runs once per unique glyph (or glyph cluster), with interm
 6. **Mesh construction**: generates 2D or 3D geometry with front faces and optional depth/extrusion (back faces and side walls)
 
 The multi-stage geometry approach (curve polygonization followed by cleanup, then triangulation) reduces triangle counts and removes overlaps in variable fonts
+
+### Vector rendering
+
+The vector pipeline (`three-text/vector`) renders glyphs directly from their mathematical outlines without tessellation or curve flattening. Text stays sharp at any zoom level and the geometry footprint is small -- just the control points of each curve
+
+Curves use the [Loop-Blinn](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf) technique: each quadratic curve is rendered as a triangle whose fragment shader evaluates `u² - v` to resolve inside/outside, with screen-space derivatives producing a signed distance that feeds alpha-to-coverage for smooth MSAA edges. Glyph interiors use [Kokojima et al.](https://dl.acm.org/doi/10.1145/1179849.1179997) stencil filling: fan-triangulate, stencil XOR, fill where nonzero
+
+An alternative for this sort of resolution-independent rendering is [Slug](https://github.com/EricLengyel/Slug) by Eric Lengyel, which casts rays against all curves per fragment to compute winding numbers. Loop-Blinn was chosen here because it integrates with hardware MSAA and alpha-to-coverage directly, without the overhead of adaptive supersampling that Slug requires for comparable antialiasing
 
 #### Glyph caching
 
@@ -339,7 +550,7 @@ For text with tight tracking, connected scripts, or complex kerning pairs, indiv
 
 #### Flat geometry mode
 
-When `depth` is 0, the library generates single-sided geometry, reducing triangles by approximately 50%
+When `depth` is 0 in mesh mode, the library generates single-sided geometry, reducing triangles by approximately 50%
 
 - Use `THREE.DoubleSide` for flat text so it remains visible from both sides
 - For extruded text, `THREE.FrontSide` is typical since front and back faces are separate geometry
@@ -369,11 +580,11 @@ const text = await Text.create({
   },
 });
 
-// Fixed-step: 8 segments per curve
+// Fixed-step: 32 segments per curve
 const text = await Text.create({
   text: 'Sample',
   font: '/fonts/Font.ttf',
-  curveSteps: 8,
+  curveSteps: 32,
 });
 ```
 
@@ -385,6 +596,8 @@ After curve polygonization, the library applies Visvalingam-Whyatt simplificatio
 const text = await Text.create({
   text: 'Sample text',
   font: '/fonts/Font.ttf',
+  // Fixed-step: 32 segments per curve
+  curveSteps: 32,
   geometryOptimization: {
     areaThreshold: 1.0,  // remove triangles < 1 font unit²
   },
@@ -533,7 +746,7 @@ Common tags include [`liga`](https://learn.microsoft.com/en-us/typography/openty
 
 ### Per-glyph attributes
 
-For shader-based animations and interactive effects, the library can generate per-vertex attributes that identify which glyph each vertex belongs to:
+For shader-based animations and interactive effects, the library can generate per-vertex attributes that identify which glyph each vertex belongs to. Both mesh and vector entry points support this: pass `perGlyphAttributes: true` to `Text.create()`
 
 ```javascript
 const text = await Text.create({
@@ -550,7 +763,9 @@ const text = await Text.create({
 // - glyphBaselineY (float): Y coordinate of glyph baseline
 ```
 
-This option bypasses overlap-based clustering and adds vertex attributes suitable for per-character manipulation in vertex shaders. Each unique glyph is still tessellated only once and cached for reuse. The tradeoff is potential visual artifacts where glyphs actually overlap (tight kerning, cursive scripts)
+**Mesh:** attributes live on the extruded `geometry`. **Vector:** the same attributes are emitted on interior, curve, and fill buffer geometries. When you need per-glyph draw ranges (for example stencil passes that must not XOR across overlapping glyphs), use `geometryData.glyphRanges`: each entry lists index/vertex ranges for that glyph’s interior, curve, and fill quads
+
+This option bypasses overlap-based clustering and adds vertex attributes suitable for per-character manipulation in vertex shaders (or TSL `positionNode` displacements). Each unique glyph is still tessellated only once and cached for reuse. The tradeoff is potential visual artifacts where glyphs actually overlap (tight kerning, cursive scripts)
 
 ## Querying text content
 
@@ -945,7 +1160,7 @@ While `three-text` runs on all modern browsers, performance varies significantly
 
 **Safari** for macOS shows reduced performance, which is likely due to the platform's conservative resource management; 120FPS is not acheivable
 
-The library was also tested on a Brightsign 223HD, which took a long time to generate the initial geometry but seemed fine after that
+The library was also tested on a Brightsign 223HD, which took a very long time to generate the initial geometry but ran fine after that. We did not push our luck with further testing
 
 ## Testing
 
@@ -1023,8 +1238,12 @@ The build generates multiple module formats for core and all adapters:
 **Adapters:**
 - `dist/three/` - Three.js adapter
 - `dist/three/react.js` - React component
-- `dist/webgl/` - WebGL utility
-- `dist/webgpu/` - WebGPU utility
+- `dist/vector/` - Vector rendering (Loop-Blinn, Three.js adapter)
+- `dist/vector/react.js` - React Three Fiber vector component
+- `dist/webgl/` - WebGL mesh buffer utility
+- `dist/vector/webgl/` - WebGL vector renderer
+- `dist/webgpu/` - WebGPU mesh buffer utility
+- `dist/vector/webgpu/` - WebGPU vector renderer
 - `dist/p5/` - p5.js adapter
 
 **Patterns:**

@@ -1,5 +1,5 @@
 import { Cache } from '../../utils/Cache';
-import type { GlyphData, GlyphContours } from '../types';
+import type { GlyphData, GlyphContours, GlyphOutline } from '../types';
 
 export function getGlyphCacheKey(
   fontId: string,
@@ -29,3 +29,5 @@ export const globalClusteringCache = new Cache<
     groups: number[][];
   }
 >();
+
+export const globalOutlineCache = new Cache<string, GlyphOutline>();

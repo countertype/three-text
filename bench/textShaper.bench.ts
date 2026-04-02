@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import { Text } from '../src/core/Text';
 import { TextShaper } from '../src/core/shaping/TextShaper';
-import { GlyphGeometryBuilder } from '../src/core/cache/GlyphGeometryBuilder';
+import { GlyphGeometryBuilder } from '../src/mesh/GlyphGeometryBuilder';
 import { globalGlyphCache } from '../src/core/cache/sharedCaches';
 import type { LineInfo, LoadedFont } from '../src/core/types';
 
