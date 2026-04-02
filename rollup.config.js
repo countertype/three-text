@@ -8,7 +8,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
 
 // License banner for all builds
-const licenseBanner = `/**
+const licenseBanner = `/*!
  * @license
  * three-text v${JSON.parse(readFileSync('./package.json', 'utf8')).version}
  * Copyright © 2025-2026 Jeremy Tribby, Countertype LLC
