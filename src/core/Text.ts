@@ -38,6 +38,8 @@ export class Text {
   private static patternCache = new Map<string, HyphenationTrieNode>();
   private static hbInitPromise: Promise<HarfBuzzInstance> | null = null;
   private static fontCache = new Map<string, LoadedFont>();
+  private static fontLoadPromises = new Map<string, Promise<LoadedFont>>();
+  private static fontRefCounts = new Map<string, number>();
   private static fontCacheMemoryBytes = 0;
   private static maxFontCacheMemoryBytes = Infinity;
   private static fontIdCounter = 0;
@@ -59,6 +61,7 @@ export class Text {
   private fontLoader: FontLoader;
   private loadedFont?: LoadedFont;
   private currentFontId: string = '';
+  private currentFontCacheKey?: string;
   private textShaper?: TextShaper;
   private textLayout?: TextLayout;
 
@@ -97,10 +100,10 @@ export class Text {
       Text.hbInitPromise = HarfBuzzLoader.getHarfBuzz();
     }
 
-    const loadedFont = await Text.resolveFont(options);
+    const { loadedFont, fontKey } = await Text.resolveFont(options);
 
     const text = new Text();
-    text.setLoadedFont(loadedFont);
+    text.setLoadedFont(loadedFont, fontKey);
 
     const result = await text.createLayout(options);
 
@@ -118,8 +121,9 @@ export class Text {
         newOptions.fontVariations !== undefined ||
         newOptions.fontFeatures !== undefined
       ) {
-        const newLoadedFont = await Text.resolveFont(mergedOptions);
-        text.setLoadedFont(newLoadedFont);
+        const { loadedFont: newLoadedFont, fontKey: newFontKey } =
+          await Text.resolveFont(mergedOptions);
+        text.setLoadedFont(newLoadedFont, newFontKey);
         text.resetHelpers();
       }
 
@@ -147,7 +151,30 @@ export class Text {
     };
   }
 
-  private static async resolveFont(options: TextOptions): Promise<LoadedFont> {
+  private static retainFont(fontKey: string): void {
+    Text.fontRefCounts.set(fontKey, (Text.fontRefCounts.get(fontKey) ?? 0) + 1);
+  }
+
+  private static releaseFont(fontKey: string, loadedFont: LoadedFont): void {
+    const nextCount = (Text.fontRefCounts.get(fontKey) ?? 0) - 1;
+
+    if (nextCount > 0) {
+      Text.fontRefCounts.set(fontKey, nextCount);
+      return;
+    }
+
+    Text.fontRefCounts.delete(fontKey);
+
+    // Cached fonts stay alive while present in the cache. If a font has been
+    // evicted, destroy it once the last live handle releases it.
+    if (!Text.fontCache.has(fontKey)) {
+      FontLoader.destroyFont(loadedFont);
+    }
+  }
+
+  private static async resolveFont(
+    options: TextOptions
+  ): Promise<{ loadedFont: LoadedFont; fontKey: string }> {
     const baseFontKey =
       typeof options.font === 'string'
         ? options.font
@@ -163,14 +190,23 @@ export class Text {
 
     let loadedFont = Text.fontCache.get(fontKey);
     if (!loadedFont) {
-      loadedFont = await Text.loadAndCacheFont(
-        fontKey,
-        options.font!,
-        options.fontVariations,
-        options.fontFeatures
-      );
+      let loadPromise = Text.fontLoadPromises.get(fontKey);
+      if (!loadPromise) {
+        loadPromise = Text.loadAndCacheFont(
+          fontKey,
+          options.font!,
+          options.fontVariations,
+          options.fontFeatures
+        ).finally(() => {
+          Text.fontLoadPromises.delete(fontKey);
+        });
+        Text.fontLoadPromises.set(fontKey, loadPromise);
+      }
+      loadedFont = await loadPromise;
     }
-    return loadedFont;
+
+    Text.retainFont(fontKey);
+    return { loadedFont, fontKey };
   }
 
   private static async loadAndCacheFont(
@@ -209,8 +245,12 @@ export class Text {
     ) {
       const firstKey = Text.fontCache.keys().next().value;
       if (firstKey === undefined) break;
+      const font = Text.fontCache.get(firstKey);
       Text.trackFontCacheRemove(firstKey);
       Text.fontCache.delete(firstKey);
+      if ((Text.fontRefCounts.get(firstKey) ?? 0) <= 0 && font) {
+        FontLoader.destroyFont(font);
+      }
     }
   }
 
@@ -237,8 +277,13 @@ export class Text {
     }
   }
 
-  private setLoadedFont(loadedFont: LoadedFont): void {
+  private setLoadedFont(loadedFont: LoadedFont, fontKey?: string): void {
+    if (this.loadedFont && this.loadedFont !== loadedFont) {
+      this.releaseCurrentFont();
+    }
+
     this.loadedFont = loadedFont;
+    this.currentFontCacheKey = fontKey;
 
     const contentHash = Text.generateFontContentHash(loadedFont._buffer);
     this.currentFontId = `font_${contentHash}`;
@@ -247,6 +292,28 @@ export class Text {
     }
     if (loadedFont.fontFeatures) {
       this.currentFontId += `_feat_${Text.stableStringify(loadedFont.fontFeatures)}`;
+    }
+  }
+
+  private releaseCurrentFont(): void {
+    if (!this.loadedFont) return;
+
+    const currentFont = this.loadedFont;
+    const currentFontKey = this.currentFontCacheKey;
+
+    try {
+      if (currentFontKey) {
+        Text.releaseFont(currentFontKey, currentFont);
+      } else {
+        FontLoader.destroyFont(currentFont);
+      }
+    } catch (error) {
+      logger.warn('Error destroying HarfBuzz objects:', error);
+    } finally {
+      this.loadedFont = undefined;
+      this.currentFontCacheKey = undefined;
+      this.textLayout = undefined;
+      this.textShaper = undefined;
     }
   }
 
@@ -568,16 +635,6 @@ export class Text {
       return;
     }
 
-    const currentFont = this.loadedFont;
-
-    try {
-      FontLoader.destroyFont(currentFont);
-    } catch (error) {
-      logger.warn('Error destroying HarfBuzz objects:', error);
-    } finally {
-      this.loadedFont = undefined;
-      this.textLayout = undefined;
-      this.textShaper = undefined;
-    }
+    this.releaseCurrentFont();
   }
 }

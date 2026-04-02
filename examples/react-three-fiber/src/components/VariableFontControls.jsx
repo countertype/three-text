@@ -21,6 +21,9 @@ const VariableFontControls = ({ axes, variations, onVariationsChange }) => {
         max: axisInfo.max,
         step: tag === "slnt" ? 0.1 : 1, // Slant often uses decimal values
         onChange: (value) => {
+          if (variations[tag] === undefined && value === axisInfo.default) {
+            return;
+          }
           onVariationsChange({
             ...variations,
             [tag]: value,

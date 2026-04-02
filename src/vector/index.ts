@@ -1,121 +1,80 @@
-import { Text as TextCore } from '../core/Text';
-import { GlyphVectorGeometryBuilder } from './GlyphVectorGeometryBuilder';
-import { globalOutlineCache } from '../core/cache/sharedCaches';
-import { buildVectorGeometry } from './LoopBlinnGeometry';
-import type {
-  TextOptions,
-  TextLayoutHandle,
-  VectorGlyphInfo,
-  LoadedFont,
-  TextQueryOptions,
-  TextRange
-} from '../core/types';
-import type { VectorGeometryData } from './LoopBlinnGeometry';
-import { TextRangeQuery } from '../core/layout/TextRangeQuery';
-import type { HyphenationTrieNode } from '../hyphenation';
+import { Text as CoreText, type VectorTextResult } from './core';
+import { createVectorMeshes, loopBlinnFragment, type VectorMeshes, type VectorMeshOptions } from './loopBlinnTSL';
+import type { TextOptions } from '../core/types';
 
-export interface VectorTextResult {
-  glyphs: VectorGlyphInfo[];
-  geometryData: VectorGeometryData;
-  query(options: TextQueryOptions): TextRange[];
-  getLoadedFont(): LoadedFont | undefined;
-  measureTextWidth(text: string, letterSpacing?: number): number;
-  update(options: Partial<TextOptions>): Promise<VectorTextResult>;
-  dispose(): void;
+export interface VectorTextOptions extends TextOptions {
+  color?: any;
+  positionNode?: any;
+  colorNode?: any;
+  center?: boolean;
 }
 
-function buildVectorResult(
-  layoutHandle: TextLayoutHandle,
-  vectorBuilder: GlyphVectorGeometryBuilder,
-  options: TextOptions
-): VectorTextResult {
-  const scale = layoutHandle.layoutData.pixelsPerFontUnit;
+export interface VectorResult extends VectorTextResult {
+  group: import('three').Group;
+  interiorGeometry: import('three').BufferGeometry;
+  curveGeometry: import('three').BufferGeometry;
+  fillGeometry: import('three').BufferGeometry;
+  updateMaterials(options?: VectorMeshOptions): void;
+  update(newOptions: Partial<VectorTextOptions>): Promise<VectorResult>;
+}
 
-  const { loopBlinnInput, glyphs } =
-    vectorBuilder.buildForLoopBlinn(layoutHandle.clustersByLine, scale);
-  const geometryData = buildVectorGeometry(loopBlinnInput);
-
-  let cachedQuery: TextRangeQuery | null = null;
-
-  const update = async (newOptions: Partial<TextOptions>): Promise<VectorTextResult> => {
-    const mergedOptions: TextOptions = { ...options };
-    for (const key in newOptions) {
-      const value = newOptions[key as keyof TextOptions];
-      if (value !== undefined) {
-        (mergedOptions as any)[key] = value;
-      }
-    }
-
-    if (
-      newOptions.font !== undefined ||
-      newOptions.fontVariations !== undefined ||
-      newOptions.fontFeatures !== undefined
-    ) {
-      const newLayout = await layoutHandle.update(mergedOptions);
-      const newBuilder = new GlyphVectorGeometryBuilder(
-        newLayout.loadedFont,
-        globalOutlineCache
-      );
-      newBuilder.setFontId(newLayout.fontId);
-      layoutHandle = newLayout;
-      options = mergedOptions;
-      return buildVectorResult(layoutHandle, newBuilder, options);
-    }
-
-    const newLayout = await layoutHandle.update(mergedOptions);
-    layoutHandle = newLayout;
-    options = mergedOptions;
-    return buildVectorResult(layoutHandle, vectorBuilder, options);
-  };
+function wrapResult(
+  coreResult: VectorTextResult,
+  opts: VectorTextOptions
+): VectorResult {
+  const meshes = createVectorMeshes(coreResult.geometryData, {
+    color: opts.color,
+    positionNode: opts.positionNode,
+    colorNode: opts.colorNode,
+    center: opts.center,
+  });
 
   return {
-    glyphs,
-    geometryData,
-    query: (queryOptions: TextQueryOptions): TextRange[] => {
-      if (!cachedQuery) {
-        cachedQuery = new TextRangeQuery(options.text, glyphs);
-      }
-      return cachedQuery.execute(queryOptions);
+    glyphs: coreResult.glyphs,
+    geometryData: coreResult.geometryData,
+    group: meshes.group,
+    interiorGeometry: meshes.interiorGeometry,
+    curveGeometry: meshes.curveGeometry,
+    fillGeometry: meshes.fillGeometry,
+    query: coreResult.query,
+    getLoadedFont: coreResult.getLoadedFont,
+    measureTextWidth: coreResult.measureTextWidth,
+    updateMaterials: meshes.updateMaterials,
+    async update(newOptions: Partial<VectorTextOptions>): Promise<VectorResult> {
+      const newCore = await coreResult.update(newOptions);
+      return wrapResult(newCore, { ...opts, ...newOptions });
     },
-    getLoadedFont: () => layoutHandle.getLoadedFont(),
-    measureTextWidth: (text: string, letterSpacing?: number) =>
-      layoutHandle.measureTextWidth(text, letterSpacing),
-    update,
-    dispose: () => layoutHandle.dispose()
+    dispose() {
+      meshes.dispose();
+      coreResult.dispose();
+    }
   };
 }
 
 export class Text {
-  static setHarfBuzzPath = TextCore.setHarfBuzzPath;
-  static setHarfBuzzBuffer = TextCore.setHarfBuzzBuffer;
-  static init = TextCore.init;
-  static registerPattern = TextCore.registerPattern;
-  static preloadPatterns = TextCore.preloadPatterns;
-  static setMaxFontCacheMemoryMB = TextCore.setMaxFontCacheMemoryMB;
-  static enableWoff2 = TextCore.enableWoff2;
+  static setHarfBuzzPath = CoreText.setHarfBuzzPath;
+  static setHarfBuzzBuffer = CoreText.setHarfBuzzBuffer;
+  static init = CoreText.init;
+  static registerPattern = CoreText.registerPattern;
+  static preloadPatterns = CoreText.preloadPatterns;
+  static setMaxFontCacheMemoryMB = CoreText.setMaxFontCacheMemoryMB;
+  static enableWoff2 = CoreText.enableWoff2;
 
-  static async create(options: TextOptions): Promise<VectorTextResult> {
-    const layoutHandle = await TextCore.create(options);
-    const vectorBuilder = new GlyphVectorGeometryBuilder(
-      layoutHandle.loadedFont,
-      globalOutlineCache
-    );
-    vectorBuilder.setFontId(layoutHandle.fontId);
-    return buildVectorResult(layoutHandle, vectorBuilder, options);
+  static async create(options: VectorTextOptions): Promise<VectorResult> {
+    const coreResult = await CoreText.create(options);
+    return wrapResult(coreResult, options);
   }
 }
 
-export type {
-  TextOptions,
-  VectorTextResult as TextGeometryInfo,
-  VectorGlyphInfo,
-  LoadedFont
-};
-export type { HyphenationTrieNode };
+export { createVectorMeshes, loopBlinnFragment };
+export type { VectorMeshes, VectorMeshOptions };
+export type { VectorTextResult } from './core';
+
 export {
   buildVectorGeometry,
   extractContours
 } from './LoopBlinnGeometry';
+export type { TextOptions } from '../core/types';
 export type {
   VectorGeometryData,
   VectorGlyphAttributes,
@@ -125,3 +84,8 @@ export type {
   LoopBlinnGlyphInput,
   QuadraticSegment
 } from './LoopBlinnGeometry';
+export type {
+  VectorGlyphInfo,
+  LoadedFont
+} from '../core/types';
+export type { HyphenationTrieNode } from '../hyphenation';

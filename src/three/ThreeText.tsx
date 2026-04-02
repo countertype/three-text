@@ -39,7 +39,12 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
       null
     );
     const [error, setError] = useState<Error | null>(null);
-    const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+    const textRef = useRef<TextGeometryInfo | null>(null);
+    const opRef = useRef<Promise<TextGeometryInfo | null>>(Promise.resolve(null));
+    const onLoadRef = useRef(onLoad);
+    const onErrorRef = useRef(onError);
+    onLoadRef.current = onLoad;
+    onErrorRef.current = onError;
 
     const defaultMaterial = useMemo(() => {
       return new THREE.MeshBasicMaterial({
@@ -62,28 +67,43 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
 
           if (cancelled) return;
 
-          const text = await ThreeText.create({
-            text: children,
-            font,
-            ...memoizedTextOptions
+          const textPromise = opRef.current.catch(() => null).then(() => {
+            if (cancelled) return null;
+
+            return textRef.current
+              ? textRef.current.update({
+                  text: children,
+                  font,
+                  ...memoizedTextOptions
+                })
+              : ThreeText.create({
+                  text: children,
+                  font,
+                  ...memoizedTextOptions
+                });
           });
 
+          opRef.current = textPromise.catch(() => null);
+
+          const text = await textPromise;
+
+          if (!text) return;
+
           if (cancelled) {
-            // If a newer render superseded this request, avoid leaking geometry
-            text.geometry.dispose();
+            text.dispose();
             return;
           }
 
-          // Dispose previous geometry (if any) before swapping
-          geometryRef.current?.dispose();
-          geometryRef.current = text.geometry;
+          const prev = textRef.current;
+          textRef.current = text;
           setGeometry(text.geometry);
-          if (onLoad) onLoad(text.geometry, text);
+          if (onLoadRef.current) onLoadRef.current(text.geometry, text);
+          requestAnimationFrame(() => prev?.dispose());
         } catch (err) {
           const error = err as Error;
           if (!cancelled) {
             setError(error);
-            if (onError) onError(error);
+            if (onErrorRef.current) onErrorRef.current(error);
             else console.error('ThreeText error:', error);
           }
         }
@@ -94,13 +114,13 @@ export const Text = forwardRef<THREE.Mesh, ThreeTextProps>(
       return () => {
         cancelled = true;
       };
-    }, [font, children, memoizedTextOptions, onLoad, onError]);
+    }, [font, children, memoizedTextOptions]);
 
     // Cleanup geometry on unmount
     useEffect(() => {
       return () => {
-        geometryRef.current?.dispose();
-        geometryRef.current = null;
+        textRef.current?.dispose();
+        textRef.current = null;
       };
     }, []);
 

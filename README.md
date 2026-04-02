@@ -71,10 +71,10 @@ three-text has a framework-agnostic core that processes fonts and generates geom
 - **`three-text/mesh/webgpu`** - WebGPU mesh buffer utility
 - **`three-text/mesh/p5`** - p5.js adapter
 - **`three-text/core`** - Framework-agnostic core (returns raw arrays)
-- **`three-text/vector`** - Vector rendering (Loop-Blinn and Kokojima stencil fill, resolution-independent)
+- **`three-text/vector`** - Vector rendering (Loop-Blinn curve eval + Kokojima stencil fill), `Text.create()` returns a `THREE.Group` ready for `scene.add()`
 - **`three-text/vector/react`** - React Three Fiber component for vector text
-- **`three-text/vector/webgl`** - WebGL vector renderer
-- **`three-text/vector/webgpu`** - WebGPU vector renderer
+- **`three-text/vector/webgl`** - Raw WebGL2 vector renderer (no Three.js dependency)
+- **`three-text/vector/webgpu`** - Raw WebGPU vector renderer (no Three.js dependency)
 - **`three-text/webgl`** - Deprecated, use `three-text/mesh/webgl`
 - **`three-text/webgpu`** - Deprecated, use `three-text/mesh/webgpu`
 - **`three-text/p5`** - Deprecated, use `three-text/mesh/p5`
@@ -121,20 +121,18 @@ Resolution-independent outlines via Loop-Blinn stencil passes (see [Vector rende
 
 ```javascript
 import { Text } from 'three-text/vector';
-import { woff2Decode } from 'woff-lib/woff2/decode';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
-Text.enableWoff2(woff2Decode);
 const result = await Text.create({
   text: 'Hello Vector',
   font: '/fonts/Font.woff2',
-  size: 72
+  size: 72,
+  color: '#ffffff'
 });
-
-const vectorData = result.geometryData;
+scene.add(result.group);
 ```
 
-Use `createVectorMeshes(vectorData)` from `three-text/vector` for TSL / `WebGPURenderer`, or build your own stencil materials (see [Vector rendering](#vector-rendering))
+`Text.create()` handles stencil setup, render ordering, and geometry centering internally. Pass `positionNode` and `colorNode` for TSL animation/styling. For raw WebGL2 or WebGPU without Three.js, see [Vector rendering](#vector-rendering)
 
 #### Mesh + vector in one scene
 
@@ -142,7 +140,7 @@ Alias one import to avoid the name collision between `Text` components. The entr
 
 ```javascript
 import { Text as MeshText } from 'three-text';
-import { Text as VectorText, createVectorMeshes } from 'three-text/vector';
+import { Text as VectorText } from 'three-text/vector';
 
 MeshText.setHarfBuzzPath('/hb/hb.wasm');
 
@@ -156,10 +154,10 @@ scene.add(new THREE.Mesh(heading.geometry, material));
 const caption = await VectorText.create({
   text: 'Caption text',
   font: '/fonts/Font.woff2',
-  size: 24
+  size: 24,
+  color: '#ffffff'
 });
-const { interiorMesh, curveMesh, fillMesh } = createVectorMeshes(caption.geometryData);
-scene.add(interiorMesh, curveMesh, fillMesh);
+scene.add(caption.group);
 ```
 
 #### React Three Fiber — mesh
@@ -477,8 +475,9 @@ three-text/
 │   │   ├── react.tsx           # React component export
 │   │   └── ThreeText.tsx       # React Three Fiber component
 │   ├── vector/                 # Vector rendering (Loop-Blinn)
-│   │   ├── index.ts            # Vector entry point and TSL re-exports
-│   │   ├── loopBlinnTSL.ts                # TSL adapter for Three.js WebGPURenderer
+│   │   ├── index.ts            # Main entry point (wraps core + Three.js integration)
+│   │   ├── core.ts             # Three.js-free layout engine (used by raw WebGL/WebGPU)
+│   │   ├── loopBlinnTSL.ts                # TSL stencil materials and mesh construction
 │   │   ├── LoopBlinnGeometry.ts           # Fan triangulation + curve extraction
 │   │   ├── GlyphVectorGeometryBuilder.ts  # Outline collection and geometry packing
 │   │   ├── GlyphOutlineCollector.ts       # Collects draw callbacks for vector path
@@ -537,7 +536,7 @@ The multi-stage geometry approach (curve polygonization followed by cleanup, the
 
 The vector pipeline (`three-text/vector`) renders glyphs directly from their mathematical outlines without tessellation or curve flattening. Text stays sharp at any zoom level and the geometry footprint is small -- just the control points of each curve
 
-Curves use the [Loop-Blinn](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf) technique: each quadratic curve is rendered as a triangle whose fragment shader evaluates `u² - v` to resolve inside/outside, with screen-space derivatives producing a signed distance that feeds alpha-to-coverage for smooth MSAA edges. Glyph interiors use [Kokojima et al.](https://dl.acm.org/doi/10.1145/1179849.1179997) stencil filling: fan-triangulate, stencil XOR, fill where nonzero
+Curves use the [Loop-Blinn](https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/p1000-loop.pdf) technique: each quadratic curve is rendered as a triangle whose fragment shader evaluates `u² - v` to resolve inside/outside, with screen-space derivatives producing a signed distance that feeds alpha-to-coverage for smooth MSAA edges. Glyph interiors use [Kokojima et al.](https://dl.acm.org/doi/10.1145/1179849.1179997) stencil filling with a nonzero winding rule (`INCR_WRAP`/`DECR_WRAP`), which correctly handles overlapping contours in variable fonts and connected scripts
 
 An alternative for this sort of resolution-independent rendering is [Slug](https://github.com/EricLengyel/Slug) by Eric Lengyel, which casts rays against all curves per fragment to compute winding numbers. Loop-Blinn was chosen here because it integrates with hardware MSAA and alpha-to-coverage directly, without the overhead of adaptive supersampling that Slug requires for comparable antialiasing
 

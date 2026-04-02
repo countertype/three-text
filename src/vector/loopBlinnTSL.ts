@@ -5,16 +5,30 @@
 
 // @ts-ignore - three is a peer dependency
 import * as THREE from 'three';
+// @ts-ignore - three/webgpu provides node material classes
+import { MeshBasicNodeMaterial } from 'three/webgpu';
 // @ts-ignore - three/tsl is a peer dependency
 import { Fn, vec4, float, uv, dFdx, dFdy, sqrt, clamp, Discard } from 'three/tsl';
 
 import type { VectorGeometryData } from './LoopBlinnGeometry';
 
+export interface VectorMeshOptions {
+  color?: THREE.ColorRepresentation;
+  positionNode?: any;
+  colorNode?: any;
+  center?: boolean;
+}
+
 export interface VectorMeshes {
+  group: THREE.Group;
   interiorMesh: THREE.Object3D;
   curveMesh: THREE.Object3D;
   fillMesh: THREE.Mesh;
+  interiorGeometry: THREE.BufferGeometry;
+  curveGeometry: THREE.BufferGeometry;
+  fillGeometry: THREE.BufferGeometry;
   setOffset(x: number, y: number, z?: number): void;
+  updateMaterials(options?: VectorMeshOptions): void;
   dispose(): void;
 }
 
@@ -83,14 +97,60 @@ function applyStencilNonzero(mat: THREE.Material, side: THREE.Side): void {
     : THREE.DecrementWrapStencilOp;
 }
 
+function createStencilMaterials(opts: VectorMeshOptions) {
+  function makePair(extra?: (mat: any) => void) {
+    const mats = [THREE.FrontSide, THREE.BackSide].map(side => {
+      const mat = new MeshBasicNodeMaterial();
+      applyStencilNonzero(mat, side);
+      mat.colorWrite = false;
+      if (opts.positionNode) mat.positionNode = opts.positionNode;
+      if (extra) extra(mat);
+      return mat;
+    });
+    return mats;
+  }
+
+  const interiorMats = makePair();
+  const curveMats = makePair((mat) => {
+    mat.alphaToCoverage = true;
+    mat.fragmentNode = loopBlinnFragment();
+  });
+
+  const fillMat = new MeshBasicNodeMaterial();
+  fillMat.depthTest = false;
+  fillMat.depthWrite = false;
+  fillMat.side = THREE.DoubleSide;
+  fillMat.stencilWrite = true;
+  fillMat.stencilFunc = THREE.NotEqualStencilFunc;
+  fillMat.stencilRef = 0;
+  fillMat.stencilFuncMask = 0xFF;
+  fillMat.stencilWriteMask = 0xFF;
+  fillMat.stencilFail = THREE.KeepStencilOp;
+  fillMat.stencilZFail = THREE.KeepStencilOp;
+  fillMat.stencilZPass = THREE.ZeroStencilOp;
+  if (opts.positionNode) fillMat.positionNode = opts.positionNode;
+  if (opts.colorNode) {
+    fillMat.colorNode = opts.colorNode;
+  } else if (opts.color !== undefined) {
+    fillMat.color = new THREE.Color(opts.color);
+  }
+
+  return { interiorMats, curveMats, fillMat };
+}
+
 // Three meshes rendered in order (via renderOrder or sequential draws):
 //   1. interiorMesh - nonzero stencil winding (fan interiors, no color output)
 //   2. curveMesh    - nonzero stencil winding (Loop-Blinn curve eval, alpha-to-coverage)
 //   3. fillMesh     - color where stencil != 0, then zeros stencil
 export function createVectorMeshes(
   data: VectorGeometryData,
-  color?: THREE.ColorRepresentation
+  options?: VectorMeshOptions | THREE.ColorRepresentation
 ): VectorMeshes {
+  const opts: VectorMeshOptions =
+    (options !== null && options !== undefined && typeof options === 'object' && !(options instanceof THREE.Color))
+      ? options as VectorMeshOptions
+      : { color: options as THREE.ColorRepresentation | undefined };
+
   const interiorGeo = new THREE.BufferGeometry();
   interiorGeo.setAttribute('position', new THREE.Float32BufferAttribute(data.interiorPositions, 3));
   interiorGeo.setIndex(new THREE.BufferAttribute(data.interiorIndices, 1));
@@ -101,9 +161,9 @@ export function createVectorMeshes(
   const curveVertCount = data.curvePositions.length / 3;
   const curveUVs = new Float32Array(curveVertCount * 2);
   for (let i = 0; i < curveVertCount; i += 3) {
-    curveUVs[i * 2]     = 0;   curveUVs[i * 2 + 1] = 0;     // p0
-    curveUVs[i * 2 + 2] = 0.5; curveUVs[i * 2 + 3] = 0;     // p1
-    curveUVs[i * 2 + 4] = 1;   curveUVs[i * 2 + 5] = 1;     // p2
+    curveUVs[i * 2]     = 0;   curveUVs[i * 2 + 1] = 0;
+    curveUVs[i * 2 + 2] = 0.5; curveUVs[i * 2 + 3] = 0;
+    curveUVs[i * 2 + 4] = 1;   curveUVs[i * 2 + 5] = 1;
   }
   curveGeo.setAttribute('uv', new THREE.Float32BufferAttribute(curveUVs, 2));
   setGlyphAttrsOnGeometry(curveGeo, data.curveGlyphAttrs);
@@ -113,62 +173,80 @@ export function createVectorMeshes(
   fillGeo.setIndex(new THREE.BufferAttribute(data.fillIndices, 1));
   setGlyphAttrsOnGeometry(fillGeo, data.fillGlyphAttrs);
 
-  function makeStencilPair(geo: THREE.BufferGeometry, extra?: (mat: any) => void) {
-    const frontMat = new (THREE as any).MeshBasicNodeMaterial();
-    applyStencilNonzero(frontMat, THREE.FrontSide);
-    frontMat.colorWrite = false;
-    const backMat = new (THREE as any).MeshBasicNodeMaterial();
-    applyStencilNonzero(backMat, THREE.BackSide);
-    backMat.colorWrite = false;
-    if (extra) { extra(frontMat); extra(backMat); }
-    const group = new THREE.Group();
-    group.add(new THREE.Mesh(geo, frontMat), new THREE.Mesh(geo, backMat));
-    return { group, materials: [frontMat, backMat] };
+  if (opts.center !== false && data.planeBounds) {
+    const cx = (data.planeBounds.min.x + data.planeBounds.max.x) * 0.5;
+    const cy = (data.planeBounds.min.y + data.planeBounds.max.y) * 0.5;
+    for (const geo of [interiorGeo, curveGeo, fillGeo]) {
+      geo.translate(-cx, -cy, 0);
+      const gc = geo.attributes.glyphCenter as THREE.BufferAttribute | undefined;
+      if (gc) {
+        for (let i = 0; i < gc.count; i++) {
+          gc.setX(i, gc.getX(i) - cx);
+          gc.setY(i, gc.getY(i) - cy);
+        }
+      }
+    }
   }
 
-  const interior = makeStencilPair(interiorGeo);
-  const curve = makeStencilPair(curveGeo, (mat) => {
-    mat.alphaToCoverage = true;
-    mat.fragmentNode = loopBlinnFragment();
+  let { interiorMats, curveMats, fillMat } = createStencilMaterials(opts);
+
+  const interiorMesh = new THREE.Group();
+  interiorMats.forEach(mat => {
+    const m = new THREE.Mesh(interiorGeo, mat);
+    m.renderOrder = 0;
+    interiorMesh.add(m);
   });
+  const curveMesh = new THREE.Group();
+  curveMats.forEach(mat => {
+    const m = new THREE.Mesh(curveGeo, mat);
+    m.renderOrder = 1;
+    curveMesh.add(m);
+  });
+  const fillMesh = new THREE.Mesh(fillGeo, fillMat);
+  fillMesh.renderOrder = 2;
 
-  // Color fill material - renders where stencil != 0
-  const colorMat = new (THREE as any).MeshBasicNodeMaterial();
-  colorMat.depthTest = false;
-  colorMat.depthWrite = false;
-  colorMat.side = THREE.DoubleSide;
-  colorMat.stencilWrite = true;
-  colorMat.stencilFunc = THREE.NotEqualStencilFunc;
-  colorMat.stencilRef = 0;
-  colorMat.stencilFuncMask = 0xFF;
-  colorMat.stencilWriteMask = 0xFF;
-  colorMat.stencilFail = THREE.KeepStencilOp;
-  colorMat.stencilZFail = THREE.KeepStencilOp;
-  colorMat.stencilZPass = THREE.ZeroStencilOp;
-  if (color !== undefined) {
-    colorMat.color = new THREE.Color(color);
-  }
-
-  const interiorMesh = interior.group;
-  const curveMesh = curve.group;
-  const fillMesh = new THREE.Mesh(fillGeo, colorMat);
+  const group = new THREE.Group();
+  group.add(interiorMesh, curveMesh, fillMesh);
 
   return {
+    group,
     interiorMesh,
     curveMesh,
     fillMesh,
+    interiorGeometry: interiorGeo,
+    curveGeometry: curveGeo,
+    fillGeometry: fillGeo,
     setOffset(x: number, y: number, z = 0) {
       interiorMesh.position.set(x, y, z);
       curveMesh.position.set(x, y, z);
       fillMesh.position.set(x, y, z);
     },
+    updateMaterials(newOpts?: VectorMeshOptions) {
+      const merged = { ...opts, ...newOpts };
+      const created = createStencilMaterials(merged);
+      interiorMesh.children.forEach((c, i) => {
+        const m = c as THREE.Mesh;
+        (m.material as THREE.Material).dispose();
+        m.material = created.interiorMats[i];
+      });
+      curveMesh.children.forEach((c, i) => {
+        const m = c as THREE.Mesh;
+        (m.material as THREE.Material).dispose();
+        m.material = created.curveMats[i];
+      });
+      (fillMesh.material as THREE.Material).dispose();
+      fillMesh.material = created.fillMat;
+      interiorMats = created.interiorMats;
+      curveMats = created.curveMats;
+      fillMat = created.fillMat;
+    },
     dispose() {
       interiorGeo.dispose();
       curveGeo.dispose();
       fillGeo.dispose();
-      interior.materials.forEach(m => m.dispose());
-      curve.materials.forEach(m => m.dispose());
-      colorMat.dispose();
+      interiorMesh.children.forEach(c => ((c as THREE.Mesh).material as THREE.Material).dispose());
+      curveMesh.children.forEach(c => ((c as THREE.Mesh).material as THREE.Material).dispose());
+      (fillMesh.material as THREE.Material).dispose();
     }
   };
 }
