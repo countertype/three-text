@@ -10,6 +10,28 @@
 
 - Removed hyphenation patterns for Czech, Indonesian, Macedonian, and Serbian due to incompatible licensing
 
+## [0.4.12] - 2026-03-31
+
+### Added
+
+- Resolution-independent vector text rendering via Loop-Blinn curve evaluation with Kokojima et al. stencil filling
+- New entry points: `three-text/vector`, `three-text/vector/webgl`, `three-text/vector/webgpu`
+- `createVectorMeshes()` TSL adapter for Loop-Blinn rendering on `WebGPURenderer` (Three.js r170+)
+- Per-glyph vertex attributes for vector text (`perGlyphAttributes: true`) with `glyphRanges` for per-glyph draw control
+- React Three Fiber components: `three-text/mesh/react` and `three-text/vector/react`
+- New examples: `webgl-vector.html`, `webgpu-vector.html`
+- Main demo (`examples/index.html`) uses `WebGPURenderer` with TSL node materials; WebGL variant at `index-webgl.html`
+
+### Changed
+
+- Refactored source layout: mesh geometry code moved from `src/core/` to `src/mesh/`, vector code lives under `src/vector/`
+- Core `Text` module now returns a `TextLayoutHandle` separating layout from geometry, enabling tree-shakeable mesh vs vector paths
+
+### Deprecated
+
+- `three-text/three`, `three-text/webgl`, `three-text/webgpu`, `three-text/p5` — use `three-text/mesh/*` equivalents
+- `DrawCallbacks` generalized via `GlyphDrawCollector` interface to support both mesh and vector outline collection
+
 ## [0.4.11] - 2026-02-12
 
 ### Performance

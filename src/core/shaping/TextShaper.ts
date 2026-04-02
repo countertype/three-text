@@ -8,7 +8,6 @@ import {
   GlyphCluster,
   ColorOptions
 } from '../types';
-import { GlyphGeometryBuilder } from '../cache/GlyphGeometryBuilder';
 import { TextMeasurer } from './TextMeasurer';
 import { perfLogger } from '../../utils/PerformanceLogger';
 import { SPACE_STRETCH_RATIO, SPACE_SHRINK_RATIO } from '../layout/constants';
@@ -29,15 +28,12 @@ export interface ShapedResult {
   };
 }
 
-// Shapes text with glyph caching
 export class TextShaper {
   private loadedFont: LoadedFont;
-  private geometryBuilder: GlyphGeometryBuilder;
   private cachedSpaceWidth: Map<number, number> = new Map();
 
-  constructor(loadedFont: LoadedFont, geometryBuilder: GlyphGeometryBuilder) {
+  constructor(loadedFont: LoadedFont) {
     this.loadedFont = loadedFont;
-    this.geometryBuilder = geometryBuilder;
   }
 
   public shapeLines(
@@ -284,11 +280,4 @@ export class TextShaper {
     return 0;
   }
 
-  public clearCache(): void {
-    this.geometryBuilder.clearCache();
-  }
-
-  public getCacheStats() {
-    return this.geometryBuilder.getCacheStats();
-  }
 }

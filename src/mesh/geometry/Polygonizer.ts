@@ -37,7 +37,7 @@
  */
 
 import { Vec2 } from '../../utils/vectors';
-import { CurveFidelityConfig } from '../types';
+import { CurveFidelityConfig } from '../../core/types';
 
 export const DEFAULT_CURVE_FIDELITY: CurveFidelityConfig = {
   distanceTolerance: 0.5,

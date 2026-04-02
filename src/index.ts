@@ -1,8 +1,14 @@
-// Export core Text class (framework-agnostic)
 export { Text } from './core/Text';
-export { DEFAULT_CURVE_FIDELITY } from './core/geometry/Polygonizer';
+export { MeshGeometryBuilder } from './mesh/MeshGeometryBuilder';
+export { DEFAULT_CURVE_FIDELITY } from './mesh/geometry/Polygonizer';
 export { FontMetadataExtractor } from './core/font/FontMetadata';
-export { globalGlyphCache, createGlyphCache } from './core/cache/sharedCaches';
+export { globalGlyphCache, createGlyphCache, globalOutlineCache } from './core/cache/sharedCaches';
+export {
+  DrawCallbackHandler,
+  getSharedDrawCallbackHandler
+} from './core/shaping/DrawCallbacks';
+export type { GlyphDrawCollector } from './core/shaping/DrawCallbacks';
+export { TextRangeQuery } from './core/layout/TextRangeQuery';
 export type { CacheStats } from './utils/Cache';
 
 export type {
@@ -25,8 +31,12 @@ export type {
   Triangles,
   GlyphData,
   GlyphGeometryInfo,
+  GlyphCluster,
   TextGeometryInfo,
   TextHandle,
+  TextLayoutData,
+  TextLayoutResult,
+  TextLayoutHandle,
   TextOptions,
   ColorOptions,
   ColorByRange,

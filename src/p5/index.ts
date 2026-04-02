@@ -1,6 +1,7 @@
 // p5.js adapter
 
 import { Text as TextCore } from '../core/Text';
+import { MeshGeometryBuilder } from '../mesh/MeshGeometryBuilder';
 import type { TextGeometryInfo, TextOptions } from '../core/types';
 
 interface P5Vector {
@@ -150,20 +151,26 @@ if (typeof window !== 'undefined' && window.p5) {
     const { font, ...coreOptions } = options;
 
     try {
-      const result = await TextCore.create({
+      const fullOptions: TextOptions = {
         text,
         font: font.buffer!,
         fontVariations: font.variations,
         ...coreOptions
-      });
+      };
+      const layoutHandle = await TextCore.create(fullOptions);
+      const meshPipeline = new MeshGeometryBuilder(
+        layoutHandle.loadedFont,
+        layoutHandle.fontId
+      );
+      const meshResult = meshPipeline.build(layoutHandle, fullOptions);
 
       const p5Instance = this as P5Instance;
-      const geometry = convertToP5Geometry(p5Instance, result);
+      const geometry = convertToP5Geometry(p5Instance, meshResult);
 
       return {
         geometry,
-        planeBounds: result.planeBounds,
-        glyphs: result.glyphs
+        planeBounds: meshResult.planeBounds,
+        glyphs: meshResult.glyphs
       };
     } catch (err) {
       console.error('Failed to create text geometry:', err);

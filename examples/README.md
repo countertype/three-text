@@ -6,24 +6,33 @@ This directory contains examples demonstrating three-text across different rende
 
 **Three.js:**
 - `hello-world.html` - Minimal Three.js example
-- `index.html` - Full-featured demo with parameter controls
+- `index.html` - Full-featured demo using `WebGPURenderer` with TSL node materials (mesh + Loop-Blinn vector)
+- `index-webgl.html` - Same demo using `WebGLRenderer` with raw GLSL shaders
 - `index-umd.html` - UMD build for legacy browsers
+
+**Three.js (continued):**
 - `variable-fonts.html` - Variable font demonstration
-- `react-three-fiber/` - React Three Fiber with Leva controls
+
+**React Three Fiber** (`three-text/mesh/react`, `three-text/vector/react`):
+- `react-three-fiber/` - Mesh `Text` demo with Leva controls
 
 **p5.js**
 - `p5-basic.html` - p5.js integration
 
-**Raw APIs:**
-- `webgpu-basic.html` - WebGPU example
-- `webgl-basic.html` - WebGL example
+**Raw APIs (mesh):**
+- `webgl-basic.html` - WebGL mesh example
+- `webgpu-basic.html` - WebGPU mesh example
+
+**Raw APIs (vector):**
+- `webgl-vector.html` - WebGL vector rendering (Loop-Blinn + Kokojima stencil fill)
+- `webgpu-vector.html` - WebGPU vector rendering (Loop-Blinn + Kokojima stencil fill)
 
 
 ## Running the examples
 
 ### Static HTML examples
 
-The examples are located in `src/three-text/examples/` and can be run after building the library:
+The examples can be run after building the library:
 
 ```bash
 # From the three-text root directory
@@ -140,7 +149,7 @@ See `react-three-fiber/` for a complete example.
 
 ```jsx
 import { Canvas } from '@react-three/fiber';
-import { Text } from 'three-text/three/react';
+import { Text } from 'three-text/mesh/react';
 
 Text.setHarfBuzzPath('/hb/hb.wasm');
 
@@ -158,11 +167,49 @@ function App() {
 
 ### WebGL
 
-See `webgl-basic.html` for raw WebGL usage without Three.js
+See `webgl-basic.html` for raw WebGL mesh rendering without Three.js
 
 ### WebGPU
 
-See `webgpu-basic.html` for WebGPU usage
+See `webgpu-basic.html` for raw WebGPU mesh rendering
+
+### Vector rendering (WebGL)
+
+See `webgl-vector.html` for resolution-independent vector text via Loop-Blinn curve evaluation with Kokojima stencil fill on WebGL2
+
+```javascript
+import { Text } from 'three-text/vector';
+import { createWebGLVectorRenderer } from 'three-text/vector/webgl';
+
+const gl = canvas.getContext('webgl2', { antialias: true, stencil: true });
+const renderer = createWebGLVectorRenderer(gl);
+
+const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
+renderer.setGeometry(result.geometryData);
+
+// In render loop:
+renderer.render(mvpMatrix, new Float32Array([1, 1, 1, 1]));
+```
+
+### Vector rendering (WebGPU)
+
+See `webgpu-vector.html` for resolution-independent vector text via Loop-Blinn curve evaluation with Kokojima stencil fill on WebGPU
+
+```javascript
+import { Text } from 'three-text/vector';
+import { createWebGPUVectorRenderer } from 'three-text/vector/webgpu';
+
+const renderer = createWebGPUVectorRenderer(device, format, {
+  depthStencilFormat: 'depth24plus-stencil8',
+  sampleCount: 4
+});
+
+const result = await Text.create({ text: 'Hello', font: '/fonts/Font.woff2', size: 72 });
+renderer.setGeometry(result.geometryData);
+
+// In render pass:
+renderer.render(passEncoder, mvpMatrix, new Float32Array([1, 1, 1, 1]));
+```
 
 ### p5.js
 

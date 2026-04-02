@@ -1,8 +1,23 @@
 import { LoadedFont } from '../types';
-import { GlyphContourCollector } from '../cache/GlyphContourCollector';
 import { logger } from '../../utils/Logger';
 
-// HarfBuzz callbacks
+export interface GlyphDrawCollector {
+  setPosition(x: number, y: number): void;
+  updatePosition(dx: number, dy: number): void;
+  onMoveTo(x: number, y: number): void;
+  onLineTo(x: number, y: number): void;
+  onQuadTo(cx: number, cy: number, x: number, y: number): void;
+  onCubicTo(
+    c1x: number,
+    c1y: number,
+    c2x: number,
+    c2y: number,
+    x: number,
+    y: number
+  ): void;
+  onClosePath(): void;
+}
+
 export class DrawCallbackHandler {
   private moveTo_func: number | null = null;
   private lineTo_func: number | null = null;
@@ -10,7 +25,7 @@ export class DrawCallbackHandler {
   private cubicTo_func: number | null = null;
   private closePath_func: number | null = null;
   private drawFuncsPtr: number = 0;
-  private collector?: GlyphContourCollector;
+  private collector?: GlyphDrawCollector;
   private position = { x: 0, y: 0 };
 
   public setPosition(x: number, y: number): void {
@@ -29,13 +44,13 @@ export class DrawCallbackHandler {
     }
   }
 
-  public setCollector(collector: GlyphContourCollector): void {
+  public setCollector(collector: GlyphDrawCollector): void {
     this.collector = collector;
   }
 
   public createDrawFuncs(
     font: LoadedFont,
-    collector: GlyphContourCollector
+    collector: GlyphDrawCollector
   ): void {
     if (!font || !font.module || !font.hb) {
       throw new Error('Invalid font object');

@@ -1,4 +1,4 @@
-import type { ProcessedGeometry } from '../types';
+import type { ProcessedGeometry } from '../../core/types';
 
 export interface ExtrusionResult {
   vertices: Float32Array;

@@ -1,28 +1,24 @@
-// Three.js adapter - wraps core text processing and returns BufferGeometry
-// This is a thin convenience layer for Three.js users
-
 import {
   BufferGeometry,
   Float32BufferAttribute,
   Uint32BufferAttribute
 } from 'three';
 import { Text as TextCore } from '../core/Text';
+import { MeshGeometryBuilder } from '../mesh/MeshGeometryBuilder';
 import type {
   TextOptions,
   TextGeometryInfo as CoreTextGeometryInfo,
-  LoadedFont,
-  TextHandle as CoreTextHandle
+  TextLayoutHandle,
+  LoadedFont
 } from '../core/types';
 import type { HyphenationTrieNode } from '../hyphenation';
 
-// Three.js specific interface that includes BufferGeometry
 export interface ThreeTextGeometryInfo
   extends Omit<
     CoreTextGeometryInfo,
     'vertices' | 'normals' | 'indices' | 'colors' | 'glyphAttributes'
   > {
   geometry: BufferGeometry;
-  // Utility methods from core
   getLoadedFont(): LoadedFont | undefined;
   getCacheSize(): number;
   clearCache(): void;
@@ -30,74 +26,101 @@ export interface ThreeTextGeometryInfo
   update(options: Partial<TextOptions>): Promise<ThreeTextGeometryInfo>;
 }
 
-function convertToThree(result: CoreTextHandle): ThreeTextGeometryInfo {
-  // Create BufferGeometry from raw arrays
+function buildThreeResult(
+  layoutHandle: TextLayoutHandle,
+  meshPipeline: MeshGeometryBuilder,
+  options: TextOptions
+): ThreeTextGeometryInfo {
+  const meshResult = meshPipeline.build(layoutHandle, options);
+
   const geometry = new BufferGeometry();
   geometry.setAttribute(
     'position',
-    new Float32BufferAttribute(result.vertices, 3)
+    new Float32BufferAttribute(meshResult.vertices, 3)
   );
   geometry.setAttribute(
     'normal',
-    new Float32BufferAttribute(result.normals, 3)
+    new Float32BufferAttribute(meshResult.normals, 3)
   );
-  geometry.setIndex(new Uint32BufferAttribute(result.indices, 1));
+  geometry.setIndex(new Uint32BufferAttribute(meshResult.indices, 1));
 
-  // Add optional color attribute (only if provided)
-  if (result.colors) {
+  if (meshResult.colors) {
     geometry.setAttribute(
       'color',
-      new Float32BufferAttribute(result.colors, 3)
+      new Float32BufferAttribute(meshResult.colors, 3)
     );
   }
 
-  if (result.glyphAttributes) {
+  if (meshResult.glyphAttributes) {
     geometry.setAttribute(
       'glyphCenter',
-      new Float32BufferAttribute(result.glyphAttributes.glyphCenter, 3)
+      new Float32BufferAttribute(meshResult.glyphAttributes.glyphCenter, 3)
     );
     geometry.setAttribute(
       'glyphIndex',
-      new Float32BufferAttribute(result.glyphAttributes.glyphIndex, 1)
+      new Float32BufferAttribute(meshResult.glyphAttributes.glyphIndex, 1)
     );
     geometry.setAttribute(
       'glyphLineIndex',
-      new Float32BufferAttribute(result.glyphAttributes.glyphLineIndex, 1)
+      new Float32BufferAttribute(meshResult.glyphAttributes.glyphLineIndex, 1)
     );
     geometry.setAttribute(
       'glyphProgress',
-      new Float32BufferAttribute(result.glyphAttributes.glyphProgress, 1)
+      new Float32BufferAttribute(meshResult.glyphAttributes.glyphProgress, 1)
     );
     geometry.setAttribute(
       'glyphBaselineY',
-      new Float32BufferAttribute(result.glyphAttributes.glyphBaselineY, 1)
+      new Float32BufferAttribute(meshResult.glyphAttributes.glyphBaselineY, 1)
     );
   }
 
   geometry.computeBoundingBox();
 
-  // Return Three.js specific interface with utility methods
+  const update = async (newOptions: Partial<TextOptions>): Promise<ThreeTextGeometryInfo> => {
+    const mergedOptions: TextOptions = { ...options };
+    for (const key in newOptions) {
+      const value = newOptions[key as keyof TextOptions];
+      if (value !== undefined) {
+        (mergedOptions as any)[key] = value;
+      }
+    }
+
+    if (
+      newOptions.font !== undefined ||
+      newOptions.fontVariations !== undefined ||
+      newOptions.fontFeatures !== undefined
+    ) {
+      const newLayout = await layoutHandle.update(mergedOptions);
+      meshPipeline.setFont(newLayout.loadedFont, newLayout.fontId);
+      meshPipeline.reset();
+      layoutHandle = newLayout;
+      options = mergedOptions;
+      return buildThreeResult(layoutHandle, meshPipeline, options);
+    }
+
+    const newLayout = await layoutHandle.update(mergedOptions);
+    layoutHandle = newLayout;
+    options = mergedOptions;
+    return buildThreeResult(layoutHandle, meshPipeline, options);
+  };
+
   return {
     geometry,
-    glyphs: result.glyphs,
-    planeBounds: result.planeBounds,
-    stats: result.stats,
-    query: result.query,
-    coloredRanges: result.coloredRanges,
-    // Pass through utility methods from core
-    getLoadedFont: result.getLoadedFont,
-    getCacheSize: result.getCacheSize,
-    clearCache: result.clearCache,
-    measureTextWidth: result.measureTextWidth,
-    update: async (newOptions: Partial<TextOptions>) => {
-      const newCoreResult = await result.update(newOptions);
-      return convertToThree(newCoreResult);
-    }
+    glyphs: meshResult.glyphs,
+    planeBounds: meshResult.planeBounds,
+    stats: meshResult.stats,
+    query: meshResult.query,
+    coloredRanges: meshResult.coloredRanges,
+    getLoadedFont: () => layoutHandle.getLoadedFont(),
+    getCacheSize: () => meshPipeline.getCacheSize(),
+    clearCache: () => meshPipeline.clearCache(),
+    measureTextWidth: (text: string, letterSpacing?: number) =>
+      layoutHandle.measureTextWidth(text, letterSpacing),
+    update
   };
 }
 
 export class Text {
-  // Delegate static methods to core
   static setHarfBuzzPath = TextCore.setHarfBuzzPath;
   static setHarfBuzzBuffer = TextCore.setHarfBuzzBuffer;
   static init = TextCore.init;
@@ -106,14 +129,16 @@ export class Text {
   static setMaxFontCacheMemoryMB = TextCore.setMaxFontCacheMemoryMB;
   static enableWoff2 = TextCore.enableWoff2;
 
-  // Main API - wraps core result in BufferGeometry
   static async create(options: TextOptions): Promise<ThreeTextGeometryInfo> {
-    const coreResult = await TextCore.create(options);
-    return convertToThree(coreResult);
+    const layoutHandle = await TextCore.create(options);
+    const meshPipeline = new MeshGeometryBuilder(
+      layoutHandle.loadedFont,
+      layoutHandle.fontId
+    );
+    return buildThreeResult(layoutHandle, meshPipeline, options);
   }
 }
 
-// Re-export types for convenience
 export type {
   TextOptions,
   ThreeTextGeometryInfo as TextGeometryInfo,

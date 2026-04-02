@@ -1,6 +1,6 @@
 {
   "name": "three-text",
-  "version": "0.4.11",
+  "version": "0.4.12",
   "description": "3D mesh font geometry and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
@@ -23,10 +23,30 @@
       "import": "./dist/three/index.js",
       "require": "./dist/three/index.cjs"
     },
+    "./mesh": {
+      "types": "./dist/three/index.d.ts",
+      "import": "./dist/three/index.js",
+      "require": "./dist/three/index.cjs"
+    },
     "./three/react": {
       "types": "./dist/three/react.d.ts",
       "import": "./dist/three/react.js",
       "require": "./dist/three/react.cjs"
+    },
+    "./mesh/react": {
+      "types": "./dist/three/react.d.ts",
+      "import": "./dist/three/react.js",
+      "require": "./dist/three/react.cjs"
+    },
+    "./mesh/webgl": {
+      "types": "./dist/webgl/index.d.ts",
+      "import": "./dist/webgl/index.js",
+      "require": "./dist/webgl/index.cjs"
+    },
+    "./mesh/webgpu": {
+      "types": "./dist/webgpu/index.d.ts",
+      "import": "./dist/webgpu/index.js",
+      "require": "./dist/webgpu/index.cjs"
     },
     "./webgl": {
       "types": "./dist/webgl/index.d.ts",
@@ -37,6 +57,31 @@
       "types": "./dist/webgpu/index.d.ts",
       "import": "./dist/webgpu/index.js",
       "require": "./dist/webgpu/index.cjs"
+    },
+    "./vector/webgl": {
+      "types": "./dist/vector/webgl/index.d.ts",
+      "import": "./dist/vector/webgl/index.js",
+      "require": "./dist/vector/webgl/index.cjs"
+    },
+    "./vector/webgpu": {
+      "types": "./dist/vector/webgpu/index.d.ts",
+      "import": "./dist/vector/webgpu/index.js",
+      "require": "./dist/vector/webgpu/index.cjs"
+    },
+    "./vector": {
+      "types": "./dist/vector/index.d.ts",
+      "import": "./dist/vector/index.js",
+      "require": "./dist/vector/index.cjs"
+    },
+    "./vector/react": {
+      "types": "./dist/vector/react.d.ts",
+      "import": "./dist/vector/react.js",
+      "require": "./dist/vector/react.cjs"
+    },
+    "./mesh/p5": {
+      "types": "./dist/p5/index.d.ts",
+      "import": "./dist/p5/index.js",
+      "require": "./dist/p5/index.cjs"
     },
     "./p5": {
       "types": "./dist/p5/index.d.ts",
@@ -59,7 +104,7 @@
     "build:patterns": "node scripts/convertPatterns.js",
     "build:patterns:en-us": "node scripts/convertPatterns.js --languages en-us",
     "copy:harfbuzz": "mkdir -p examples/hb && cp node_modules/harfbuzzjs/hb.wasm examples/hb/",
-    "build": "rollup -c && npm run copy:harfbuzz",
+    "build": "tsc --emitDeclarationOnly && rollup -c && npm run copy:harfbuzz",
     "dev": "rollup -c -w",
     "serve": "npx http-server . -c-1 -p 8080 --cors",
     "clean": "rimraf dist/index.* dist/react dist/three dist/hb dist/types",
@@ -116,7 +161,7 @@
     "@rollup/plugin-commonjs": "^25.0.0",
     "@rollup/plugin-node-resolve": "^15.0.0",
     "@rollup/plugin-replace": "^6.0.2",
-    "@rollup/plugin-terser": "^0.4.0",
+    "@rollup/plugin-terser": "^1.0.0",
     "@rollup/plugin-typescript": "^11.0.0",
     "@types/react": ">=17.0.0",
     "@types/three": ">=0.175.0",

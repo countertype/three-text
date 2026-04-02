@@ -1,5 +1,5 @@
 import { Vec3 } from '../../utils/vectors';
-import type { GlyphContours } from '../types';
+import type { GlyphContours } from '../../core/types';
 import { perfLogger } from '../../utils/PerformanceLogger';
 
 interface BBox {
