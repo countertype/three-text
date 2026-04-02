@@ -62,10 +62,9 @@ npm install three
 
 three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats:
 
-- **`three-text`** - Three.js adapter (default export, returns `BufferGeometry`)
+- **`three-text`** - Three.js adapter (default export, returns mesh `BufferGeometry`)
 - **`three-text/mesh`** - Same as above (explicit alias)
 - **`three-text/mesh/react`** - React Three Fiber component for extruded mesh text
-- **`three-text/three`** - Deprecated, use `three-text/mesh`
 - **`three-text/three/react`** - Deprecated, use `three-text/mesh/react`
 - **`three-text/mesh/webgl`** - WebGL mesh buffer utility
 - **`three-text/mesh/webgpu`** - WebGPU mesh buffer utility
@@ -76,9 +75,6 @@ three-text has a framework-agnostic core that processes fonts and generates geom
 - **`three-text/vector/core`** - Framework-agnostic vector core (returns raw `SlugGPUData`, no Three.js dependency)
 - **`three-text/vector/webgl`** - Raw WebGL2 vector renderer (no Three.js dependency)
 - **`three-text/vector/webgpu`** - Raw WebGPU vector renderer (no Three.js dependency)
-- **`three-text/webgl`** - Deprecated, use `three-text/mesh/webgl`
-- **`three-text/webgpu`** - Deprecated, use `three-text/mesh/webgpu`
-- **`three-text/p5`** - Deprecated, use `three-text/mesh/p5`
 
 Most users will just `import { Text } from 'three-text'` for Three.js projects with mesh, or `import { Text } from 'three-text/vector'` for vector text
 
@@ -87,7 +83,7 @@ Most users will just `import { Text } from 'three-text'` for Three.js projects w
 The library offers two rendering modes that share the same core (HarfBuzz shaping, Knuth-Plass justification, glyph caching):
 
 - **Mesh** (`three-text` (default) / `three-text/mesh`): triangulated geometry you can extrude, light, and shade. Use for 3D text, text in a scene graph, or anywhere you need depth
-- **Vector** (`three-text/vector`): resolution-independent rendering on the GPU via per-fragment curve evaluation. No tessellation, no stencil buffer. Use for text that needs to stay sharp at arbitrary zoom
+- **Vector** (`three-text/vector`): resolution-independent rendering on the GPU via per-fragment curve evaluation. Use for flat text that needs to stay sharp at arbitrary zoom
 
 Both can be used in the same project from separate entry points
 
