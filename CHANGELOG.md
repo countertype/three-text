@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.1] - 2026-04-02
+
+### Fixed
+
+- Pack curve data in glyph-local coordinates
+
 ## [0.6.0] - 2026-04-02
 
 ### Breaking changes

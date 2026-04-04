@@ -64,6 +64,7 @@ export function packSlugData(
 
   for (const shape of shapes) {
     const entries: CurveEntry[] = [];
+    const [ox, oy] = shape.bounds;
     for (const curve of shape.curves) {
       // Don't let a curve span across row boundary (needs 2 consecutive texels)
       if (curveX >= TEX_WIDTH - 1) {
@@ -71,25 +72,31 @@ export function packSlugData(
         curveY++;
       }
 
+      // Store control points in glyph-local space (relative to bounds min)
+      // so the fragment shader's renderCoord subtraction stays near zero
+      const lp1x = curve.p1[0] - ox, lp1y = curve.p1[1] - oy;
+      const lp2x = curve.p2[0] - ox, lp2y = curve.p2[1] - oy;
+      const lp3x = curve.p3[0] - ox, lp3y = curve.p3[1] - oy;
+
       const base = (curveY * TEX_WIDTH + curveX) * 4;
-      curveData[base + 0] = curve.p1[0];
-      curveData[base + 1] = curve.p1[1];
-      curveData[base + 2] = curve.p2[0];
-      curveData[base + 3] = curve.p2[1];
+      curveData[base + 0] = lp1x;
+      curveData[base + 1] = lp1y;
+      curveData[base + 2] = lp2x;
+      curveData[base + 3] = lp2y;
 
       const base2 = base + 4;
-      curveData[base2 + 0] = curve.p3[0];
-      curveData[base2 + 1] = curve.p3[1];
+      curveData[base2 + 0] = lp3x;
+      curveData[base2 + 1] = lp3y;
 
-      const minX = Math.min(curve.p1[0], curve.p2[0], curve.p3[0]);
-      const minY = Math.min(curve.p1[1], curve.p2[1], curve.p3[1]);
-      const maxX = Math.max(curve.p1[0], curve.p2[0], curve.p3[0]);
-      const maxY = Math.max(curve.p1[1], curve.p2[1], curve.p3[1]);
+      const minX = Math.min(lp1x, lp2x, lp3x);
+      const minY = Math.min(lp1y, lp2y, lp3y);
+      const maxX = Math.max(lp1x, lp2x, lp3x);
+      const maxY = Math.max(lp1y, lp2y, lp3y);
 
       entries.push({
-        p1x: curve.p1[0], p1y: curve.p1[1],
-        p2x: curve.p2[0], p2y: curve.p2[1],
-        p3x: curve.p3[0], p3y: curve.p3[1],
+        p1x: lp1x, p1y: lp1y,
+        p2x: lp2x, p2y: lp2y,
+        p3x: lp3x, p3y: lp3y,
         minX, minY, maxX, maxY,
         curveTexX: curveX,
         curveTexY: curveY
@@ -142,13 +149,13 @@ export function packSlugData(
     const bandMaxY = hBandCount - 1;
     const bandMaxX = vBandCount - 1;
 
-    // Build horizontal bands (partition y-axis)
+    // Build horizontal bands (partition y-axis, glyph-local coords)
     const hBands: BandEntry[] = [];
     const hLists: number[][] = [];
     const bandH = h / hBandCount;
 
     for (let bi = 0; bi < hBandCount; bi++) {
-      const bandMinY = bMinY + bi * bandH;
+      const bandMinY = bi * bandH;
       const bandMaxYCoord = bandMinY + bandH;
       // Collect curves whose y-range overlaps this band
       const list: { curve: CurveEntry; sortKey: number }[] = [];
@@ -167,13 +174,13 @@ export function packSlugData(
       hLists.push(flatList);
     }
 
-    // Build vertical bands (partition x-axis)
+    // Build vertical bands (partition x-axis, glyph-local coords)
     const vBands: BandEntry[] = [];
     const vLists: number[][] = [];
     const bandW = w / vBandCount;
 
     for (let bi = 0; bi < vBandCount; bi++) {
-      const bandMinX = bMinX + bi * bandW;
+      const bandMinX = bi * bandW;
       const bandMaxXCoord = bandMinX + bandW;
       const list: { curve: CurveEntry; sortKey: number }[] = [];
       for (const c of curves) {
@@ -365,12 +372,12 @@ export function packSlugData(
       [bMinX, bMaxY],
     ];
 
-    // Em-space sample coords at corners (same as object-space for 1:1 mapping)
+    // Em-space sample coords in glyph-local space (origin at bounds min)
     const emCorners: [number, number][] = [
-      [bMinX, bMinY],
-      [bMaxX, bMinY],
-      [bMaxX, bMaxY],
-      [bMinX, bMaxY],
+      [0, 0],
+      [w, 0],
+      [w, h],
+      [0, h],
     ];
 
     // Pack tex.z: glyph location in band texture
@@ -381,11 +388,9 @@ export function packSlugData(
     if (evenOdd) texWBits |= 0x10000000; // E flag at bit 28
     const texW = uintAsFloat(texWBits);
 
-    // Band transform: scale and offset to map em-coords to band indices
+    // Band transform: scale to map glyph-local em-coords to band indices
     const bandScaleX = w > 0 ? sd.vBands.length / w : 0;
     const bandScaleY = h > 0 ? sd.hBands.length / h : 0;
-    const bandOffsetX = -bMinX * bandScaleX;
-    const bandOffsetY = -bMinY * bandScaleY;
 
     for (let vi = 0; vi < 4; vi++) {
       const base = (si * 4 + vi) * FLOATS_PER_VERTEX;
@@ -402,17 +407,17 @@ export function packSlugData(
       vertices[base + 6] = texZ;
       vertices[base + 7] = texW;
 
-      // jac: identity Jacobian (em-space = object-space)
+      // jac: identity Jacobian (em-space is a pure translation of object-space)
       vertices[base + 8] = 1.0;
       vertices[base + 9] = 0.0;
       vertices[base + 10] = 0.0;
       vertices[base + 11] = 1.0;
 
-      // bnd: band scale and offset
+      // bnd: band scale (offset is zero in glyph-local space)
       vertices[base + 12] = bandScaleX;
       vertices[base + 13] = bandScaleY;
-      vertices[base + 14] = bandOffsetX;
-      vertices[base + 15] = bandOffsetY;
+      vertices[base + 14] = 0;
+      vertices[base + 15] = 0;
 
       // col: white with full alpha (caller overrides via uniform or attribute)
       vertices[base + 16] = 1.0;

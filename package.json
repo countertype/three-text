@@ -1,7 +1,7 @@
 {
   "name": "three-text",
-  "version": "0.6.0",
-  "description": "3D mesh font geometry and text layout engine for the web",
+  "version": "0.6.1",
+  "description": "3D font rendering and text layout engine for the web",
   "main": "dist/three/index.cjs",
   "module": "dist/three/index.js",
   "type": "module",
