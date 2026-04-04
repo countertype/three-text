@@ -34,8 +34,6 @@ export interface VectorTextResult {
   dispose(): void;
 }
 
-// Outline collection + Slug packing
-
 interface OutlineContext {
   loadedFont: LoadedFont;
   outlineCache: Cache<string, GlyphOutline>;
@@ -221,8 +219,6 @@ function computePlaneBounds(glyphInfos: VectorGlyphInfo[]): BoundingBox {
   }
   return { min: { x: minX, y: minY, z: 0 }, max: { x: maxX, y: maxY, z: 0 } };
 }
-
-// Public API
 
 function buildVectorResult(
   layoutHandle: TextLayoutHandle,

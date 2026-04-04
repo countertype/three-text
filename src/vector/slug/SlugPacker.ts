@@ -4,12 +4,11 @@
 // Takes generic quadratic Bezier shapes (not text-specific) and produces
 // GPU-ready packed textures + vertex attribute buffers
 
-import type { QuadCurve, SlugShape, SlugGPUData, SlugPackOptions } from './types';
+import type { SlugShape, SlugGPUData, SlugPackOptions } from './types';
 
 const TEX_WIDTH = 4096;
 const LOG_TEX_WIDTH = 12;
 
-// Float/Uint32 reinterpretation helpers
 const _f32 = new Float32Array(1);
 const _u32 = new Uint32Array(_f32.buffer);
 
@@ -47,11 +46,8 @@ export function packSlugData(
   const bandCount = options?.bandCount ?? 16;
   const evenOdd = options?.evenOdd ?? false;
 
-  // Pack all curves into curveTexture
   const allCurves: CurveEntry[][] = [];
   let curveTexelCount = 0;
-
-  // Estimate max texels needed
   let totalCurves = 0;
   for (const shape of shapes) {
     totalCurves += shape.curves.length;
@@ -66,14 +62,13 @@ export function packSlugData(
     const entries: CurveEntry[] = [];
     const [ox, oy] = shape.bounds;
     for (const curve of shape.curves) {
-      // Don't let a curve span across row boundary (needs 2 consecutive texels)
       if (curveX >= TEX_WIDTH - 1) {
         curveX = 0;
         curveY++;
       }
 
-      // Store control points in glyph-local space (relative to bounds min)
-      // so the fragment shader's renderCoord subtraction stays near zero
+      // Glyph-local space (relative to bounds min) keeps renderCoord
+      // subtraction near zero, preserving float32 precision in the solver
       const lp1x = curve.p1[0] - ox, lp1y = curve.p1[1] - oy;
       const lp2x = curve.p2[0] - ox, lp2y = curve.p2[1] - oy;
       const lp3x = curve.p3[0] - ox, lp3y = curve.p3[1] - oy;
@@ -110,13 +105,10 @@ export function packSlugData(
 
   const actualCurveTexHeight = curveY + 1;
 
-  // Build band data for each shape and pack into bandTexture
-  // Layout per shape in bandTexture (relative to glyphLoc):
-  //   [0 .. hBandMax]                          : h-band headers
-  //   [hBandMax+1 .. hBandMax+1+vBandMax]      : v-band headers
-  //   [hBandMax+vBandMax+2 .. ]                : curve index lists
-
-  // First pass: compute total band texels needed
+  // Band texture layout per shape (relative to glyphLoc):
+  //   [0 .. hBandMax]                     h-band headers
+  //   [hBandMax+1 .. hBandMax+1+vBandMax] v-band headers
+  //   [hBandMax+vBandMax+2 .. ]           curve index lists
   const shapeBandData: {
     hBands: BandEntry[];
     vBands: BandEntry[];
@@ -149,7 +141,7 @@ export function packSlugData(
     const bandMaxY = hBandCount - 1;
     const bandMaxX = vBandCount - 1;
 
-    // Build horizontal bands (partition y-axis, glyph-local coords)
+    // Horizontal bands (partition y-axis)
     const hBands: BandEntry[] = [];
     const hLists: number[][] = [];
     const bandH = h / hBandCount;
@@ -157,14 +149,12 @@ export function packSlugData(
     for (let bi = 0; bi < hBandCount; bi++) {
       const bandMinY = bi * bandH;
       const bandMaxYCoord = bandMinY + bandH;
-      // Collect curves whose y-range overlaps this band
       const list: { curve: CurveEntry; sortKey: number }[] = [];
       for (const c of curves) {
         if (c.maxY >= bandMinY && c.minY <= bandMaxYCoord) {
           list.push({ curve: c, sortKey: c.maxX });
         }
       }
-      // Sort by descending max-x for early exit
       list.sort((a, b) => b.sortKey - a.sortKey);
       const flatList: number[] = [];
       for (const item of list) {
@@ -174,7 +164,7 @@ export function packSlugData(
       hLists.push(flatList);
     }
 
-    // Build vertical bands (partition x-axis, glyph-local coords)
+    // Vertical bands (partition x-axis)
     const vBands: BandEntry[] = [];
     const vLists: number[][] = [];
     const bandW = w / vBandCount;
@@ -188,7 +178,6 @@ export function packSlugData(
           list.push({ curve: c, sortKey: c.maxY });
         }
       }
-      // Sort by descending max-y for early exit
       list.sort((a, b) => b.sortKey - a.sortKey);
       const flatList: number[] = [];
       for (const item of list) {
@@ -198,7 +187,6 @@ export function packSlugData(
       vLists.push(flatList);
     }
 
-    // Total texels for this shape: band headers + curve lists
     const headerTexels = hBandCount + vBandCount;
     let listTexels = 0;
     for (const l of hLists) listTexels += l.length / 2;
@@ -214,11 +202,9 @@ export function packSlugData(
     totalBandTexels += total;
   }
 
-  // Allocate bandTexture (extra rows for row-alignment padding of curve lists)
   const bandTexHeight = Math.max(1, Math.ceil(totalBandTexels / TEX_WIDTH) + shapes.length * 2);
   const bandData = new Uint32Array(TEX_WIDTH * bandTexHeight * 4);
 
-  // Pack band data per shape
   let bandX = 0;
   let bandY = 0;
 
@@ -231,11 +217,8 @@ export function packSlugData(
       continue;
     }
 
-    // Ensure glyph data doesn't start too close to row end
-    // (need at least headerTexels contiguous... actually wrapping is handled by CalcBandLoc)
-    // But the initial band header reads don't use CalcBandLoc, so glyphLoc.x + bandMax.y + 1 + bandMaxX
-    // must be reachable. CalcBandLoc handles wrapping for curve lists.
-    // To be safe, start each glyph at the beginning of a row if remaining space is tight.
+    // Band headers are read without CalcBandLoc wrapping, so all
+    // headers for a glyph must fit within a single texture row
     const minContiguous = sd.hBands.length + sd.vBands.length;
     if (bandX + minContiguous > TEX_WIDTH) {
       bandX = 0;
@@ -246,12 +229,9 @@ export function packSlugData(
     const glyphLocY = bandY;
     glyphLocs.push({ x: glyphLocX, y: glyphLocY });
 
-    // Curve lists start after all headers
     let listStartOffset = sd.hBands.length + sd.vBands.length;
 
-    // The shader reads curve list entries at (hbandLoc.x + curveIndex, hbandLoc.y)
-    // with NO row wrapping. Each list must fit entirely within a single texture row.
-    // Pad the offset to the next row start when a list would cross a row boundary.
+    // Curve lists aren't row-wrapped by the shader, so pad to avoid crossing
     const ensureListFits = (listLen: number) => {
       if (listLen === 0) return;
       const startX = (glyphLocX + listStartOffset) & ((1 << LOG_TEX_WIDTH) - 1);
@@ -260,14 +240,12 @@ export function packSlugData(
       }
     };
 
-    // Assign list offsets for h-bands
     for (let bi = 0; bi < sd.hBands.length; bi++) {
       const listLen = sd.hLists[bi].length / 2;
       ensureListFits(listLen);
       sd.hBands[bi].listOffset = listStartOffset;
       listStartOffset += listLen;
     }
-    // Assign list offsets for v-bands
     for (let bi = 0; bi < sd.vBands.length; bi++) {
       const listLen = sd.vLists[bi].length / 2;
       ensureListFits(listLen);
@@ -275,7 +253,6 @@ export function packSlugData(
       listStartOffset += listLen;
     }
 
-    // Write h-band headers
     for (let bi = 0; bi < sd.hBands.length; bi++) {
       const tx = glyphLocX + bi;
       const ty = glyphLocY;
@@ -286,7 +263,6 @@ export function packSlugData(
       bandData[idx + 3] = 0;
     }
 
-    // Write v-band headers (after h-bands)
     const vBandStart = glyphLocX + sd.hBands.length;
     for (let bi = 0; bi < sd.vBands.length; bi++) {
       const tx = vBandStart + bi;
@@ -298,10 +274,8 @@ export function packSlugData(
       bandData[idx + 3] = 0;
     }
 
-    // Write curve lists using CalcBandLoc-style wrapping
     const texWidthMask = (1 << LOG_TEX_WIDTH) - 1;
 
-    // Write h-band curve lists
     for (let bi = 0; bi < sd.hBands.length; bi++) {
       const list = sd.hLists[bi];
       const baseOffset = sd.hBands[bi].listOffset;
@@ -310,14 +284,13 @@ export function packSlugData(
         const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
         bx &= texWidthMask;
         const idx = (by * TEX_WIDTH + bx) * 4;
-        bandData[idx + 0] = list[ci];     // curveTexX
-        bandData[idx + 1] = list[ci + 1]; // curveTexY
+        bandData[idx + 0] = list[ci];
+        bandData[idx + 1] = list[ci + 1];
         bandData[idx + 2] = 0;
         bandData[idx + 3] = 0;
       }
     }
 
-    // Write v-band curve lists
     for (let bi = 0; bi < sd.vBands.length; bi++) {
       const list = sd.vLists[bi];
       const baseOffset = sd.vBands[bi].listOffset;
@@ -333,7 +306,6 @@ export function packSlugData(
       }
     }
 
-    // Advance band cursor past this shape's data
     let endBx = glyphLocX + listStartOffset;
     bandY = glyphLocY + (endBx >> LOG_TEX_WIDTH);
     bandX = endBx & texWidthMask;
@@ -341,19 +313,16 @@ export function packSlugData(
 
   const actualBandTexHeight = bandY + 1;
 
-  // Build vertex attributes
-  // 5 attribs x 4 floats x 4 vertices per shape = 80 floats per shape
   const FLOATS_PER_VERTEX = 20; // 5 attribs * 4 components
   const VERTS_PER_SHAPE = 4;
   const vertices = new Float32Array(shapes.length * VERTS_PER_SHAPE * FLOATS_PER_VERTEX);
   const indices = new Uint16Array(shapes.length * 6);
 
-  // Corner normals (outward-pointing, un-normalized; SlugDilate normalizes)
   const cornerNormals: [number, number][] = [
-    [-1, -1], // bottom-left
-    [ 1, -1], // bottom-right
-    [ 1,  1], // top-right
-    [-1,  1], // top-left
+    [-1, -1],
+    [ 1, -1],
+    [ 1,  1],
+    [-1,  1],
   ];
 
   for (let si = 0; si < shapes.length; si++) {
@@ -364,7 +333,6 @@ export function packSlugData(
     const w = bMaxX - bMinX;
     const h = bMaxY - bMinY;
 
-    // Corner positions in object-space
     const corners: [number, number][] = [
       [bMinX, bMinY],
       [bMaxX, bMinY],
@@ -372,7 +340,6 @@ export function packSlugData(
       [bMinX, bMaxY],
     ];
 
-    // Em-space sample coords in glyph-local space (origin at bounds min)
     const emCorners: [number, number][] = [
       [0, 0],
       [w, 0],
@@ -380,15 +347,12 @@ export function packSlugData(
       [0, h],
     ];
 
-    // Pack tex.z: glyph location in band texture
     const texZ = uintAsFloat((glyph.x & 0xFFFF) | ((glyph.y & 0xFFFF) << 16));
 
-    // Pack tex.w: band max + flags
     let texWBits = (sd.bandMaxX & 0xFF) | ((sd.bandMaxY & 0xFF) << 16);
     if (evenOdd) texWBits |= 0x10000000; // E flag at bit 28
     const texW = uintAsFloat(texWBits);
 
-    // Band transform: scale to map glyph-local em-coords to band indices
     const bandScaleX = w > 0 ? sd.vBands.length / w : 0;
     const bandScaleY = h > 0 ? sd.hBands.length / h : 0;
 
@@ -407,26 +371,25 @@ export function packSlugData(
       vertices[base + 6] = texZ;
       vertices[base + 7] = texW;
 
-      // jac: identity Jacobian (em-space is a pure translation of object-space)
+      // jac: identity (em-space is a translation of object-space)
       vertices[base + 8] = 1.0;
       vertices[base + 9] = 0.0;
       vertices[base + 10] = 0.0;
       vertices[base + 11] = 1.0;
 
-      // bnd: band scale (offset is zero in glyph-local space)
+      // bnd: band scale (offset zero in glyph-local space)
       vertices[base + 12] = bandScaleX;
       vertices[base + 13] = bandScaleY;
       vertices[base + 14] = 0;
       vertices[base + 15] = 0;
 
-      // col: white with full alpha (caller overrides via uniform or attribute)
+      // col
       vertices[base + 16] = 1.0;
       vertices[base + 17] = 1.0;
       vertices[base + 18] = 1.0;
       vertices[base + 19] = 1.0;
     }
 
-    // Indices: two triangles per quad
     const vBase = si * 4;
     const iBase = si * 6;
     indices[iBase + 0] = vBase + 0;

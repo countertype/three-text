@@ -8,7 +8,7 @@ import type {
 } from '../core/types';
 import type { BoundingBox } from '../utils/vectors';
 import type { SlugGPUData } from './slug/types';
-import { createSlugGLSLMesh, type SlugGLSLMesh } from './slug/slugGLSL';
+import { createSlugGLSLMesh } from './slug/slugGLSL';
 import type { HyphenationTrieNode } from '../hyphenation';
 // @ts-ignore - three is a peer dependency
 import * as THREE from 'three';

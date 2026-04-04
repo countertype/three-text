@@ -1,7 +1,3 @@
-// Slug shader source re-exports
-// The .glsl/.wgsl files are the single source of truth, imported as strings
-// at build time via the glslPlugin in rollup.config.js
-
 // @ts-ignore - resolved by rollup glslPlugin
 import vertGLSL from './shaders/slug.vert.glsl';
 // @ts-ignore - resolved by rollup glslPlugin
