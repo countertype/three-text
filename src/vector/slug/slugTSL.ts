@@ -1,17 +1,8 @@
-// Slug TSL adapter for Three.js WebGPURenderer (and WebGL via r170+)
+// Slug adapter using Three.js TSL (node materials)
+// Works on both WebGPU and WebGL backends (r170+)
 //
-// Creates a single Three.js Mesh with a NodeMaterial that implements
-// the Slug algorithm: per-fragment winding number evaluation via
-// band-accelerated ray-curve intersection
-//
-// Works on both WebGPU and WebGL backends via Three.js TSL
-//
-// Compared to the raw GLSL/WGSL standalone renderers, this adapter
-// trades some features for Three.js integration:
-//   - No vertex dilation (may cause sub-pixel edge clipping at extreme zoom)
-//   - No adaptive supersampling (single-sample per fragment)
-//
-// Requires peer dependencies: three, three/tsl
+// No vertex dilation or adaptive supersampling (unlike the raw
+// GLSL/WGSL renderers); may clip at sub-pixel edges under extreme zoom
 
 // @ts-ignore - three is a peer dependency
 import * as THREE from 'three';
@@ -25,9 +16,7 @@ import { unpackSlugVertices } from './unpackVertices';
 
 export interface SlugTSLMesh {
   mesh: THREE.Mesh;
-  // Set position offset (e.g. to center the text)
   setOffset(x: number, y: number, z?: number): void;
-  // Update text color without rebuilding the mesh
   setColor(r: number, g: number, b: number): void;
   dispose(): void;
 }
@@ -103,10 +92,6 @@ const calcBandLoc = Fn(([glyphX, glyphY, offset]: any[]) => {
   return ivec2(bx, by);
 });
 
-// Create a Three.js Mesh from SlugGPUData using TSL node materials.
-// Returns a single transparent mesh suitable for any Three.js scene.
-// The Slug algorithm evaluates per-fragment coverage analytically,
-// so no stencil buffer or multi-pass rendering is required
 export function createSlugTSLMesh(
   gpuData: SlugGPUData,
   color?: { r: number; g: number; b: number }
@@ -152,18 +137,13 @@ export function createSlugTSLMesh(
   bandTex.generateMipmaps = false;
   bandTex.needsUpdate = true;
 
-  // Varyings: vertex attributes interpolated to fragment stage
   const vTexcoord = varying(attribute('slugTexcoord', 'vec2'), 'v_texcoord');
   const vBanding = varying(attribute('slugBanding', 'vec4'), 'v_banding');
   const vGlyph = varying(attribute('slugGlyph', 'vec4'), 'v_glyph');
   const vColor = varying(attribute('slugColor', 'vec4'), 'v_color');
 
-  // Color uniform (allows dynamic color updates)
   const textColor = uniform(new THREE.Color(color?.r ?? 1, color?.g ?? 1, color?.b ?? 1));
 
-  // Main per-fragment evaluation: SlugRenderSingle ported to TSL
-  // Evaluates horizontal and vertical band loops to compute
-  // analytic winding-number coverage
   const slugRenderSingle = Fn((
     [renderCoord, emsPerPixel, bandTransform, glyphData]: any[]
   ) => {
@@ -186,7 +166,6 @@ export function createSlugTSLMesh(
       bandMaxY
     ), int(0));
 
-    // Horizontal band loop
     const xcov = float(0).toVar();
     const xwgt = float(0).toVar();
 
@@ -232,7 +211,6 @@ export function createSlugTSLMesh(
       hIdx.addAssign(1);
     });
 
-    // Vertical band loop
     const ycov = float(0).toVar();
     const ywgt = float(0).toVar();
 
@@ -279,7 +257,6 @@ export function createSlugTSLMesh(
       vIdx.addAssign(1);
     });
 
-    // CalcCoverage (nonzero winding rule)
     const coverage = max(
       abs(xcov.mul(xwgt).add(ycov.mul(ywgt))).div(
         max(xwgt.add(ywgt), float(1.0 / 65536.0))
@@ -289,14 +266,11 @@ export function createSlugTSLMesh(
     return clamp(coverage, 0, 1);
   });
 
-  // Top-level fragment node
   const fragmentNode = Fn(() => {
     const emsPerPixel = fwidth(vTexcoord);
     const coverage = slugRenderSingle(vTexcoord, emsPerPixel, vBanding, vGlyph);
     return vec4(textColor.x, textColor.y, textColor.z, vColor.w.mul(coverage));
   })();
-
-  // Material & mesh
 
   const material = new MeshBasicNodeMaterial();
   material.fragmentNode = fragmentNode;

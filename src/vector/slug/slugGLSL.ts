@@ -1,14 +1,8 @@
-// Slug GLSL adapter for Three.js, using RawShaderMaterial with the
-// reference GLSL shaders. Works with both WebGLRenderer and
-// WebGPURenderer (via GLSL-to-WGSL transpilation)
+// Slug adapter using Three.js RawShaderMaterial (GLSL)
+// Works with any Three.js renderer (WebGL or WebGPU via transpilation)
 //
-// Compared to the TSL adapter (slugTSL.ts):
-//   - Works with any Three.js renderer (no node-material dependency)
-//   - Uses native Uint32 band texture (no float conversion)
-//   - Supports GLSL animation injection via animationDeclarations/animationBody
-//   - Same tradeoff: no vertex dilation (may cause sub-pixel edge clipping at extreme zoom)
-//
-// Requires peer dependency: three
+// Supports GLSL animation injection and native Uint32 band textures
+// No vertex dilation; may clip at sub-pixel edges under extreme zoom
 
 // @ts-ignore - three is a peer dependency
 import * as THREE from 'three';
@@ -94,7 +88,6 @@ export function createSlugGLSLMesh(
   geo.setAttribute('glyphIndex', new THREE.Float32BufferAttribute(attrs.glyphIndices, 1));
   geo.setIndex(new THREE.BufferAttribute(gpuData.indices, 1));
 
-  // Curve texture: RGBA32F
   const curveTex = new THREE.DataTexture(
     gpuData.curveTexture.data,
     gpuData.curveTexture.width,
@@ -107,7 +100,7 @@ export function createSlugGLSLMesh(
   curveTex.generateMipmaps = false;
   curveTex.needsUpdate = true;
 
-  // Band texture: native RGBA32UI (no float conversion needed)
+  // RGBA32UI (unlike TSL, GLSL supports integer textures natively)
   const bandTex = new THREE.DataTexture(
     gpuData.bandTexture.data,
     gpuData.bandTexture.width,

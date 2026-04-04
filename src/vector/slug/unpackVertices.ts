@@ -1,6 +1,3 @@
-// Restructures the tightly-packed vertex buffer from SlugPacker into
-// separate per-attribute arrays for GPU attribute binding
-
 import type { SlugGPUData } from './types';
 
 const FLOATS_PER_VERT = 20;
@@ -40,7 +37,6 @@ export function unpackSlugVertices(gpuData: SlugGPUData): SlugVertexArrays {
     bandings[i * 4 + 2] = srcF[s + 14];
     bandings[i * 4 + 3] = srcF[s + 15];
 
-    // Unpack glyph location and band metadata from bit-packed fields
     const g0 = srcU[s + 6];
     const g1 = srcU[s + 7];
     glyphData[i * 4] = g0 & 0xFFFF;
@@ -54,7 +50,6 @@ export function unpackSlugVertices(gpuData: SlugGPUData): SlugVertexArrays {
     colors[i * 4 + 3] = srcF[s + 19];
   }
 
-  // Per-glyph center: average of quad corner positions
   const glyphCenters = new Float32Array(vertCount * 3);
   const glyphIndices = new Float32Array(vertCount);
   for (let g = 0; g < gpuData.shapeCount; g++) {

@@ -46,12 +46,12 @@ vec2 SlugDilate(vec4 pos, vec4 tex, vec4 jac, vec4 m0, vec4 m1, vec4 m3, vec2 di
 void main() {
     vec2 p;
 
-    // Dynamic dilation: expand quad by a pixel to prevent edge clipping.
+    // Dynamic dilation: expand quad by a pixel to prevent edge clipping
     v_texcoord = SlugDilate(a_pos, a_tex, a_jac,
                             slug_matrix[0], slug_matrix[1], slug_matrix[3],
                             slug_viewport, p);
 
-    // MVP transform on dilated position.
+    // MVP transform on dilated position
     gl_Position.x = p.x * slug_matrix[0].x + p.y * slug_matrix[0].y + slug_matrix[0].w;
     gl_Position.y = p.x * slug_matrix[1].x + p.y * slug_matrix[1].y + slug_matrix[1].w;
     gl_Position.z = p.x * slug_matrix[2].x + p.y * slug_matrix[2].y + slug_matrix[2].w;
