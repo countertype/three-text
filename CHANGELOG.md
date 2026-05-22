@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.2] - 2026-05-21
+
+### Fixed
+
+- Security: updated dependencies via `npm audit fix` (follow-redirects, postcss, vite, ws)
+
 ## [0.6.1] - 2026-04-02
 
 ### Fixed
