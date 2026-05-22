@@ -19,8 +19,6 @@ High fidelity 3D text rendering and layout for the web
 
 The library has a framework-agnostic core with lightweight adapters for [Three.js](https://threejs.org), [React Three Fiber](https://docs.pmnd.rs/react-three-fiber), [p5.js](https://p5js.org), [WebGL](https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API), and [WebGPU](https://developer.mozilla.org/en-US/docs/Web/API/WebGPU_API)
 
-Under the hood, three-text relies on a core of [harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs) (based on [HarfBuzz](https://github.com/harfbuzz/harfbuzz) by Behdad Esfahbod et al) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking (with [SILE](https://github.com/sile-typesetter/sile/blob/master/core/break.lua) and LuaTex being the closest modern references), [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation and the [TeX hyphenation patterns](https://github.com/hyphenation/tex-hyphen), and [woff-lib](https://github.com/countertype/woff-lib) for optional WOFF2 support. The mesh text pipeline uses [libtess-ts](https://github.com/countertype/libtess-ts) (a port of the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, adaptive curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), and [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/). The vector pipeline uses [Slug](https://github.com/EricLengyel/Slug) by Eric Lengyel for resolution-independent curve rendering
-
 ## Table of contents
 
 - [Overview](#overview)
@@ -41,6 +39,7 @@ Under the hood, three-text relies on a core of [harfbuzzjs](https://github.com/h
 - [Browser compatibility](#browser-compatibility)
 - [Testing](#testing)
 - [Build system](#build-system)
+- [Entry points](#entry-points)
 - [Build outputs](#build-outputs)
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
@@ -60,23 +59,7 @@ npm install three
 
 ## Architecture
 
-three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats:
-
-- **`three-text`** - Three.js adapter (default export, returns mesh `BufferGeometry`)
-- **`three-text/mesh`** - Same as above (explicit alias)
-- **`three-text/mesh/react`** - React Three Fiber component for extruded mesh text
-- **`three-text/three/react`** - Deprecated, use `three-text/mesh/react`
-- **`three-text/mesh/webgl`** - WebGL mesh buffer utility
-- **`three-text/mesh/webgpu`** - WebGPU mesh buffer utility
-- **`three-text/mesh/p5`** - p5.js adapter
-- **`three-text/core`** - Framework-agnostic core (returns raw arrays)
-- **`three-text/vector`** - Vector rendering (Slug per-fragment curve evaluation), `Text.create()` returns a `THREE.Group`
-- **`three-text/vector/react`** - React Three Fiber component for vector text
-- **`three-text/vector/core`** - Framework-agnostic vector core (returns raw `SlugGPUData`, no Three.js dependency)
-- **`three-text/vector/webgl`** - Raw WebGL2 vector renderer (no Three.js dependency)
-- **`three-text/vector/webgpu`** - Raw WebGPU vector renderer (no Three.js dependency)
-
-Most users will just `import { Text } from 'three-text'` for Three.js projects with mesh, or `import { Text } from 'three-text/vector'` for vector text
+three-text has a framework-agnostic core that processes fonts and generates geometry data. Lightweight adapters convert this data to framework-specific formats. Most users will just `import { Text } from 'three-text'` for Three.js projects with mesh, or `import { Text } from 'three-text/vector'` for vector text. See [Entry points](#entry-points) for the full list of adapters
 
 ### Mesh vs vector
 
@@ -478,6 +461,8 @@ Existing solutions take different approaches:
 - **troika-three-text** generates SDF glyphs at runtime via HarfBuzz. More flexible than bmfont, but still an image-space technique with artifacts up close
 
 three-text produces actual geometry from font files, sharper at close distances than bitmap approaches, with control over typesetting and paragraph justification via TeX-based parameters
+
+Under the hood, three-text relies on a core of [harfbuzzjs](https://github.com/harfbuzz/harfbuzzjs) (based on [HarfBuzz](https://github.com/harfbuzz/harfbuzz) by Behdad Esfahbod et al) for text shaping, [Knuth-Plass](http://www.eprg.org/G53DOC/pdfs/knuth-plass-breaking.pdf) line breaking (with [SILE](https://github.com/sile-typesetter/sile/blob/master/core/break.lua) and LuaTex being the closest modern references), [Liang](https://tug.org/docs/liang/liang-thesis.pdf) hyphenation and the [TeX hyphenation patterns](https://github.com/hyphenation/tex-hyphen), and [woff-lib](https://github.com/countertype/woff-lib) for optional WOFF2 support. The mesh text pipeline uses [libtess-ts](https://github.com/countertype/libtess-ts) (a port of the [GLU tessellator](https://www.songho.ca/opengl/gl_tessellation.html) by Eric Veach) for removing overlaps and triangulation, adaptive curve polygonization from Maxim Shemanarev's [Anti-Grain Geometry](https://web.archive.org/web/20060128212843/http://www.antigrain.com/research/adaptive_bezier/index.html), and [Visvalingam-Whyatt](https://hull-repository.worktribe.com/preview/376364/000870493786962263.pdf) [line simplification](https://bost.ocks.org/mike/simplify/). The vector pipeline uses [Slug](https://github.com/EricLengyel/Slug) by Eric Lengyel for resolution-independent curve rendering
 
 ### Why Slug
 
@@ -1251,6 +1236,22 @@ git submodule update --init --recursive
 ```
 
 The script then processes the TeX hyphenation data into optimized trie structures. The process is slow for the complete set of languages (~1 minute on an M2 Max), so using `--languages` for development is recommended
+
+## Entry points
+
+- **`three-text`** - Three.js adapter (default export, returns mesh `BufferGeometry`)
+- **`three-text/mesh`** - Same as above (explicit alias)
+- **`three-text/mesh/react`** - React Three Fiber component for extruded mesh text
+- **`three-text/three/react`** - Deprecated, use `three-text/mesh/react`
+- **`three-text/mesh/webgl`** - WebGL mesh buffer utility
+- **`three-text/mesh/webgpu`** - WebGPU mesh buffer utility
+- **`three-text/mesh/p5`** - p5.js adapter
+- **`three-text/core`** - Framework-agnostic core (returns raw arrays)
+- **`three-text/vector`** - Vector rendering (Slug per-fragment curve evaluation), `Text.create()` returns a `THREE.Group`
+- **`three-text/vector/react`** - React Three Fiber component for vector text
+- **`three-text/vector/core`** - Framework-agnostic vector core (returns raw `SlugGPUData`, no Three.js dependency)
+- **`three-text/vector/webgl`** - Raw WebGL2 vector renderer (no Three.js dependency)
+- **`three-text/vector/webgpu`** - Raw WebGPU vector renderer (no Three.js dependency)
 
 ## Build outputs
 
