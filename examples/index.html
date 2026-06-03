@@ -617,8 +617,6 @@ function createVectorPositionNode(mode) {
 function createMeshMaterial(mode) {
   const animatedDoubleSided = ["flip", "explode", "orbit", "twister"].includes(mode);
   const material = new THREE.MeshBasicNodeMaterial();
-  material.transparent = true;
-  material.opacity = 1.0;
   material.wireframe = params.wireframe;
   material.side = (params.depth === 0 || animatedDoubleSided) ? THREE.DoubleSide : THREE.FrontSide;
 
