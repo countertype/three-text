@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.3] - 2026-06-03
+
+### Fixed
+
+- Fix mesh depth occlusion in examples
+- Expose `setColor(r, g, b)` on `VectorTextResult`
+
 ## [0.6.2] - 2026-05-21
 
 ### Fixed

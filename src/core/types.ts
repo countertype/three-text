@@ -344,7 +344,6 @@ export interface TextOptions {
   geometryOptimization?: GeometryOptimizationOptions;
   layout?: LayoutOptions;
   color?: [number, number, number] | ColorOptions;
-  /** Enable rotated RGSS-4 adaptive supersampling (4 samples per pixel). Takes effect when the GLSL rendering path is active. */
   adaptiveSupersampling?: boolean;
 }
 

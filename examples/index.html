@@ -723,6 +723,10 @@ function onWindowResize() {
   textFolder.addColor(params, "textColor").name("Text color").onChange((value) => {
     textColorU.value.set(value);
     if (params.renderMode === "vector") {
+      if (currentVectorResult) {
+        const [r, g, b] = hexToRgb(value);
+        currentVectorResult.setColor(r, g, b);
+      }
       return;
     }
 
