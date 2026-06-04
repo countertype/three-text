@@ -22,6 +22,7 @@ export interface VectorTextResult {
   query(options: TextQueryOptions): TextRange[];
   getLoadedFont(): LoadedFont | undefined;
   measureTextWidth(text: string, letterSpacing?: number): number;
+  setColor(r: number, g: number, b: number): void;
   update(options: Partial<TextOptions>): Promise<VectorTextResult>;
   dispose(): void;
 }
@@ -87,6 +88,7 @@ async function wrapCoreResult(
     glyphs: coreResult.glyphs,
     planeBounds: coreResult.planeBounds,
     query: (queryOptions) => coreResult.query(queryOptions),
+    setColor: (r, g, b) => slugMesh.setColor(r, g, b),
     getLoadedFont: () => coreResult.getLoadedFont(),
     measureTextWidth: (text, letterSpacing) => coreResult.measureTextWidth(text, letterSpacing),
     update: async (newOptions) => {
