@@ -102,11 +102,14 @@ export class GlyphOutlineCollector {
     const p1 = new Vec2(x, y);
     const p0 = this.currentPoint;
     this.updateBounds(p1);
+    // p2/p3 always present so every segment shares one hidden class
     this.currentSegments.push({
       type: 0,
       contourId: this.contourId,
       p0,
-      p1
+      p1,
+      p2: p1,
+      p3: p1
     });
     this.currentPoint = p1;
   }
@@ -123,7 +126,8 @@ export class GlyphOutlineCollector {
       contourId: this.contourId,
       p0,
       p1,
-      p2
+      p2,
+      p3: p2
     });
     this.currentPoint = p2;
   }
@@ -164,7 +168,9 @@ export class GlyphOutlineCollector {
         type: 0,
         contourId: this.contourId,
         p0,
-        p1
+        p1,
+        p2: p1,
+        p3: p1
       });
     }
     this.currentPoint = p1;

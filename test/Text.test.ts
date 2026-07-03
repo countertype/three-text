@@ -88,7 +88,7 @@ vi.mock('../src/mesh/GlyphContourCollector', () => {
   });
 
   return {
-    GlyphContourCollector: vi.fn(() => {
+    GlyphContourCollector: vi.fn(function () {
       const contoursCache = new Map();
 
       return {
@@ -141,7 +141,9 @@ vi.mock('../src/core/shaping/HarfBuzzLoader', () => ({
 
 vi.mock('../src/core/font/FontLoader', () => {
   const FontLoader = Object.assign(
-    vi.fn(() => ({
+    // vitest 4 constructs the implementation, so it must not be an arrow fn
+    vi.fn(function () {
+      return {
       loadFont: vi.fn().mockResolvedValue({
         hb: {
           createBuffer: vi.fn().mockReturnValue({
@@ -202,7 +204,8 @@ vi.mock('../src/core/font/FontLoader', () => {
         variationAxes: {},
         _buffer: new ArrayBuffer(100)
       })
-    })),
+      };
+    }),
     { destroyFont: vi.fn() }
   );
 
@@ -210,10 +213,12 @@ vi.mock('../src/core/font/FontLoader', () => {
 });
 
 vi.mock('../src/core/shaping/DrawCallbacks', () => ({
-  DrawCallbackHandler: vi.fn(() => ({
-    createDrawFuncs: vi.fn(),
-    destroy: vi.fn()
-  }))
+  DrawCallbackHandler: vi.fn(function () {
+    return {
+      createDrawFuncs: vi.fn(),
+      destroy: vi.fn()
+    };
+  })
 }));
 
 vi.mock('../src/mesh/GlyphGeometryBuilder', () => {
@@ -222,7 +227,8 @@ vi.mock('../src/mesh/GlyphGeometryBuilder', () => {
   const mockIndices = new Uint32Array(300).fill(0);
 
   return {
-    GlyphGeometryBuilder: vi.fn().mockImplementation(() => ({
+    GlyphGeometryBuilder: vi.fn().mockImplementation(function () {
+      return {
       setFontId: vi.fn(),
       setCurveFidelityConfig: vi.fn(),
       setCurveSteps: vi.fn(),
@@ -285,13 +291,15 @@ vi.mock('../src/mesh/GlyphGeometryBuilder', () => {
         memoryUsageMB: 1.024
       }),
       clearCache: vi.fn()
-    }))
+      };
+    })
   };
 });
 
 vi.mock('../src/core/shaping/TextShaper', () => {
   return {
-    TextShaper: vi.fn().mockImplementation((loadedFont) => ({
+    TextShaper: vi.fn().mockImplementation(function (loadedFont) {
+      return {
       shapeLines: vi.fn((lineInfos) => {
         // For each line, create clusters with glyphs from HarfBuzz
         return lineInfos.map((lineInfo: any, lineIndex: number) => {
@@ -324,7 +332,8 @@ vi.mock('../src/core/shaping/TextShaper', () => {
           ];
         });
       })
-    }))
+      };
+    })
   };
 });
 

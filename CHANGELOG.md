@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.4] - 2026-07-03
+
+### Added
+
+- Optional `key` on `SlugShape` — shapes sharing a key store curve/band texels once, so texture size scales with unique glyphs instead of glyph count
+
+### Changed
+
+- Vector text builds up to 20x faster: slug texels packed per unique glyph, band texture allocated at exact size
+- Mesh layout 30-45% faster: text measurements memoized per layout, monomorphic line-break items, reduced hot-loop allocation
+- Hyphenation tries converted to charCode-keyed Maps with per-word memoization
+
+### Fixed
+
+- `dispose()` on the three adapter releases the `BufferGeometry` (GPU memory grew on repeated updates)
+- WebGPU adapter honors `Uint16Array` indices and 4-byte buffer size alignment
+- Extruder edge keys collided past 65,535 vertices per tessellation
+
 ## [0.6.3] - 2026-06-03
 
 ### Fixed

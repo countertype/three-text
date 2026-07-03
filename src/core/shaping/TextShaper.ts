@@ -124,19 +124,6 @@ export class TextShaper {
       const isWhitespace =
         charCode === 32 || charCode === 9 || charCode === 10 || charCode === 13;
 
-      // Inserted hyphens inherit the color of the last character in the word
-      if (
-        lineInfo.endedWithHyphen &&
-        charIndex === lineTextLength - 1 &&
-        char === '-'
-      ) {
-        glyph.absoluteTextIndex = lineInfo.originalEnd;
-      } else {
-        glyph.absoluteTextIndex = lineInfo.originalStart + charIndex;
-      }
-
-      glyph.lineIndex = lineIndex;
-
       // Cluster boundaries are based on whitespace only.
       // Coloring is applied later via vertex colors and must never affect shaping/kerning.
       if (isWhitespace) {
@@ -159,9 +146,29 @@ export class TextShaper {
           clusterStartX = absoluteGlyphX;
           clusterStartY = absoluteGlyphY;
         }
-        glyph.x = absoluteGlyphX - clusterStartX;
-        glyph.y = absoluteGlyphY - clusterStartY;
-        currentClusterGlyphs.push(glyph);
+
+        // Inserted hyphens inherit the color of the last character in the word
+        const absoluteTextIndex =
+          lineInfo.endedWithHyphen &&
+          charIndex === lineTextLength - 1 &&
+          char === '-'
+            ? lineInfo.originalEnd
+            : lineInfo.originalStart + charIndex;
+
+        // One fully-initialized literal per glyph keeps every cluster's
+        // glyph array monomorphic for downstream per-glyph loops
+        currentClusterGlyphs.push({
+          g: glyph.g,
+          cl: glyph.cl,
+          ax: glyph.ax,
+          ay: glyph.ay,
+          dx: glyph.dx,
+          dy: glyph.dy,
+          x: absoluteGlyphX - clusterStartX,
+          y: absoluteGlyphY - clusterStartY,
+          lineIndex,
+          absoluteTextIndex
+        });
         clusterTextChars.push(char);
       }
 

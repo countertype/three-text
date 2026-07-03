@@ -12,6 +12,10 @@ export type SlugVec2 = [number, number];
 export interface SlugShape {
   curves: QuadCurve[];
   bounds: [number, number, number, number]; // minX, minY, maxX, maxY
+  // Optional dedup key. Shapes sharing a key must have translation-equivalent
+  // curves; the packer stores texels once per key, so texture size is
+  // O(unique keys) rather than O(shapes)
+  key?: number | string;
 }
 
 export interface SlugPackedTexture {

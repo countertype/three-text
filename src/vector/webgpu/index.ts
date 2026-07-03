@@ -144,6 +144,9 @@ function createResources(
   return { pipeline, bindGroup, vertexBuffer, indexBuffer, uniformBuffer, indexCount: gpuData.indices.length };
 }
 
+// Reused across draw calls; writeBuffer copies synchronously
+const _uniformScratch = new Float32Array(20);
+
 function draw(
   device: GPUDevice,
   pass: GPURenderPassEncoder,
@@ -152,7 +155,7 @@ function draw(
   viewportWidth: number,
   viewportHeight: number
 ): void {
-  const uniformData = new Float32Array(20);
+  const uniformData = _uniformScratch;
   uniformData.set(mvpMatrix, 0);
   uniformData[16] = viewportWidth;
   uniformData[17] = viewportHeight;

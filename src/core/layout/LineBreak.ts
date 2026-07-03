@@ -200,6 +200,129 @@ const EJECT_PENALTY = -10000; // eject_penalty - force break here
 // Retry increment when no breakpoints found
 const EMERGENCY_STRETCH_INCREMENT = 0.1;
 
+// Registered pattern tries are converted lazily (cached by identity) to
+// charCode-keyed Maps, with raw per-word points memoized across layouts
+interface FastTrieNode {
+  patterns: number[] | null;
+  children: Map<number, FastTrieNode> | null;
+}
+
+interface FastPatternCache {
+  root: FastTrieNode;
+  wordMemo: Map<string, number[]>;
+}
+
+const MAX_WORD_MEMO_ENTRIES = 20000;
+const fastPatternCaches = new WeakMap<HyphenationTrieNode, FastPatternCache>();
+
+function toFastTrie(node: HyphenationTrieNode): FastTrieNode {
+  let children: Map<number, FastTrieNode> | null = null;
+  if (node.children) {
+    for (const key in node.children) {
+      if (children === null) children = new Map();
+      // Pattern keys are single BMP chars
+      children.set(key.charCodeAt(0), toFastTrie(node.children[key]));
+    }
+  }
+  return { patterns: node.patterns ?? null, children };
+}
+
+function getFastPatternCache(trie: HyphenationTrieNode): FastPatternCache {
+  let cache = fastPatternCaches.get(trie);
+  if (!cache) {
+    cache = { root: toFastTrie(trie), wordMemo: new Map() };
+    fastPatternCaches.set(trie, cache);
+  }
+  return cache;
+}
+
+// Hoisted regexes for per-char/per-token loops
+const WHITESPACE_RE = /\s/;
+const WS_TOKEN_RE = /^\s/;
+const TOKENIZE_RE = /\S+|\s+/g;
+const LETTERS_ONLY_RE = /^\p{L}+$/u;
+
+// All items share one hidden class so the Knuth-Plass inner loop stays
+// monomorphic; unused fields hold falsy defaults, preserving consumers'
+// truthiness checks on text/noBreak/flagged
+function newItem(
+  type: ItemType,
+  width: number,
+  text: string,
+  originIndex: number,
+  stretch: number,
+  shrink: number,
+  penalty: number,
+  flagged: boolean,
+  preBreak: string,
+  postBreak: string,
+  noBreak: string,
+  preBreakWidth: number
+) {
+  return {
+    type,
+    width,
+    text,
+    originIndex,
+    stretch,
+    shrink,
+    penalty,
+    flagged,
+    preBreak,
+    postBreak,
+    noBreak,
+    preBreakWidth
+  };
+}
+
+function makeBox(width: number, text: string, originIndex: number): Box {
+  return newItem(
+    ItemType.BOX, width, text, originIndex, 0, 0, 0, false, '', '', '', 0
+  ) as Box;
+}
+
+function makeGlue(
+  width: number,
+  stretch: number,
+  shrink: number,
+  text: string,
+  originIndex: number
+): Glue {
+  return newItem(
+    ItemType.GLUE, width, text, originIndex, stretch, shrink, 0, false,
+    '', '', '', 0
+  ) as Glue;
+}
+
+function makePenalty(
+  width: number,
+  penalty: number,
+  flagged: boolean,
+  text: string,
+  originIndex: number
+): Penalty {
+  return newItem(
+    ItemType.PENALTY, width, text, originIndex, 0, 0, penalty, flagged,
+    '', '', '', 0
+  ) as Penalty;
+}
+
+function makeDiscretionary(
+  width: number,
+  preBreak: string,
+  postBreak: string,
+  noBreak: string,
+  preBreakWidth: number,
+  penalty: number,
+  text: string,
+  originIndex: number
+): Discretionary {
+  return newItem(
+    ItemType.DISCRETIONARY, width, text, originIndex, 0, 0, penalty, true,
+    preBreak, postBreak, noBreak, preBreakWidth
+  ) as Discretionary;
+}
+
 export class LineBreak {
   // TeX: badness function (tex.web lines 2337-2348)
   // Computes badness = 100 * (t/s)³ where t=adjustment, s=stretchability
@@ -243,37 +366,55 @@ export class LineBreak {
 
     if (!patternTrie) return [];
 
+    const cache = getFastPatternCache(patternTrie);
     const lowerWord = word.toLowerCase();
-    const paddedWord = `.${lowerWord}.`;
-    const points = new Array(paddedWord.length).fill(0);
 
-    for (let i = 0; i < paddedWord.length; i++) {
-      let node = patternTrie;
-      for (let j = i; j < paddedWord.length; j++) {
-        const char = paddedWord[j];
-        if (!node.children || !node.children[char]) break;
-        node = node.children[char];
-        if (node.patterns) {
-          for (let k = 0; k < node.patterns.length; k++) {
-            const pos = i + k;
-            if (pos < points.length) {
-              points[pos] = Math.max(points[pos], node.patterns[k]);
+    // Memo holds unfiltered points; lefthyphenmin/righthyphenmin vary per call
+    let hyphenPoints = cache.wordMemo.get(lowerWord);
+    if (hyphenPoints === undefined) {
+      const paddedWord = `.${lowerWord}.`;
+      const paddedLength = paddedWord.length;
+      const points = new Array(paddedLength).fill(0);
+      const root = cache.root;
+
+      for (let i = 0; i < paddedLength; i++) {
+        let node: FastTrieNode | undefined = root;
+        for (let j = i; j < paddedLength; j++) {
+          node = node.children?.get(paddedWord.charCodeAt(j));
+          if (node === undefined) break;
+          const patterns = node.patterns;
+          if (patterns) {
+            for (let k = 0; k < patterns.length; k++) {
+              const pos = i + k;
+              if (pos < paddedLength && patterns[k] > points[pos]) {
+                points[pos] = patterns[k];
+              }
             }
           }
         }
       }
+
+      hyphenPoints = [];
+      for (let i = 2; i < paddedLength - 2; i++) {
+        if (points[i] % 2 === 1) {
+          hyphenPoints.push(i - 1);
+        }
+      }
+
+      if (cache.wordMemo.size >= MAX_WORD_MEMO_ENTRIES) {
+        cache.wordMemo.clear();
+      }
+      cache.wordMemo.set(lowerWord, hyphenPoints);
     }
 
-    const hyphenPoints: number[] = [];
-    for (let i = 2; i < paddedWord.length - 2; i++) {
-      if (points[i] % 2 === 1) {
-        hyphenPoints.push(i - 1);
+    const result: number[] = [];
+    for (let i = 0; i < hyphenPoints.length; i++) {
+      const pos = hyphenPoints[i];
+      if (pos >= lefthyphenmin && word.length - pos >= righthyphenmin) {
+        result.push(pos);
       }
     }
-
-    return hyphenPoints.filter(
-      (pos) => pos >= lefthyphenmin && word.length - pos >= righthyphenmin
-    );
+    return result;
   }
 
   public static itemizeText(
@@ -290,37 +431,23 @@ export class LineBreak {
   ): Item[] {
     const items: Item[] = [];
 
-    items.push(
-      ...this.itemizeParagraph(
-        text,
-        measureText,
-        measureTextWidths,
-        hyphenate,
-        language,
-        availablePatterns,
-        lefthyphenmin,
-        righthyphenmin,
-        context,
-        lineWidth
-      )
+    this.itemizeParagraph(
+      items,
+      text,
+      measureText,
+      measureTextWidths,
+      hyphenate,
+      language,
+      availablePatterns,
+      lefthyphenmin,
+      righthyphenmin,
+      context,
+      lineWidth
     );
 
     // Final glue and penalty
-    items.push({
-      type: ItemType.GLUE,
-      width: 0,
-      stretch: 10000000,
-      shrink: 0,
-      text: '',
-      originIndex: text.length
-    } as Glue);
-    items.push({
-      type: ItemType.PENALTY,
-      width: 0,
-      penalty: EJECT_PENALTY,
-      text: '',
-      originIndex: text.length
-    } as Penalty);
+    items.push(makeGlue(0, 10000000, 0, '', text.length));
+    items.push(makePenalty(0, EJECT_PENALTY, false, '', text.length));
 
     return items;
   }
@@ -328,7 +455,10 @@ export class LineBreak {
   public static isCJK(char: string): boolean {
     const code = char.codePointAt(0);
     if (code === undefined) return false;
+    return this.isCJKCode(code);
+  }
 
+  public static isCJKCode(code: number): boolean {
     return (
       (code >= 0x4e00 && code <= 0x9fff) || // CJK Unified Ideographs
       (code >= 0x3400 && code <= 0x4dbf) || // CJK Extension A
@@ -403,14 +533,14 @@ export class LineBreak {
   }
 
   private static itemizeCJKText(
+    items: Item[],
     text: string,
     measureText: (text: string) => number,
     measureTextWidths: ((text: string) => number[]) | undefined,
     context: LineBreakContext | undefined,
     startOffset: number = 0,
     glueParams?: { width: number; stretch: number; shrink: number }
-  ): Item[] {
-    const items: Item[] = [];
+  ): void {
     const chars = Array.from(text);
     const widths = measureTextWidths ? measureTextWidths(text) : null;
     let textPosition = startOffset;
@@ -432,32 +562,34 @@ export class LineBreak {
       const char = chars[i];
       const nextChar = i < chars.length - 1 ? chars[i + 1] : null;
 
-      if (/\s/.test(char)) {
+      if (WHITESPACE_RE.test(char)) {
         const width = widths
           ? (widths[i] ?? measureText(char))
           : measureText(char);
-        items.push({
-          type: ItemType.GLUE,
-          width,
-          stretch: width * SPACE_STRETCH_RATIO,
-          shrink: width * SPACE_SHRINK_RATIO,
-          text: char,
-          originIndex: textPosition
-        } as Glue);
+        items.push(
+          makeGlue(
+            width,
+            width * SPACE_STRETCH_RATIO,
+            width * SPACE_SHRINK_RATIO,
+            char,
+            textPosition
+          )
+        );
         textPosition += char.length;
         continue;
       }
 
-      items.push({
-        type: ItemType.BOX,
-        width: widths ? (widths[i] ?? measureText(char)) : measureText(char),
-        text: char,
-        originIndex: textPosition
-      } as Box);
+      items.push(
+        makeBox(
+          widths ? (widths[i] ?? measureText(char)) : measureText(char),
+          char,
+          textPosition
+        )
+      );
 
       textPosition += char.length;
 
-      if (nextChar && !/\s/.test(nextChar)) {
+      if (nextChar && !WHITESPACE_RE.test(nextChar)) {
         let canBreak = true;
         if (this.isCJClosingPunctuation(nextChar)) canBreak = false;
         if (this.isCJOpeningPunctuation(char)) canBreak = false;
@@ -465,22 +597,16 @@ export class LineBreak {
           this.isCJPunctuation(char) && this.isCJPunctuation(nextChar);
 
         if (canBreak && !isPunctPair) {
-          items.push({
-            type: ItemType.GLUE,
-            width: glueWidth,
-            stretch: glueStretch,
-            shrink: glueShrink,
-            text: '',
-            originIndex: textPosition
-          } as Glue);
+          items.push(
+            makeGlue(glueWidth, glueStretch, glueShrink, '', textPosition)
+          );
         }
       }
     }
-
-    return items;
   }
 
   private static itemizeParagraph(
+    items: Item[],
     text: string,
     measureText: (text: string) => number,
     measureTextWidths: ((text: string) => number[]) | undefined,
@@ -491,10 +617,7 @@ export class LineBreak {
     righthyphenmin: number,
     context: LineBreakContext | undefined,
     lineWidth?: number
-  ): Item[] {
-    const items: Item[] = [];
-    const chars = Array.from(text);
-
+  ): void {
     // Inter-character glue for CJK justification
     // Matches pTeX's default \kanjiskip behavior
     let cjkGlueParams:
@@ -512,70 +635,65 @@ export class LineBreak {
       return cjkGlueParams;
     };
 
-    let buffer = '';
-    let bufferStart = 0;
-    let bufferScript: 'cjk' | 'word' | null = null;
-    let textPosition = 0;
-
-    const flushBuffer = () => {
-      if (buffer.length === 0) return;
-
-      if (bufferScript === 'cjk') {
-        items.push(
-          ...this.itemizeCJKText(
-            buffer,
-            measureText,
-            measureTextWidths,
-            context,
-            bufferStart,
-            getCjkGlueParams()
-          )
+    // Script runs are [runStart, i) code-unit ranges, sliced once per run
+    const flushRun = (
+      runText: string,
+      runStart: number,
+      runScript: 'cjk' | 'word'
+    ) => {
+      if (runScript === 'cjk') {
+        this.itemizeCJKText(
+          items,
+          runText,
+          measureText,
+          measureTextWidths,
+          context,
+          runStart,
+          getCjkGlueParams()
         );
       } else {
-        items.push(
-          ...this.itemizeWordBased(
-            buffer,
-            bufferStart,
-            measureText,
-            hyphenate,
-            language,
-            availablePatterns,
-            lefthyphenmin,
-            righthyphenmin,
-            context,
-            lineWidth
-          )
+        this.itemizeWordBased(
+          items,
+          runText,
+          runStart,
+          measureText,
+          hyphenate,
+          language,
+          availablePatterns,
+          lefthyphenmin,
+          righthyphenmin,
+          context,
+          lineWidth
         );
       }
-
-      buffer = '';
-      bufferScript = null;
     };
 
-    for (let i = 0; i < chars.length; i++) {
-      const char = chars[i];
-      const isCJKChar = this.isCJK(char);
-      const currentScript = isCJKChar ? 'cjk' : 'word';
+    let runStart = 0;
+    let runScript: 'cjk' | 'word' | null = null;
 
-      if (bufferScript !== null && bufferScript !== currentScript) {
-        flushBuffer();
-        bufferStart = textPosition;
+    for (let i = 0; i < text.length; ) {
+      const code = text.codePointAt(i)!;
+      const currentScript = this.isCJKCode(code) ? 'cjk' : 'word';
+
+      if (runScript === null) {
+        runScript = currentScript;
+        runStart = i;
+      } else if (runScript !== currentScript) {
+        flushRun(text.slice(runStart, i), runStart, runScript);
+        runScript = currentScript;
+        runStart = i;
       }
 
-      if (bufferScript === null) {
-        bufferScript = currentScript;
-        bufferStart = textPosition;
-      }
-
-      buffer += char;
-      textPosition += char.length;
+      i += code > 0xffff ? 2 : 1;
     }
 
-    flushBuffer();
-    return items;
+    if (runScript !== null) {
+      flushRun(text.slice(runStart), runStart, runScript);
+    }
   }
 
   private static itemizeWordBased(
+    items: Item[],
     text: string,
     startOffset: number,
     measureText: (text: string) => number,
@@ -586,24 +704,24 @@ export class LineBreak {
     righthyphenmin: number,
     context: LineBreakContext | undefined,
     lineWidth?: number
-  ): Item[] {
-    const items: Item[] = [];
-    const tokens = text.match(/\S+|\s+/g) || [];
+  ): void {
+    const tokens = text.match(TOKENIZE_RE) || [];
     let currentIndex = 0;
 
     for (const token of tokens) {
       const tokenStartIndex = startOffset + currentIndex;
 
-      if (/\s+/.test(token)) {
+      if (WS_TOKEN_RE.test(token)) {
         const width = measureText(token);
-        items.push({
-          type: ItemType.GLUE,
-          width,
-          stretch: width * SPACE_STRETCH_RATIO,
-          shrink: width * SPACE_SHRINK_RATIO,
-          text: token,
-          originIndex: tokenStartIndex
-        } as Glue);
+        items.push(
+          makeGlue(
+            width,
+            width * SPACE_STRETCH_RATIO,
+            width * SPACE_SHRINK_RATIO,
+            token,
+            tokenStartIndex
+          )
+        );
         currentIndex += token.length;
       } else {
         if (lineWidth && token.includes('-') && !token.includes('\u00AD')) {
@@ -612,20 +730,14 @@ export class LineBreak {
             // Break long hyphenated tokens into characters (break-all behavior)
             const chars = Array.from(token);
             for (let i = 0; i < chars.length; i++) {
-              items.push({
-                type: ItemType.BOX,
-                width: measureText(chars[i]),
-                text: chars[i],
-                originIndex: tokenStartIndex + i
-              } as Box);
+              items.push(
+                makeBox(measureText(chars[i]), chars[i], tokenStartIndex + i)
+              );
 
               if (i < chars.length - 1) {
-                items.push({
-                  type: ItemType.PENALTY,
-                  width: 0,
-                  penalty: 5000,
-                  originIndex: tokenStartIndex + i + 1
-                } as Penalty);
+                items.push(
+                  makePenalty(0, 5000, false, '', tokenStartIndex + i + 1)
+                );
               }
             }
             currentIndex += token.length;
@@ -640,18 +752,18 @@ export class LineBreak {
           if (!segment) continue;
 
           if (segment === '-') {
-            items.push({
-              type: ItemType.DISCRETIONARY,
-              width: measureText('-'),
-              preBreak: '-',
-              postBreak: '',
-              noBreak: '-',
-              preBreakWidth: measureText('-'),
-              penalty: context?.exHyphenPenalty ?? DEFAULT_EX_HYPHEN_PENALTY,
-              flagged: true,
-              text: '-',
-              originIndex: segmentIndex
-            } as Discretionary);
+            items.push(
+              makeDiscretionary(
+                measureText('-'),
+                '-',
+                '',
+                '-',
+                measureText('-'),
+                context?.exHyphenPenalty ?? DEFAULT_EX_HYPHEN_PENALTY,
+                '-',
+                segmentIndex
+              )
+            );
             segmentIndex += 1;
           } else if (segment.includes('\u00AD')) {
             const parts = segment.split('\u00AD');
@@ -659,34 +771,35 @@ export class LineBreak {
             for (let k = 0; k < parts.length; k++) {
               const partText = parts[k];
               if (partText.length > 0) {
-                items.push({
-                  type: ItemType.BOX,
-                  width: measureText(partText),
-                  text: partText,
-                  originIndex: segmentIndex + runningIndex
-                } as Box);
+                items.push(
+                  makeBox(
+                    measureText(partText),
+                    partText,
+                    segmentIndex + runningIndex
+                  )
+                );
                 runningIndex += partText.length;
               }
               if (k < parts.length - 1) {
-                items.push({
-                  type: ItemType.DISCRETIONARY,
-                  width: 0,
-                  preBreak: '-',
-                  postBreak: '',
-                  noBreak: '',
-                  preBreakWidth: measureText('-'),
-                  penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
-                  flagged: true,
-                  text: '',
-                  originIndex: segmentIndex + runningIndex
-                } as Discretionary);
+                items.push(
+                  makeDiscretionary(
+                    0,
+                    '-',
+                    '',
+                    '',
+                    measureText('-'),
+                    context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
+                    '',
+                    segmentIndex + runningIndex
+                  )
+                );
                 runningIndex += 1;
               }
             }
           } else if (
             hyphenate &&
             segment.length >= lefthyphenmin + righthyphenmin &&
-            /^\p{L}+$/u.test(segment)
+            LETTERS_ONLY_RE.test(segment)
           ) {
             const hyphenPoints = this.findHyphenationPoints(
               segment,
@@ -700,100 +813,74 @@ export class LineBreak {
               let lastPoint = 0;
               for (const point of hyphenPoints) {
                 const part = segment.substring(lastPoint, point);
-                items.push({
-                  type: ItemType.BOX,
-                  width: measureText(part),
-                  text: part,
-                  originIndex: segmentIndex + lastPoint
-                } as Box);
-                items.push({
-                  type: ItemType.DISCRETIONARY,
-                  width: 0,
-                  preBreak: '-',
-                  postBreak: '',
-                  noBreak: '',
-                  preBreakWidth: measureText('-'),
-                  penalty: context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
-                  flagged: true,
-                  text: '',
-                  originIndex: segmentIndex + point
-                } as Discretionary);
+                items.push(
+                  makeBox(measureText(part), part, segmentIndex + lastPoint)
+                );
+                items.push(
+                  makeDiscretionary(
+                    0,
+                    '-',
+                    '',
+                    '',
+                    measureText('-'),
+                    context?.hyphenPenalty ?? DEFAULT_HYPHEN_PENALTY,
+                    '',
+                    segmentIndex + point
+                  )
+                );
                 lastPoint = point;
               }
-              items.push({
-                type: ItemType.BOX,
-                width: measureText(segment.substring(lastPoint)),
-                text: segment.substring(lastPoint),
-                originIndex: segmentIndex + lastPoint
-              } as Box);
+              const tail = segment.substring(lastPoint);
+              items.push(
+                makeBox(measureText(tail), tail, segmentIndex + lastPoint)
+              );
             } else {
-              const wordWidth = measureText(segment);
-              if (lineWidth && wordWidth > lineWidth) {
-                // Word longer than line width - break into characters
-                const chars = Array.from(segment);
-                for (let i = 0; i < chars.length; i++) {
-                  items.push({
-                    type: ItemType.BOX,
-                    width: measureText(chars[i]),
-                    text: chars[i],
-                    originIndex: segmentIndex + i
-                  } as Box);
-
-                  if (i < chars.length - 1) {
-                    items.push({
-                      type: ItemType.PENALTY,
-                      width: 0,
-                      penalty: 5000,
-                      originIndex: segmentIndex + i + 1
-                    } as Penalty);
-                  }
-                }
-              } else {
-                items.push({
-                  type: ItemType.BOX,
-                  width: wordWidth,
-                  text: segment,
-                  originIndex: segmentIndex
-                } as Box);
-              }
+              this.pushWordOrChars(
+                items,
+                segment,
+                segmentIndex,
+                measureText,
+                lineWidth
+              );
             }
           } else {
-            const wordWidth = measureText(segment);
-            if (lineWidth && wordWidth > lineWidth) {
-              // Word longer than line width - break into characters
-              const chars = Array.from(segment);
-              for (let i = 0; i < chars.length; i++) {
-                items.push({
-                  type: ItemType.BOX,
-                  width: measureText(chars[i]),
-                  text: chars[i],
-                  originIndex: segmentIndex + i
-                } as Box);
-
-                if (i < chars.length - 1) {
-                  items.push({
-                    type: ItemType.PENALTY,
-                    width: 0,
-                    penalty: 5000,
-                    originIndex: segmentIndex + i + 1
-                  } as Penalty);
-                }
-              }
-            } else {
-              items.push({
-                type: ItemType.BOX,
-                width: wordWidth,
-                text: segment,
-                originIndex: segmentIndex
-              } as Box);
-            }
+            this.pushWordOrChars(
+              items,
+              segment,
+              segmentIndex,
+              measureText,
+              lineWidth
+            );
           }
           segmentIndex += segment.length;
         }
         currentIndex += token.length;
       }
     }
-    return items;
+  }
+
+  // Push a word box, or per-character boxes with break penalties when the
+  // word alone exceeds the line width (break-all behavior)
+  private static pushWordOrChars(
+    items: Item[],
+    segment: string,
+    segmentIndex: number,
+    measureText: (text: string) => number,
+    lineWidth?: number
+  ): void {
+    const wordWidth = measureText(segment);
+    if (lineWidth && wordWidth > lineWidth) {
+      const chars = Array.from(segment);
+      for (let i = 0; i < chars.length; i++) {
+        items.push(makeBox(measureText(chars[i]), chars[i], segmentIndex + i));
+
+        if (i < chars.length - 1) {
+          items.push(makePenalty(0, 5000, false, '', segmentIndex + i + 1));
+        }
+      }
+    } else {
+      items.push(makeBox(wordWidth, segment, segmentIndex));
+    }
   }
 
   // TeX: line_break inner loop (tex.web lines 16169-17256)
@@ -826,6 +913,12 @@ export class LineBreak {
     let cumWidth = 0;
     let cumStretch = 0;
     let cumShrink = 0;
+
+    // Per-breakpoint scratch, reset in place; only the winning predecessor
+    // per fitness class is tracked, nodes are constructed at insertion
+    const bestPrev: (BreakNode | null)[] = [null, null, null, null];
+    const bestDemerits = [Infinity, Infinity, Infinity, Infinity];
+    const toDeactivate: BreakNode[] = [];
 
     // Process each item
     for (let i = 0; i < items.length; i++) {
@@ -872,12 +965,11 @@ export class LineBreak {
         breakWidth = (item as Discretionary).preBreakWidth;
       }
 
-      // Best for each fitness class
-      const bestNode: (BreakNode | null)[] = [null, null, null, null];
-      const bestDemerits = [Infinity, Infinity, Infinity, Infinity];
-
-      // Nodes to deactivate
-      const toDeactivate: BreakNode[] = [];
+      // Reset per-breakpoint scratch
+      bestPrev[0] = bestPrev[1] = bestPrev[2] = bestPrev[3] = null;
+      bestDemerits[0] = bestDemerits[1] = bestDemerits[2] = bestDemerits[3] =
+        Infinity;
+      toDeactivate.length = 0;
 
       // Try each active node as predecessor
       const active = activeNodes.getActive();
@@ -946,19 +1038,7 @@ export class LineBreak {
 
         if (totalDemerits < bestDemerits[fitness]) {
           bestDemerits[fitness] = totalDemerits;
-          bestNode[fitness] = {
-            position: i,
-            line: a.line + 1,
-            fitness,
-            totalDemerits,
-            previous: a,
-            hyphenated: flagged,
-            active: true,
-            activeIndex: -1,
-            cumWidth: cumWidth,
-            cumStretch: cumStretch,
-            cumShrink: cumShrink
-          };
+          bestPrev[fitness] = a;
         }
       }
 
@@ -969,8 +1049,21 @@ export class LineBreak {
 
       // Insert best nodes
       for (let f = 0; f < 4; f++) {
-        if (bestNode[f]) {
-          activeNodes.insert(bestNode[f]!);
+        const prev = bestPrev[f];
+        if (prev) {
+          activeNodes.insert({
+            position: i,
+            line: prev.line + 1,
+            fitness: f as FitnessClass,
+            totalDemerits: bestDemerits[f],
+            previous: prev,
+            hyphenated: flagged,
+            active: true,
+            activeIndex: -1,
+            cumWidth: cumWidth,
+            cumStretch: cumStretch,
+            cumShrink: cumShrink
+          });
         }
       }
 
@@ -1181,9 +1274,10 @@ export class LineBreak {
       const breakpoints: number[] = [];
       let node: BreakNode | null = best;
       while (node && node.position > 0) {
-        breakpoints.unshift(node.position);
+        breakpoints.push(node.position);
         node = node.previous;
       }
+      breakpoints.reverse();
 
       perfLogger.end('LineBreak.breakText');
       return this.postLineBreak(
@@ -1236,11 +1330,11 @@ export class LineBreak {
 
     const lines: LineInfo[] = [];
     let lineStart = 0;
+    const willHaveFinalLine =
+      breakpoints[breakpoints.length - 1] + 1 < items.length - 1;
 
     for (let i = 0; i < breakpoints.length; i++) {
       const breakpoint = breakpoints[i];
-      const willHaveFinalLine =
-        breakpoints[breakpoints.length - 1] + 1 < items.length - 1;
       const isLastLine = willHaveFinalLine
         ? false
         : i === breakpoints.length - 1;

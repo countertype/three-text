@@ -32,11 +32,6 @@ interface CurveEntry {
   curveTexY: number;
 }
 
-interface BandEntry {
-  curveCount: number;
-  listOffset: number; // relative to glyph data start in band texture
-}
-
 // Pack an array of shapes into Slug's GPU data layout
 // Each shape is a closed region defined by quadratic Bezier curves
 export function packSlugData(
@@ -46,10 +41,29 @@ export function packSlugData(
   const bandCount = options?.bandCount ?? 16;
   const evenOdd = options?.evenOdd ?? false;
 
+  // Curve and band texels are stored once per unique key (first occurrence
+  // wins) and instances share the texture location
+  const packedIndexByKey = new Map<number | string, number>();
+  const packedShapes: SlugShape[] = [];
+  const packedOf = new Array<number>(shapes.length);
+  for (let si = 0; si < shapes.length; si++) {
+    const key = shapes[si].key;
+    if (key !== undefined) {
+      const existing = packedIndexByKey.get(key);
+      if (existing !== undefined) {
+        packedOf[si] = existing;
+        continue;
+      }
+      packedIndexByKey.set(key, packedShapes.length);
+    }
+    packedOf[si] = packedShapes.length;
+    packedShapes.push(shapes[si]);
+  }
+
   const allCurves: CurveEntry[][] = [];
   let curveTexelCount = 0;
   let totalCurves = 0;
-  for (const shape of shapes) {
+  for (const shape of packedShapes) {
     totalCurves += shape.curves.length;
   }
   const curveTexHeight = Math.ceil((totalCurves * 2) / TEX_WIDTH) + 1;
@@ -58,7 +72,7 @@ export function packSlugData(
   let curveX = 0;
   let curveY = 0;
 
-  for (const shape of shapes) {
+  for (const shape of packedShapes) {
     const entries: CurveEntry[] = [];
     const [ox, oy] = shape.bounds;
     for (const curve of shape.curves) {
@@ -109,25 +123,27 @@ export function packSlugData(
   //   [0 .. hBandMax]                     h-band headers
   //   [hBandMax+1 .. hBandMax+1+vBandMax] v-band headers
   //   [hBandMax+vBandMax+2 .. ]           curve index lists
+  //
+  // Band lists hold sorted CurveEntry refs; per-band offsets are computed
+  // in a placement pass so the texture is allocated at exact size
+  const texWidthMask = (1 << LOG_TEX_WIDTH) - 1;
+
   const shapeBandData: {
-    hBands: BandEntry[];
-    vBands: BandEntry[];
-    hLists: number[][]; // each is [curveTexX, curveTexY, ...]
-    vLists: number[][];
-    totalTexels: number;
+    hLists: CurveEntry[][];
+    vLists: CurveEntry[][];
+    hOffsets: number[];
+    vOffsets: number[];
     bandMaxX: number;
     bandMaxY: number;
   }[] = [];
 
-  let totalBandTexels = 0;
-
-  for (let si = 0; si < shapes.length; si++) {
-    const shape = shapes[si];
+  for (let si = 0; si < packedShapes.length; si++) {
+    const shape = packedShapes[si];
     const curves = allCurves[si];
     if (curves.length === 0) {
       shapeBandData.push({
-        hBands: [], vBands: [], hLists: [], vLists: [],
-        totalTexels: 0, bandMaxX: 0, bandMaxY: 0
+        hLists: [], vLists: [], hOffsets: [], vOffsets: [],
+        bandMaxX: 0, bandMaxY: 0
       });
       continue;
     }
@@ -141,85 +157,66 @@ export function packSlugData(
     const bandMaxY = hBandCount - 1;
     const bandMaxX = vBandCount - 1;
 
-    // Horizontal bands (partition y-axis)
-    const hBands: BandEntry[] = [];
-    const hLists: number[][] = [];
+    // Horizontal bands (partition y-axis), each sorted by descending maxX
+    const hLists: CurveEntry[][] = [];
     const bandH = h / hBandCount;
 
     for (let bi = 0; bi < hBandCount; bi++) {
       const bandMinY = bi * bandH;
       const bandMaxYCoord = bandMinY + bandH;
-      const list: { curve: CurveEntry; sortKey: number }[] = [];
+      const list: CurveEntry[] = [];
       for (const c of curves) {
         if (c.maxY >= bandMinY && c.minY <= bandMaxYCoord) {
-          list.push({ curve: c, sortKey: c.maxX });
+          list.push(c);
         }
       }
-      list.sort((a, b) => b.sortKey - a.sortKey);
-      const flatList: number[] = [];
-      for (const item of list) {
-        flatList.push(item.curve.curveTexX, item.curve.curveTexY);
-      }
-      hBands.push({ curveCount: list.length, listOffset: 0 });
-      hLists.push(flatList);
+      list.sort((a, b) => b.maxX - a.maxX);
+      hLists.push(list);
     }
 
-    // Vertical bands (partition x-axis)
-    const vBands: BandEntry[] = [];
-    const vLists: number[][] = [];
+    // Vertical bands (partition x-axis), each sorted by descending maxY
+    const vLists: CurveEntry[][] = [];
     const bandW = w / vBandCount;
 
     for (let bi = 0; bi < vBandCount; bi++) {
       const bandMinX = bi * bandW;
       const bandMaxXCoord = bandMinX + bandW;
-      const list: { curve: CurveEntry; sortKey: number }[] = [];
+      const list: CurveEntry[] = [];
       for (const c of curves) {
         if (c.maxX >= bandMinX && c.minX <= bandMaxXCoord) {
-          list.push({ curve: c, sortKey: c.maxY });
+          list.push(c);
         }
       }
-      list.sort((a, b) => b.sortKey - a.sortKey);
-      const flatList: number[] = [];
-      for (const item of list) {
-        flatList.push(item.curve.curveTexX, item.curve.curveTexY);
-      }
-      vBands.push({ curveCount: list.length, listOffset: 0 });
-      vLists.push(flatList);
+      list.sort((a, b) => b.maxY - a.maxY);
+      vLists.push(list);
     }
 
-    const headerTexels = hBandCount + vBandCount;
-    let listTexels = 0;
-    for (const l of hLists) listTexels += l.length / 2;
-    for (const l of vLists) listTexels += l.length / 2;
-
-    const total = headerTexels + listTexels;
-
     shapeBandData.push({
-      hBands, vBands, hLists, vLists,
-      totalTexels: total, bandMaxX, bandMaxY
+      hLists,
+      vLists,
+      hOffsets: new Array(hBandCount).fill(0),
+      vOffsets: new Array(vBandCount).fill(0),
+      bandMaxX,
+      bandMaxY
     });
-
-    totalBandTexels += total;
   }
 
-  const bandTexHeight = Math.max(1, Math.ceil(totalBandTexels / TEX_WIDTH) + shapes.length * 2);
-  const bandData = new Uint32Array(TEX_WIDTH * bandTexHeight * 4);
-
+  // Placement pass: compute glyph locations and per-band list offsets,
+  // yielding the exact band texture height before allocating it
   let bandX = 0;
   let bandY = 0;
-
   const glyphLocs: { x: number; y: number }[] = [];
 
-  for (let si = 0; si < shapes.length; si++) {
+  for (let si = 0; si < packedShapes.length; si++) {
     const sd = shapeBandData[si];
-    if (sd.totalTexels === 0) {
+    if (sd.hLists.length === 0 && sd.vLists.length === 0) {
       glyphLocs.push({ x: 0, y: 0 });
       continue;
     }
 
     // Band headers are read without CalcBandLoc wrapping, so all
     // headers for a glyph must fit within a single texture row
-    const minContiguous = sd.hBands.length + sd.vBands.length;
+    const minContiguous = sd.hLists.length + sd.vLists.length;
     if (bandX + minContiguous > TEX_WIDTH) {
       bandX = 0;
       bandY++;
@@ -229,89 +226,87 @@ export function packSlugData(
     const glyphLocY = bandY;
     glyphLocs.push({ x: glyphLocX, y: glyphLocY });
 
-    let listStartOffset = sd.hBands.length + sd.vBands.length;
+    let listStartOffset = sd.hLists.length + sd.vLists.length;
 
     // Curve lists aren't row-wrapped by the shader, so pad to avoid crossing
     const ensureListFits = (listLen: number) => {
       if (listLen === 0) return;
-      const startX = (glyphLocX + listStartOffset) & ((1 << LOG_TEX_WIDTH) - 1);
+      const startX = (glyphLocX + listStartOffset) & texWidthMask;
       if (startX + listLen > TEX_WIDTH) {
         listStartOffset += (TEX_WIDTH - startX);
       }
     };
 
-    for (let bi = 0; bi < sd.hBands.length; bi++) {
-      const listLen = sd.hLists[bi].length / 2;
+    for (let bi = 0; bi < sd.hLists.length; bi++) {
+      const listLen = sd.hLists[bi].length;
       ensureListFits(listLen);
-      sd.hBands[bi].listOffset = listStartOffset;
+      sd.hOffsets[bi] = listStartOffset;
       listStartOffset += listLen;
     }
-    for (let bi = 0; bi < sd.vBands.length; bi++) {
-      const listLen = sd.vLists[bi].length / 2;
+    for (let bi = 0; bi < sd.vLists.length; bi++) {
+      const listLen = sd.vLists[bi].length;
       ensureListFits(listLen);
-      sd.vBands[bi].listOffset = listStartOffset;
+      sd.vOffsets[bi] = listStartOffset;
       listStartOffset += listLen;
     }
 
-    for (let bi = 0; bi < sd.hBands.length; bi++) {
-      const tx = glyphLocX + bi;
-      const ty = glyphLocY;
-      const idx = (ty * TEX_WIDTH + tx) * 4;
-      bandData[idx + 0] = sd.hBands[bi].curveCount;
-      bandData[idx + 1] = sd.hBands[bi].listOffset;
-      bandData[idx + 2] = 0;
-      bandData[idx + 3] = 0;
-    }
-
-    const vBandStart = glyphLocX + sd.hBands.length;
-    for (let bi = 0; bi < sd.vBands.length; bi++) {
-      const tx = vBandStart + bi;
-      const ty = glyphLocY;
-      const idx = (ty * TEX_WIDTH + tx) * 4;
-      bandData[idx + 0] = sd.vBands[bi].curveCount;
-      bandData[idx + 1] = sd.vBands[bi].listOffset;
-      bandData[idx + 2] = 0;
-      bandData[idx + 3] = 0;
-    }
-
-    const texWidthMask = (1 << LOG_TEX_WIDTH) - 1;
-
-    for (let bi = 0; bi < sd.hBands.length; bi++) {
-      const list = sd.hLists[bi];
-      const baseOffset = sd.hBands[bi].listOffset;
-      for (let ci = 0; ci < list.length; ci += 2) {
-        let bx = glyphLocX + baseOffset + (ci >> 1);
-        const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
-        bx &= texWidthMask;
-        const idx = (by * TEX_WIDTH + bx) * 4;
-        bandData[idx + 0] = list[ci];
-        bandData[idx + 1] = list[ci + 1];
-        bandData[idx + 2] = 0;
-        bandData[idx + 3] = 0;
-      }
-    }
-
-    for (let bi = 0; bi < sd.vBands.length; bi++) {
-      const list = sd.vLists[bi];
-      const baseOffset = sd.vBands[bi].listOffset;
-      for (let ci = 0; ci < list.length; ci += 2) {
-        let bx = glyphLocX + baseOffset + (ci >> 1);
-        const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
-        bx &= texWidthMask;
-        const idx = (by * TEX_WIDTH + bx) * 4;
-        bandData[idx + 0] = list[ci];
-        bandData[idx + 1] = list[ci + 1];
-        bandData[idx + 2] = 0;
-        bandData[idx + 3] = 0;
-      }
-    }
-
-    let endBx = glyphLocX + listStartOffset;
+    const endBx = glyphLocX + listStartOffset;
     bandY = glyphLocY + (endBx >> LOG_TEX_WIDTH);
     bandX = endBx & texWidthMask;
   }
 
   const actualBandTexHeight = bandY + 1;
+  const bandData = new Uint32Array(TEX_WIDTH * actualBandTexHeight * 4);
+
+  // Write pass
+  for (let si = 0; si < packedShapes.length; si++) {
+    const sd = shapeBandData[si];
+    if (sd.hLists.length === 0 && sd.vLists.length === 0) {
+      continue;
+    }
+
+    const glyphLocX = glyphLocs[si].x;
+    const glyphLocY = glyphLocs[si].y;
+
+    for (let bi = 0; bi < sd.hLists.length; bi++) {
+      const idx = (glyphLocY * TEX_WIDTH + glyphLocX + bi) * 4;
+      bandData[idx + 0] = sd.hLists[bi].length;
+      bandData[idx + 1] = sd.hOffsets[bi];
+    }
+
+    const vBandStart = glyphLocX + sd.hLists.length;
+    for (let bi = 0; bi < sd.vLists.length; bi++) {
+      const idx = (glyphLocY * TEX_WIDTH + vBandStart + bi) * 4;
+      bandData[idx + 0] = sd.vLists[bi].length;
+      bandData[idx + 1] = sd.vOffsets[bi];
+    }
+
+    for (let bi = 0; bi < sd.hLists.length; bi++) {
+      const list = sd.hLists[bi];
+      const baseOffset = sd.hOffsets[bi];
+      for (let ci = 0; ci < list.length; ci++) {
+        let bx = glyphLocX + baseOffset + ci;
+        const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
+        bx &= texWidthMask;
+        const idx = (by * TEX_WIDTH + bx) * 4;
+        bandData[idx + 0] = list[ci].curveTexX;
+        bandData[idx + 1] = list[ci].curveTexY;
+      }
+    }
+
+    for (let bi = 0; bi < sd.vLists.length; bi++) {
+      const list = sd.vLists[bi];
+      const baseOffset = sd.vOffsets[bi];
+      for (let ci = 0; ci < list.length; ci++) {
+        let bx = glyphLocX + baseOffset + ci;
+        const by = glyphLocY + (bx >> LOG_TEX_WIDTH);
+        bx &= texWidthMask;
+        const idx = (by * TEX_WIDTH + bx) * 4;
+        bandData[idx + 0] = list[ci].curveTexX;
+        bandData[idx + 1] = list[ci].curveTexY;
+      }
+    }
+  }
 
   const FLOATS_PER_VERTEX = 20; // 5 attribs * 4 components
   const VERTS_PER_SHAPE = 4;
@@ -327,8 +322,8 @@ export function packSlugData(
 
   for (let si = 0; si < shapes.length; si++) {
     const shape = shapes[si];
-    const sd = shapeBandData[si];
-    const glyph = glyphLocs[si];
+    const sd = shapeBandData[packedOf[si]];
+    const glyph = glyphLocs[packedOf[si]];
     const [bMinX, bMinY, bMaxX, bMaxY] = shape.bounds;
     const w = bMaxX - bMinX;
     const h = bMaxY - bMinY;
@@ -353,8 +348,8 @@ export function packSlugData(
     if (evenOdd) texWBits |= 0x10000000; // E flag at bit 28
     const texW = uintAsFloat(texWBits);
 
-    const bandScaleX = w > 0 ? sd.vBands.length / w : 0;
-    const bandScaleY = h > 0 ? sd.hBands.length / h : 0;
+    const bandScaleX = w > 0 ? sd.vLists.length / w : 0;
+    const bandScaleY = h > 0 ? sd.hLists.length / h : 0;
 
     for (let vi = 0; vi < 4; vi++) {
       const base = (si * 4 + vi) * FLOATS_PER_VERTEX;
@@ -402,12 +397,13 @@ export function packSlugData(
 
   return {
     curveTexture: {
-      data: curveData.slice(0, TEX_WIDTH * actualCurveTexHeight * 4),
+      // subarray: consumers upload or copy; no need to duplicate the buffer
+      data: curveData.subarray(0, TEX_WIDTH * actualCurveTexHeight * 4),
       width: TEX_WIDTH,
       height: actualCurveTexHeight
     },
     bandTexture: {
-      data: bandData.slice(0, TEX_WIDTH * actualBandTexHeight * 4),
+      data: bandData, // allocated at exact size by the placement pass
       width: TEX_WIDTH,
       height: actualBandTexHeight
     },
