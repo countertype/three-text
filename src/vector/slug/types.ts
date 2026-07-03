@@ -13,9 +13,8 @@ export interface SlugShape {
   curves: QuadCurve[];
   bounds: [number, number, number, number]; // minX, minY, maxX, maxY
   // Optional dedup key. Shapes sharing a key must have translation-equivalent
-  // curves (identical geometry relative to their own bounds min); the packer
-  // stores curve and band texels once per key and every instance references
-  // the shared texture location. Texture size becomes O(unique keys).
+  // curves; the packer stores texels once per key, so texture size is
+  // O(unique keys) rather than O(shapes)
   key?: number | string;
 }
 

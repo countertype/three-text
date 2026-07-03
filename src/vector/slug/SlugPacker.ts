@@ -41,8 +41,8 @@ export function packSlugData(
   const bandCount = options?.bandCount ?? 16;
   const evenOdd = options?.evenOdd ?? false;
 
-  // Dedup by key: curve and band texels are stored once per unique key
-  // (first occurrence wins) and instances share the texture location.
+  // Curve and band texels are stored once per unique key (first occurrence
+  // wins) and instances share the texture location
   const packedIndexByKey = new Map<number | string, number>();
   const packedShapes: SlugShape[] = [];
   const packedOf = new Array<number>(shapes.length);
@@ -124,9 +124,8 @@ export function packSlugData(
   //   [hBandMax+1 .. hBandMax+1+vBandMax] v-band headers
   //   [hBandMax+vBandMax+2 .. ]           curve index lists
   //
-  // Band lists hold sorted CurveEntry refs directly; per-band offsets are
-  // computed in a placement pass so the texture is allocated at exact size
-  // (the previous headroom bound reserved 2 full rows = 128 KB per shape).
+  // Band lists hold sorted CurveEntry refs; per-band offsets are computed
+  // in a placement pass so the texture is allocated at exact size
   const texWidthMask = (1 << LOG_TEX_WIDTH) - 1;
 
   const shapeBandData: {

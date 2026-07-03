@@ -200,11 +200,8 @@ const EJECT_PENALTY = -10000; // eject_penalty - force break here
 // Retry increment when no breakpoints found
 const EMERGENCY_STRETCH_INCREMENT = 0.1;
 
-// The public pattern format is a nested object trie keyed by single-char
-// strings; walking it does megamorphic string-keyed lookups across thousands
-// of object shapes. Convert each registered trie once (lazily, cached by
-// identity) to charCode-keyed Maps, and memoize raw per-word hyphenation
-// points: real text repeats words heavily and every re-layout repeats them all.
+// Registered pattern tries are converted lazily (cached by identity) to
+// charCode-keyed Maps, with raw per-word points memoized across layouts
 interface FastTrieNode {
   patterns: number[] | null;
   children: Map<number, FastTrieNode> | null;
@@ -239,16 +236,15 @@ function getFastPatternCache(trie: HyphenationTrieNode): FastPatternCache {
   return cache;
 }
 
-// Hoisted regexes (avoid per-call re-materialization in per-char/per-token loops)
+// Hoisted regexes for per-char/per-token loops
 const WHITESPACE_RE = /\s/;
 const WS_TOKEN_RE = /^\s/;
 const TOKENIZE_RE = /\S+|\s+/g;
 const LETTERS_ONLY_RE = /^\p{L}+$/u;
 
-// All items share one hidden class so the Knuth-Plass inner loop (which reads
-// type/width/penalty/flagged across every variant) stays monomorphic. Unused
-// fields hold falsy defaults; consumers already branch on ItemType and on the
-// truthiness of text/noBreak/flagged, which the defaults preserve.
+// All items share one hidden class so the Knuth-Plass inner loop stays
+// monomorphic; unused fields hold falsy defaults, preserving consumers'
+// truthiness checks on text/noBreak/flagged
 function newItem(
   type: ItemType,
   width: number,
@@ -373,8 +369,7 @@ export class LineBreak {
     const cache = getFastPatternCache(patternTrie);
     const lowerWord = word.toLowerCase();
 
-    // Memoize the raw (unfiltered) points: lefthyphenmin/righthyphenmin can
-    // vary per call, so the filter is applied on the way out.
+    // Memo holds unfiltered points; lefthyphenmin/righthyphenmin vary per call
     let hyphenPoints = cache.wordMemo.get(lowerWord);
     if (hyphenPoints === undefined) {
       const paddedWord = `.${lowerWord}.`;
@@ -640,8 +635,7 @@ export class LineBreak {
       return cjkGlueParams;
     };
 
-    // Script runs are tracked as [runStart, i) code-unit index ranges and
-    // sliced once per run, instead of building the run string char by char.
+    // Script runs are [runStart, i) code-unit ranges, sliced once per run
     const flushRun = (
       runText: string,
       runStart: number,
@@ -920,10 +914,8 @@ export class LineBreak {
     let cumStretch = 0;
     let cumShrink = 0;
 
-    // Per-breakpoint scratch, hoisted out of the item loop and reset in place.
-    // Candidate BreakNodes are not allocated in the inner active-node loop;
-    // only the winning predecessor per fitness class is tracked, and the node
-    // is constructed at insertion time.
+    // Per-breakpoint scratch, reset in place; only the winning predecessor
+    // per fitness class is tracked, nodes are constructed at insertion
     const bestPrev: (BreakNode | null)[] = [null, null, null, null];
     const bestDemerits = [Infinity, Infinity, Infinity, Infinity];
     const toDeactivate: BreakNode[] = [];

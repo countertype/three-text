@@ -54,10 +54,8 @@ export class TextLayout {
     let lines: LineInfo[];
 
     if (width) {
-      // Line breaking re-measures the same strings constantly (spaces, hyphens,
-      // repeated words, and a second itemization pass when pretolerance fails),
-      // and every measurement is a full HarfBuzz shape round-trip. Memoize per
-      // computeLines call: font and letterSpacing are fixed for its duration.
+      // Each measurement is a HarfBuzz shape round-trip and strings repeat
+      // heavily; font and letterSpacing are fixed for this call
       const widthMemo = new Map<string, number>();
 
       // Line breaking uses a measureText function that already includes letterSpacing,

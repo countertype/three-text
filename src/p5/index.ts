@@ -50,7 +50,7 @@ function convertToP5Geometry(
 
   const geom = new P5GeometryClass();
 
-  // Resolve the vector factory once instead of re-checking per vertex
+  // Resolve the vector factory once, outside the vertex loops
   const createVec: (x: number, y: number, z: number) => any =
     typeof p5Instance.createVector === 'function'
       ? (x, y, z) => p5Instance.createVector(x, y, z)

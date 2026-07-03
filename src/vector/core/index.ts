@@ -124,10 +124,8 @@ function collectForSlug(
   const shapes: SlugShape[] = [];
   const glyphInfos: VectorGlyphInfo[] = [];
 
-  // Curves are built once per unique glyph id; the packer dedups texel data
-  // by shape key, so repeat instances only carry their own bounds/quad.
-  // (Shapes sharing a key must be translation-equivalent, which holds here:
-  // same outline, same scale, differing only in px/py.)
+  // Curves are built once per unique glyph id; the packer dedups texels by
+  // shape key (same outline and scale, so instances differ only by px/py)
   const curvesByGlyph = new Map<number, QuadCurve[]>();
 
   for (const line of clustersByLine) {

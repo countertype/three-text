@@ -35,11 +35,9 @@ export class Extruder {
           }
         }
       } else {
-        // Use a directionless key (min/max) to detect shared edges.
-        // Store the directed edge (a->b) and mark as null when seen twice.
-        // Keys pack two indices via multiplication (21 bits each, exact in
-        // a float64) — 16-bit shift packing silently collided past 65,535
-        // vertices per tessellation.
+        // Use a directionless key (min/max) to detect shared edges
+        // Store the directed edge (a->b) and mark as null when seen twice
+        // Keys pack two 21-bit indices via multiplication, exact in a float64
         const PACK = 0x200000; // 2^21
         const edgeMap = new Map<number, number | null>();
 

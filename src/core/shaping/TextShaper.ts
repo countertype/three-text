@@ -155,9 +155,8 @@ export class TextShaper {
             ? lineInfo.originalEnd
             : lineInfo.originalStart + charIndex;
 
-        // Build a fully-initialized record in one literal instead of mutating
-        // the HarfBuzz JSON object: every glyph in every cluster shares a
-        // single hidden class, keeping downstream per-glyph loops monomorphic.
+        // One fully-initialized literal per glyph keeps every cluster's
+        // glyph array monomorphic for downstream per-glyph loops
         currentClusterGlyphs.push({
           g: glyph.g,
           cl: glyph.cl,
