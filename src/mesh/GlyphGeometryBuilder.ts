@@ -337,9 +337,10 @@ export class GlyphGeometryBuilder {
 
           if (shouldCluster) {
             // Cluster-level caching for this specific group of overlapping glyphs
-            const subClusterGlyphs = groupIndices.map((i) => cluster.glyphs[i]);
+            const firstGlyphInGroup = cluster.glyphs[groupIndices[0]];
             const clusterKey = this.getClusterKey(
-              subClusterGlyphs,
+              cluster.glyphs,
+              groupIndices,
               depth,
               removeOverlaps
             );
@@ -349,8 +350,8 @@ export class GlyphGeometryBuilder {
             if (!cachedCluster) {
               const clusterContours = this.clusterContoursScratch;
               let contourIndex = 0;
-              const refX = subClusterGlyphs[0].x ?? 0;
-              const refY = subClusterGlyphs[0].y ?? 0;
+              const refX = firstGlyphInGroup.x ?? 0;
+              const refY = firstGlyphInGroup.y ?? 0;
 
               for (let i = 0; i < groupIndices.length; i++) {
                 const originalIndex = groupIndices[i];
@@ -404,7 +405,6 @@ export class GlyphGeometryBuilder {
             // Calculate the absolute position of this sub-cluster based on its first glyph
 
             // (since the cached geometry is relative to that first glyph)
-            const firstGlyphInGroup = subClusterGlyphs[0];
             const groupPosX = clusterX + (firstGlyphInGroup.x ?? 0);
             const groupPosY = clusterY + (firstGlyphInGroup.y ?? 0);
             const groupPosZ = clusterZ;
@@ -580,21 +580,25 @@ export class GlyphGeometryBuilder {
 
   private getClusterKey(
     glyphs: HarfBuzzGlyph[],
+    indices: number[],
     depth: number,
     removeOverlaps: boolean
   ): string {
-    if (glyphs.length === 0) return '';
+    if (indices.length === 0) return '';
 
-    const refX = glyphs[0].x ?? 0;
-    const refY = glyphs[0].y ?? 0;
+    const first = glyphs[indices[0]];
+    const refX = first.x ?? 0;
+    const refY = first.y ?? 0;
 
-    const parts = glyphs.map((g) => {
+    let ids = '';
+    for (let i = 0; i < indices.length; i++) {
+      const g = glyphs[indices[i]];
       const relX = (g.x ?? 0) - refX;
       const relY = (g.y ?? 0) - refY;
-      return `${g.g}:${relX},${relY}`;
-    });
+      if (i > 0) ids += '|';
+      ids += `${g.g}:${relX},${relY}`;
+    }
 
-    const ids = parts.join('|');
     const roundedDepth = Math.round(depth * 1000) / 1000;
     return `${this.cacheKeyPrefix}_${ids}_${roundedDepth}_${removeOverlaps}`;
   }

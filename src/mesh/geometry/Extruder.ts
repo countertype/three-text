@@ -35,8 +35,12 @@ export class Extruder {
           }
         }
       } else {
-        // Use a directionless key (min/max) to detect shared edges
-        // Store the directed edge (a->b) and mark as null when seen twice
+        // Use a directionless key (min/max) to detect shared edges.
+        // Store the directed edge (a->b) and mark as null when seen twice.
+        // Keys pack two indices via multiplication (21 bits each, exact in
+        // a float64) — 16-bit shift packing silently collided past 65,535
+        // vertices per tessellation.
+        const PACK = 0x200000; // 2^21
         const edgeMap = new Map<number, number | null>();
 
         const triLen = triangleIndices.length;
@@ -48,11 +52,11 @@ export class Extruder {
           let key: number, packed: number;
 
           if (a < b) {
-            key = (a << 16) | b;
+            key = a * PACK + b;
           } else {
-            key = (b << 16) | a;
+            key = b * PACK + a;
           }
-          packed = (a << 16) | b;
+          packed = a * PACK + b;
           let data = edgeMap.get(key);
           if (data === undefined) {
             edgeMap.set(key, packed);
@@ -61,11 +65,11 @@ export class Extruder {
           }
 
           if (b < c) {
-            key = (b << 16) | c;
+            key = b * PACK + c;
           } else {
-            key = (c << 16) | b;
+            key = c * PACK + b;
           }
-          packed = (b << 16) | c;
+          packed = b * PACK + c;
           data = edgeMap.get(key);
           if (data === undefined) {
             edgeMap.set(key, packed);
@@ -74,11 +78,11 @@ export class Extruder {
           }
 
           if (c < a) {
-            key = (c << 16) | a;
+            key = c * PACK + a;
           } else {
-            key = (a << 16) | c;
+            key = a * PACK + c;
           }
-          packed = (c << 16) | a;
+          packed = c * PACK + a;
           data = edgeMap.get(key);
           if (data === undefined) {
             edgeMap.set(key, packed);
@@ -90,7 +94,7 @@ export class Extruder {
         boundaryEdges = [];
         for (const packedEdge of edgeMap.values()) {
           if (packedEdge === null) continue;
-          boundaryEdges.push(packedEdge >>> 16, packedEdge & 0xffff);
+          boundaryEdges.push(Math.floor(packedEdge / PACK), packedEdge % PACK);
         }
         sideEdgeCount = boundaryEdges.length >> 1;
       }
