@@ -41,10 +41,29 @@ export function packSlugData(
   const bandCount = options?.bandCount ?? 16;
   const evenOdd = options?.evenOdd ?? false;
 
+  // Dedup by key: curve and band texels are stored once per unique key
+  // (first occurrence wins) and instances share the texture location.
+  const packedIndexByKey = new Map<number | string, number>();
+  const packedShapes: SlugShape[] = [];
+  const packedOf = new Array<number>(shapes.length);
+  for (let si = 0; si < shapes.length; si++) {
+    const key = shapes[si].key;
+    if (key !== undefined) {
+      const existing = packedIndexByKey.get(key);
+      if (existing !== undefined) {
+        packedOf[si] = existing;
+        continue;
+      }
+      packedIndexByKey.set(key, packedShapes.length);
+    }
+    packedOf[si] = packedShapes.length;
+    packedShapes.push(shapes[si]);
+  }
+
   const allCurves: CurveEntry[][] = [];
   let curveTexelCount = 0;
   let totalCurves = 0;
-  for (const shape of shapes) {
+  for (const shape of packedShapes) {
     totalCurves += shape.curves.length;
   }
   const curveTexHeight = Math.ceil((totalCurves * 2) / TEX_WIDTH) + 1;
@@ -53,7 +72,7 @@ export function packSlugData(
   let curveX = 0;
   let curveY = 0;
 
-  for (const shape of shapes) {
+  for (const shape of packedShapes) {
     const entries: CurveEntry[] = [];
     const [ox, oy] = shape.bounds;
     for (const curve of shape.curves) {
@@ -119,8 +138,8 @@ export function packSlugData(
     bandMaxY: number;
   }[] = [];
 
-  for (let si = 0; si < shapes.length; si++) {
-    const shape = shapes[si];
+  for (let si = 0; si < packedShapes.length; si++) {
+    const shape = packedShapes[si];
     const curves = allCurves[si];
     if (curves.length === 0) {
       shapeBandData.push({
@@ -189,7 +208,7 @@ export function packSlugData(
   let bandY = 0;
   const glyphLocs: { x: number; y: number }[] = [];
 
-  for (let si = 0; si < shapes.length; si++) {
+  for (let si = 0; si < packedShapes.length; si++) {
     const sd = shapeBandData[si];
     if (sd.hLists.length === 0 && sd.vLists.length === 0) {
       glyphLocs.push({ x: 0, y: 0 });
@@ -241,7 +260,7 @@ export function packSlugData(
   const bandData = new Uint32Array(TEX_WIDTH * actualBandTexHeight * 4);
 
   // Write pass
-  for (let si = 0; si < shapes.length; si++) {
+  for (let si = 0; si < packedShapes.length; si++) {
     const sd = shapeBandData[si];
     if (sd.hLists.length === 0 && sd.vLists.length === 0) {
       continue;
@@ -304,8 +323,8 @@ export function packSlugData(
 
   for (let si = 0; si < shapes.length; si++) {
     const shape = shapes[si];
-    const sd = shapeBandData[si];
-    const glyph = glyphLocs[si];
+    const sd = shapeBandData[packedOf[si]];
+    const glyph = glyphLocs[packedOf[si]];
     const [bMinX, bMinY, bMaxX, bMaxY] = shape.bounds;
     const w = bMaxX - bMinX;
     const h = bMaxY - bMinY;

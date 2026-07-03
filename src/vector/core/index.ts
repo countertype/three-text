@@ -124,6 +124,12 @@ function collectForSlug(
   const shapes: SlugShape[] = [];
   const glyphInfos: VectorGlyphInfo[] = [];
 
+  // Curves are built once per unique glyph id; the packer dedups texel data
+  // by shape key, so repeat instances only carry their own bounds/quad.
+  // (Shapes sharing a key must be translation-equivalent, which holds here:
+  // same outline, same scale, differing only in px/py.)
+  const curvesByGlyph = new Map<number, QuadCurve[]>();
+
   for (const line of clustersByLine) {
     for (const cluster of line) {
       for (const g of cluster.glyphs) {
@@ -133,46 +139,50 @@ function collectForSlug(
         const px = (cluster.position.x + (g.x ?? 0)) * scale;
         const py = (cluster.position.y + (g.y ?? 0)) * scale;
 
-        const curves: QuadCurve[] = [];
-        for (const seg of outline.segments) {
-          switch (seg.type) {
-            // line to quadratic
-            case 0: {
-              const x0 = seg.p0.x * scale + px, y0 = seg.p0.y * scale + py;
-              const x1 = seg.p1.x * scale + px, y1 = seg.p1.y * scale + py;
-              curves.push({
-                p1: [x0, y0],
-                p2: [(x0 + x1) * 0.5, (y0 + y1) * 0.5],
-                p3: [x1, y1],
-              });
-              break;
-            }
-            // quadratic
-            case 1:
-              curves.push({
-                p1: [seg.p0.x * scale + px, seg.p0.y * scale + py],
-                p2: [seg.p1.x * scale + px, seg.p1.y * scale + py],
-                p3: [seg.p2!.x * scale + px, seg.p2!.y * scale + py],
-              });
-              break;
-            // cubic to quadratic
-            case 2: {
-              const quads = cubicToQuadratics(
-                [seg.p0.x, seg.p0.y],
-                [seg.p1.x, seg.p1.y],
-                [seg.p2!.x, seg.p2!.y],
-                [seg.p3!.x, seg.p3!.y]
-              );
-              for (const q of quads) {
+        let curves = curvesByGlyph.get(g.g);
+        if (curves === undefined) {
+          curves = [];
+          for (const seg of outline.segments) {
+            switch (seg.type) {
+              // line to quadratic
+              case 0: {
+                const x0 = seg.p0.x * scale + px, y0 = seg.p0.y * scale + py;
+                const x1 = seg.p1.x * scale + px, y1 = seg.p1.y * scale + py;
                 curves.push({
-                  p1: [q.p1[0] * scale + px, q.p1[1] * scale + py],
-                  p2: [q.p2[0] * scale + px, q.p2[1] * scale + py],
-                  p3: [q.p3[0] * scale + px, q.p3[1] * scale + py],
+                  p1: [x0, y0],
+                  p2: [(x0 + x1) * 0.5, (y0 + y1) * 0.5],
+                  p3: [x1, y1],
                 });
+                break;
               }
-              break;
+              // quadratic
+              case 1:
+                curves.push({
+                  p1: [seg.p0.x * scale + px, seg.p0.y * scale + py],
+                  p2: [seg.p1.x * scale + px, seg.p1.y * scale + py],
+                  p3: [seg.p2!.x * scale + px, seg.p2!.y * scale + py],
+                });
+                break;
+              // cubic to quadratic
+              case 2: {
+                const quads = cubicToQuadratics(
+                  [seg.p0.x, seg.p0.y],
+                  [seg.p1.x, seg.p1.y],
+                  [seg.p2!.x, seg.p2!.y],
+                  [seg.p3!.x, seg.p3!.y]
+                );
+                for (const q of quads) {
+                  curves.push({
+                    p1: [q.p1[0] * scale + px, q.p1[1] * scale + py],
+                    p2: [q.p2[0] * scale + px, q.p2[1] * scale + py],
+                    p3: [q.p3[0] * scale + px, q.p3[1] * scale + py],
+                  });
+                }
+                break;
+              }
             }
           }
+          curvesByGlyph.set(g.g, curves);
         }
 
         const bounds: [number, number, number, number] = [
@@ -195,7 +205,7 @@ function collectForSlug(
           },
         });
 
-        shapes.push({ curves, bounds });
+        shapes.push({ curves, bounds, key: g.g });
       }
     }
   }
