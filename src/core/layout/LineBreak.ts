@@ -200,6 +200,45 @@ const EJECT_PENALTY = -10000; // eject_penalty - force break here
 // Retry increment when no breakpoints found
 const EMERGENCY_STRETCH_INCREMENT = 0.1;
 
+// The public pattern format is a nested object trie keyed by single-char
+// strings; walking it does megamorphic string-keyed lookups across thousands
+// of object shapes. Convert each registered trie once (lazily, cached by
+// identity) to charCode-keyed Maps, and memoize raw per-word hyphenation
+// points: real text repeats words heavily and every re-layout repeats them all.
+interface FastTrieNode {
+  patterns: number[] | null;
+  children: Map<number, FastTrieNode> | null;
+}
+
+interface FastPatternCache {
+  root: FastTrieNode;
+  wordMemo: Map<string, number[]>;
+}
+
+const MAX_WORD_MEMO_ENTRIES = 20000;
+const fastPatternCaches = new WeakMap<HyphenationTrieNode, FastPatternCache>();
+
+function toFastTrie(node: HyphenationTrieNode): FastTrieNode {
+  let children: Map<number, FastTrieNode> | null = null;
+  if (node.children) {
+    for (const key in node.children) {
+      if (children === null) children = new Map();
+      // Pattern keys are single BMP chars
+      children.set(key.charCodeAt(0), toFastTrie(node.children[key]));
+    }
+  }
+  return { patterns: node.patterns ?? null, children };
+}
+
+function getFastPatternCache(trie: HyphenationTrieNode): FastPatternCache {
+  let cache = fastPatternCaches.get(trie);
+  if (!cache) {
+    cache = { root: toFastTrie(trie), wordMemo: new Map() };
+    fastPatternCaches.set(trie, cache);
+  }
+  return cache;
+}
+
 // Hoisted regexes (avoid per-call re-materialization in per-char/per-token loops)
 const WHITESPACE_RE = /\s/;
 const WS_TOKEN_RE = /^\s/;
@@ -331,37 +370,56 @@ export class LineBreak {
 
     if (!patternTrie) return [];
 
+    const cache = getFastPatternCache(patternTrie);
     const lowerWord = word.toLowerCase();
-    const paddedWord = `.${lowerWord}.`;
-    const points = new Array(paddedWord.length).fill(0);
 
-    for (let i = 0; i < paddedWord.length; i++) {
-      let node = patternTrie;
-      for (let j = i; j < paddedWord.length; j++) {
-        const char = paddedWord[j];
-        if (!node.children || !node.children[char]) break;
-        node = node.children[char];
-        if (node.patterns) {
-          for (let k = 0; k < node.patterns.length; k++) {
-            const pos = i + k;
-            if (pos < points.length) {
-              points[pos] = Math.max(points[pos], node.patterns[k]);
+    // Memoize the raw (unfiltered) points: lefthyphenmin/righthyphenmin can
+    // vary per call, so the filter is applied on the way out.
+    let hyphenPoints = cache.wordMemo.get(lowerWord);
+    if (hyphenPoints === undefined) {
+      const paddedWord = `.${lowerWord}.`;
+      const paddedLength = paddedWord.length;
+      const points = new Array(paddedLength).fill(0);
+      const root = cache.root;
+
+      for (let i = 0; i < paddedLength; i++) {
+        let node: FastTrieNode | undefined = root;
+        for (let j = i; j < paddedLength; j++) {
+          node = node.children?.get(paddedWord.charCodeAt(j));
+          if (node === undefined) break;
+          const patterns = node.patterns;
+          if (patterns) {
+            for (let k = 0; k < patterns.length; k++) {
+              const pos = i + k;
+              if (pos < paddedLength && patterns[k] > points[pos]) {
+                points[pos] = patterns[k];
+              }
             }
           }
         }
       }
+
+      hyphenPoints = [];
+      for (let i = 2; i < paddedLength - 2; i++) {
+        if (points[i] % 2 === 1) {
+          hyphenPoints.push(i - 1);
+        }
+      }
+
+      if (cache.wordMemo.size >= MAX_WORD_MEMO_ENTRIES) {
+        cache.wordMemo.clear();
+      }
+      cache.wordMemo.set(lowerWord, hyphenPoints);
     }
 
-    const hyphenPoints: number[] = [];
-    for (let i = 2; i < paddedWord.length - 2; i++) {
-      if (points[i] % 2 === 1) {
-        hyphenPoints.push(i - 1);
+    const result: number[] = [];
+    for (let i = 0; i < hyphenPoints.length; i++) {
+      const pos = hyphenPoints[i];
+      if (pos >= lefthyphenmin && word.length - pos >= righthyphenmin) {
+        result.push(pos);
       }
     }
-
-    return hyphenPoints.filter(
-      (pos) => pos >= lefthyphenmin && word.length - pos >= righthyphenmin
-    );
+    return result;
   }
 
   public static itemizeText(
