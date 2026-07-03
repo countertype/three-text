@@ -118,7 +118,10 @@ function buildThreeResult(
     measureTextWidth: (text: string, letterSpacing?: number) =>
       layoutHandle.measureTextWidth(text, letterSpacing),
     update,
-    dispose: () => layoutHandle.dispose()
+    dispose: () => {
+      geometry.dispose();
+      layoutHandle.dispose();
+    }
   };
 }
 
