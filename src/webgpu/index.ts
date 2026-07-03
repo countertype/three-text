@@ -38,10 +38,17 @@ export function createWebGPUBuffers(
   const indexFormat: GPUIndexFormat =
     indices instanceof Uint16Array ? 'uint16' : 'uint32';
 
-  // Interleave position and normal data for better cache coherency
+  // Interleave position and normal data for better cache coherency,
+  // writing directly into the mapped GPU buffer.
   // Layout: [px, py, pz, nx, ny, nz, px, py, pz, nx, ny, nz, ...]
-  const interleavedData = new Float32Array((vertices.length / 3) * 6);
-  for (let i = 0; i < vertices.length / 3; i++) {
+  const vertexCount = vertices.length / 3;
+  const vertexBuffer = device.createBuffer({
+    size: vertexCount * 6 * 4,
+    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true
+  });
+  const interleavedData = new Float32Array(vertexBuffer.getMappedRange());
+  for (let i = 0; i < vertexCount; i++) {
     const baseIndex = i * 6;
     const vertIndex = i * 3;
 
@@ -55,23 +62,25 @@ export function createWebGPUBuffers(
     interleavedData[baseIndex + 4] = normals[vertIndex + 1];
     interleavedData[baseIndex + 5] = normals[vertIndex + 2];
   }
-
-  // Create vertex buffer with interleaved data
-  const vertexBuffer = device.createBuffer({
-    size: interleavedData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    mappedAtCreation: true
-  });
-  new Float32Array(vertexBuffer.getMappedRange()).set(interleavedData);
   vertexBuffer.unmap();
 
-  // Create index buffer
+  // Create index buffer. mappedAtCreation requires a 4-byte-aligned size,
+  // and the mapped view must match the element type of `indices`.
   const indexBuffer = device.createBuffer({
-    size: indices.byteLength,
+    size: (indices.byteLength + 3) & ~3,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
     mappedAtCreation: true
   });
-  new Uint32Array(indexBuffer.getMappedRange()).set(indices);
+  const indexSource = indices as Uint32Array | Uint16Array;
+  if (indexSource instanceof Uint16Array) {
+    new Uint16Array(indexBuffer.getMappedRange(), 0, indexSource.length).set(
+      indexSource
+    );
+  } else {
+    new Uint32Array(indexBuffer.getMappedRange(), 0, indexSource.length).set(
+      indexSource
+    );
+  }
   indexBuffer.unmap();
 
   // Vertex buffer layout for interleaved data
