@@ -54,6 +54,12 @@ export class TextLayout {
     let lines: LineInfo[];
 
     if (width) {
+      // Line breaking re-measures the same strings constantly (spaces, hyphens,
+      // repeated words, and a second itemization pass when pretolerance fails),
+      // and every measurement is a full HarfBuzz shape round-trip. Memoize per
+      // computeLines call: font and letterSpacing are fixed for its duration.
+      const widthMemo = new Map<string, number>();
+
       // Line breaking uses a measureText function that already includes letterSpacing,
       // so widths passed into LineBreak.breakText account for tracking
       lines = LineBreak.breakText({
@@ -78,12 +84,18 @@ export class TextLayout {
         doublehyphendemerits,
         unitsPerEm: this.loadedFont.upem,
         letterSpacing,
-        measureText: (textToMeasure: string) =>
-          TextMeasurer.measureTextWidth(
-            this.loadedFont,
-            textToMeasure,
-            letterSpacing // Letter spacing included in width measurements
-          ),
+        measureText: (textToMeasure: string) => {
+          let measured = widthMemo.get(textToMeasure);
+          if (measured === undefined) {
+            measured = TextMeasurer.measureTextWidth(
+              this.loadedFont,
+              textToMeasure,
+              letterSpacing // Letter spacing included in width measurements
+            );
+            widthMemo.set(textToMeasure, measured);
+          }
+          return measured;
+        },
         measureTextWidths: (textToMeasure: string) =>
           TextMeasurer.measureTextWidths(
             this.loadedFont,

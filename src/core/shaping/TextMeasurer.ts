@@ -72,25 +72,27 @@ export class TextMeasurer {
     letterSpacing: number = 0
   ): number {
     const buffer = loadedFont.hb.createBuffer();
-    buffer.addText(text);
-    buffer.guessSegmentProperties();
+    try {
+      buffer.addText(text);
+      buffer.guessSegmentProperties();
 
-    const featuresString = convertFontFeaturesToString(loadedFont.fontFeatures);
-    loadedFont.hb.shape(loadedFont.font, buffer, featuresString);
+      const featuresString = convertFontFeaturesToString(
+        loadedFont.fontFeatures
+      );
+      loadedFont.hb.shape(loadedFont.font, buffer, featuresString);
 
-    const glyphInfos = buffer.json(loadedFont.font);
-    const letterSpacingInFontUnits = letterSpacing * loadedFont.upem;
+      const glyphInfos = buffer.json(loadedFont.font);
+      const letterSpacingInFontUnits = letterSpacing * loadedFont.upem;
 
-    let totalWidth = 0;
-    glyphInfos.forEach((glyph: any) => {
-      totalWidth += glyph.ax;
-
-      if (letterSpacingInFontUnits !== 0) {
-        totalWidth += letterSpacingInFontUnits;
+      let totalWidth = 0;
+      for (let i = 0; i < glyphInfos.length; i++) {
+        totalWidth += glyphInfos[i].ax;
       }
-    });
+      totalWidth += letterSpacingInFontUnits * glyphInfos.length;
 
-    buffer.destroy();
-    return totalWidth;
+      return totalWidth;
+    } finally {
+      buffer.destroy();
+    }
   }
 }
