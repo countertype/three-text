@@ -50,19 +50,20 @@ function convertToP5Geometry(
 
   const geom = new P5GeometryClass();
 
-  // Resolve the vector factory once, outside the vertex loops
-  const createVec: (x: number, y: number, z: number) => any =
-    typeof p5Instance.createVector === 'function'
-      ? (x, y, z) => p5Instance.createVector(x, y, z)
-      : (() => {
-          const globalCreateVector =
-            typeof window !== 'undefined' && (window as any).createVector;
-          if (!globalCreateVector) {
-            throw new Error('createVector not found');
-          }
-          return (x: number, y: number, z: number) =>
-            globalCreateVector(x, y, z);
-        })();
+  // Resolve the vector factory once, outside the vertex loops; a missing
+  // factory only matters if there are vertices to convert
+  let createVec: (x: number, y: number, z: number) => any;
+  if (typeof p5Instance.createVector === 'function') {
+    createVec = (x, y, z) => p5Instance.createVector(x, y, z);
+  } else {
+    const globalCreateVector =
+      typeof window !== 'undefined' && (window as any).createVector;
+    createVec = globalCreateVector
+      ? (x, y, z) => globalCreateVector(x, y, z)
+      : () => {
+          throw new Error('createVector not found');
+        };
+  }
 
   // p5 uses +Y up, we use +Y down
   for (let i = 0; i < vertices.length; i += 3) {

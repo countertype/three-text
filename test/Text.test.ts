@@ -144,66 +144,66 @@ vi.mock('../src/core/font/FontLoader', () => {
     // vitest 4 constructs the implementation, so it must not be an arrow fn
     vi.fn(function () {
       return {
-      loadFont: vi.fn().mockResolvedValue({
-        hb: {
-          createBuffer: vi.fn().mockReturnValue({
-            addText: vi.fn(),
-            guessSegmentProperties: vi.fn(),
-            setDirection: vi.fn(),
-            setScript: vi.fn(),
-            setLanguage: vi.fn(),
-            json: vi.fn().mockReturnValue([
-              // Mock glyphs for "three-text, the"
-              { g: 116, cl: 0, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-              { g: 104, cl: 1, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
-              { g: 114, cl: 2, ax: 400, ay: 0, dx: 0, dy: 0 }, // r
-              { g: 101, cl: 3, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-              { g: 101, cl: 4, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-              { g: 45, cl: 5, ax: 300, ay: 0, dx: 0, dy: 0 }, // -
-              { g: 116, cl: 6, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-              { g: 101, cl: 7, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
-              { g: 120, cl: 8, ax: 500, ay: 0, dx: 0, dy: 0 }, // x
-              { g: 116, cl: 9, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-              { g: 44, cl: 10, ax: 250, ay: 0, dx: -50, dy: 0 }, // , (with kerning!)
-              { g: 32, cl: 11, ax: 300, ay: 0, dx: 0, dy: 0 }, // space
-              { g: 116, cl: 12, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
-              { g: 104, cl: 13, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
-              { g: 101, cl: 14, ax: 500, ay: 0, dx: 0, dy: 0 } // e
-            ]),
-            destroy: vi.fn()
-          }),
-          shape: vi.fn()
-        },
-        fontBlob: {},
-        face: {},
-        font: {
-          setScale: vi.fn(),
-          setVariations: vi.fn()
-        },
-        module: {
-          addFunction: vi.fn().mockReturnValue(1),
-          removeFunction: vi.fn(),
-          exports: {}
-        },
-        upem: 1000,
-        metrics: {
-          isCFF: false,
-          unitsPerEm: 1000,
-          hheaAscender: 800,
-          hheaDescender: -200,
-          hheaLineGap: 0,
-          typoAscender: 800,
-          typoDescender: -200,
-          typoLineGap: 0,
-          winAscent: 800,
-          winDescent: 200,
-          axisNames: null
-        },
-        fontVariations: {},
-        isVariable: false,
-        variationAxes: {},
-        _buffer: new ArrayBuffer(100)
-      })
+        loadFont: vi.fn().mockResolvedValue({
+          hb: {
+            createBuffer: vi.fn().mockReturnValue({
+              addText: vi.fn(),
+              guessSegmentProperties: vi.fn(),
+              setDirection: vi.fn(),
+              setScript: vi.fn(),
+              setLanguage: vi.fn(),
+              json: vi.fn().mockReturnValue([
+                // Mock glyphs for "three-text, the"
+                { g: 116, cl: 0, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+                { g: 104, cl: 1, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
+                { g: 114, cl: 2, ax: 400, ay: 0, dx: 0, dy: 0 }, // r
+                { g: 101, cl: 3, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
+                { g: 101, cl: 4, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
+                { g: 45, cl: 5, ax: 300, ay: 0, dx: 0, dy: 0 }, // -
+                { g: 116, cl: 6, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+                { g: 101, cl: 7, ax: 500, ay: 0, dx: 0, dy: 0 }, // e
+                { g: 120, cl: 8, ax: 500, ay: 0, dx: 0, dy: 0 }, // x
+                { g: 116, cl: 9, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+                { g: 44, cl: 10, ax: 250, ay: 0, dx: -50, dy: 0 }, // , (with kerning!)
+                { g: 32, cl: 11, ax: 300, ay: 0, dx: 0, dy: 0 }, // space
+                { g: 116, cl: 12, ax: 500, ay: 0, dx: 0, dy: 0 }, // t
+                { g: 104, cl: 13, ax: 500, ay: 0, dx: 0, dy: 0 }, // h
+                { g: 101, cl: 14, ax: 500, ay: 0, dx: 0, dy: 0 } // e
+              ]),
+              destroy: vi.fn()
+            }),
+            shape: vi.fn()
+          },
+          fontBlob: {},
+          face: {},
+          font: {
+            setScale: vi.fn(),
+            setVariations: vi.fn()
+          },
+          module: {
+            addFunction: vi.fn().mockReturnValue(1),
+            removeFunction: vi.fn(),
+            exports: {}
+          },
+          upem: 1000,
+          metrics: {
+            isCFF: false,
+            unitsPerEm: 1000,
+            hheaAscender: 800,
+            hheaDescender: -200,
+            hheaLineGap: 0,
+            typoAscender: 800,
+            typoDescender: -200,
+            typoLineGap: 0,
+            winAscent: 800,
+            winDescent: 200,
+            axisNames: null
+          },
+          fontVariations: {},
+          isVariable: false,
+          variationAxes: {},
+          _buffer: new ArrayBuffer(100)
+        })
       };
     }),
     { destroyFont: vi.fn() }
@@ -229,68 +229,68 @@ vi.mock('../src/mesh/GlyphGeometryBuilder', () => {
   return {
     GlyphGeometryBuilder: vi.fn().mockImplementation(function () {
       return {
-      setFontId: vi.fn(),
-      setCurveFidelityConfig: vi.fn(),
-      setCurveSteps: vi.fn(),
-      setGeometryOptimization: vi.fn(),
-      getOptimizationStats: vi.fn().mockReturnValue({
-        pointsRemovedByVisvalingam: 5,
-        originalPointCount: 100
-      }),
-      buildInstancedGeometry: vi.fn(
-        (clustersByLine, depth, removeOverlaps, isCFF, scale) => {
-          // Generate mock glyph infos from clusters
-          const glyphInfos: any[] = [];
-          let vertexOffset = 0;
+        setFontId: vi.fn(),
+        setCurveFidelityConfig: vi.fn(),
+        setCurveSteps: vi.fn(),
+        setGeometryOptimization: vi.fn(),
+        getOptimizationStats: vi.fn().mockReturnValue({
+          pointsRemovedByVisvalingam: 5,
+          originalPointCount: 100
+        }),
+        buildInstancedGeometry: vi.fn(
+          (clustersByLine, depth, removeOverlaps, isCFF, scale) => {
+            // Generate mock glyph infos from clusters
+            const glyphInfos: any[] = [];
+            let vertexOffset = 0;
 
-          if (clustersByLine && clustersByLine.length > 0) {
-            clustersByLine.forEach((line: any[]) => {
-              line.forEach((cluster: any) => {
-                if (cluster.glyphs) {
-                  cluster.glyphs.forEach((glyph: any) => {
-                    glyphInfos.push({
-                      textIndex: glyph.absoluteTextIndex ?? 0,
-                      lineIndex: glyph.lineIndex ?? 0,
-                      vertexStart: vertexOffset,
-                      vertexCount: 20,
-                      bounds: {
-                        min: { x: vertexOffset * scale, y: 0, z: 0 },
-                        max: {
-                          x: (vertexOffset + 10) * scale,
-                          y: 10 * scale,
-                          z: 0
+            if (clustersByLine && clustersByLine.length > 0) {
+              clustersByLine.forEach((line: any[]) => {
+                line.forEach((cluster: any) => {
+                  if (cluster.glyphs) {
+                    cluster.glyphs.forEach((glyph: any) => {
+                      glyphInfos.push({
+                        textIndex: glyph.absoluteTextIndex ?? 0,
+                        lineIndex: glyph.lineIndex ?? 0,
+                        vertexStart: vertexOffset,
+                        vertexCount: 20,
+                        bounds: {
+                          min: { x: vertexOffset * scale, y: 0, z: 0 },
+                          max: {
+                            x: (vertexOffset + 10) * scale,
+                            y: 10 * scale,
+                            z: 0
+                          }
                         }
-                      }
+                      });
+                      vertexOffset += 20;
                     });
-                    vertexOffset += 20;
-                  });
-                }
+                  }
+                });
               });
-            });
-          }
-
-          return {
-            vertices: mockVertices,
-            normals: mockNormals,
-            indices: mockIndices,
-            glyphInfos,
-            planeBounds: {
-              min: { x: 0, y: 0, z: 0 },
-              max: { x: 1280 * scale, y: 800 * scale, z: 0 }
             }
-          };
-        }
-      ),
-      getCacheStats: vi.fn().mockReturnValue({
-        hits: 10,
-        misses: 5,
-        evictions: 0,
-        size: 8,
-        memoryUsage: 1024000,
-        hitRate: 66.7,
-        memoryUsageMB: 1.024
-      }),
-      clearCache: vi.fn()
+
+            return {
+              vertices: mockVertices,
+              normals: mockNormals,
+              indices: mockIndices,
+              glyphInfos,
+              planeBounds: {
+                min: { x: 0, y: 0, z: 0 },
+                max: { x: 1280 * scale, y: 800 * scale, z: 0 }
+              }
+            };
+          }
+        ),
+        getCacheStats: vi.fn().mockReturnValue({
+          hits: 10,
+          misses: 5,
+          evictions: 0,
+          size: 8,
+          memoryUsage: 1024000,
+          hitRate: 66.7,
+          memoryUsageMB: 1.024
+        }),
+        clearCache: vi.fn()
       };
     })
   };
@@ -300,38 +300,38 @@ vi.mock('../src/core/shaping/TextShaper', () => {
   return {
     TextShaper: vi.fn().mockImplementation(function (loadedFont) {
       return {
-      shapeLines: vi.fn((lineInfos) => {
-        // For each line, create clusters with glyphs from HarfBuzz
-        return lineInfos.map((lineInfo: any, lineIndex: number) => {
-          const buffer = loadedFont.hb.createBuffer();
-          buffer.addText(lineInfo.text);
-          loadedFont.hb.shape(loadedFont.font, buffer);
-          const hbGlyphs = buffer.json(loadedFont.font);
-          buffer.destroy();
+        shapeLines: vi.fn((lineInfos) => {
+          // For each line, create clusters with glyphs from HarfBuzz
+          return lineInfos.map((lineInfo: any, lineIndex: number) => {
+            const buffer = loadedFont.hb.createBuffer();
+            buffer.addText(lineInfo.text);
+            loadedFont.hb.shape(loadedFont.font, buffer);
+            const hbGlyphs = buffer.json(loadedFont.font);
+            buffer.destroy();
 
-          // Add necessary properties to glyphs
-          const glyphs = hbGlyphs.map((glyph: any) => ({
-            ...glyph,
-            absoluteTextIndex: lineInfo.originalStart + glyph.cl,
-            lineIndex,
-            x: 0,
-            y: 0
-          }));
+            // Add necessary properties to glyphs
+            const glyphs = hbGlyphs.map((glyph: any) => ({
+              ...glyph,
+              absoluteTextIndex: lineInfo.originalStart + glyph.cl,
+              lineIndex,
+              x: 0,
+              y: 0
+            }));
 
-          return [
-            {
-              text: lineInfo.text,
-              glyphs,
-              position: {
-                x: lineInfo.xOffset || 0,
-                y: -lineIndex * 1000,
-                z: 0
-              },
-              originalStart: lineInfo.originalStart
-            }
-          ];
-        });
-      })
+            return [
+              {
+                text: lineInfo.text,
+                glyphs,
+                position: {
+                  x: lineInfo.xOffset || 0,
+                  y: -lineIndex * 1000,
+                  z: 0
+                },
+                originalStart: lineInfo.originalStart
+              }
+            ];
+          });
+        })
       };
     })
   };
