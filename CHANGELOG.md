@@ -1,10 +1,20 @@
 # Changelog
 
+## [0.6.5] - 2026-07-03
+
+### Changed
+
+- Simplified mesh layout internals; text measurement memoization retained
+
+### Fixed
+
+- p5 geometry conversion handles empty text when `createVector` is unavailable
+
 ## [0.6.4] - 2026-07-03
 
 ### Added
 
-- Optional `key` on `SlugShape` — shapes sharing a key store curve/band texels once, so texture size scales with unique glyphs instead of glyph count
+- Optional `key` on `SlugShape`: shapes sharing a key store curve/band texels once, so texture size scales with unique glyphs instead of glyph count
 
 ### Changed
 

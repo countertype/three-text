@@ -258,7 +258,6 @@ export function packSlugData(
   const actualBandTexHeight = bandY + 1;
   const bandData = new Uint32Array(TEX_WIDTH * actualBandTexHeight * 4);
 
-  // Write pass
   for (let si = 0; si < packedShapes.length; si++) {
     const sd = shapeBandData[si];
     if (sd.hLists.length === 0 && sd.vLists.length === 0) {

@@ -346,18 +346,13 @@ export class Tessellator {
 
     tess.gluTessBeginPolygon();
 
-    // gluTessVertex copies the coords immediately; one scratch array
-    // serves every vertex
-    const coordScratch: [number, number] = [0, 0];
     for (const contour of contours) {
       tess.gluTessBeginContour();
 
       for (let i = 0; i < contour.length; i += 2) {
         const idx = vertices.length / 2;
         vertices.push(contour[i], contour[i + 1]);
-        coordScratch[0] = contour[i];
-        coordScratch[1] = contour[i + 1];
-        tess.gluTessVertex(coordScratch, idx);
+        tess.gluTessVertex([contour[i], contour[i + 1]], idx);
       }
 
       tess.gluTessEndContour();

@@ -84,11 +84,15 @@ export class TextMeasurer {
       const glyphInfos = buffer.json(loadedFont.font);
       const letterSpacingInFontUnits = letterSpacing * loadedFont.upem;
 
+      // Accumulation order matches the per-glyph advance sum used elsewhere,
+      // keeping measured widths bit-identical for the same input
       let totalWidth = 0;
       for (let i = 0; i < glyphInfos.length; i++) {
         totalWidth += glyphInfos[i].ax;
+        if (letterSpacingInFontUnits !== 0) {
+          totalWidth += letterSpacingInFontUnits;
+        }
       }
-      totalWidth += letterSpacingInFontUnits * glyphInfos.length;
 
       return totalWidth;
     } finally {

@@ -38,8 +38,8 @@ export function createWebGPUBuffers(
   const indexFormat: GPUIndexFormat =
     indices instanceof Uint16Array ? 'uint16' : 'uint32';
 
-  // Interleave position and normal data for better cache coherency,
-  // writing directly into the mapped GPU buffer.
+  // Interleave position and normal data for cache coherency,
+  // written directly into the mapped GPU buffer
   // Layout: [px, py, pz, nx, ny, nz, px, py, pz, nx, ny, nz, ...]
   const vertexCount = vertices.length / 3;
   const vertexBuffer = device.createBuffer({
@@ -64,8 +64,8 @@ export function createWebGPUBuffers(
   }
   vertexBuffer.unmap();
 
-  // Create index buffer. mappedAtCreation requires a 4-byte-aligned size,
-  // and the mapped view must match the element type of `indices`.
+  // mappedAtCreation requires a 4-byte-aligned size, and the mapped view
+  // must match the element type of the indices
   const indexBuffer = device.createBuffer({
     size: (indices.byteLength + 3) & ~3,
     usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
